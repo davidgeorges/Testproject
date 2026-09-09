@@ -49,7 +49,7 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
 
     public async Task<IReadOnlyList<BankTransaction>> FetchTransactions(BankConnection connection, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/transactions");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/data/v2/transactions?pageSize=100");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Unprotect(connection.ExternalConnectionId!));
         using var response = await http.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
@@ -59,15 +59,15 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
         foreach (var row in items.EnumerateArray())
         {
             var id = Text(row, "id") ?? Guid.NewGuid().ToString("N");
-            var dateText = Text(row, "date") ?? Text(row, "bookedDateTime") ?? DateTimeOffset.UtcNow.ToString("O");
+            var dateText = Text(row, "bookedDateTime") ?? Text(row, "dates", "booked") ?? Text(row, "date") ?? DateTimeOffset.UtcNow.ToString("O");
             _ = DateOnly.TryParse(dateText.Length >= 10 ? dateText[..10] : dateText, out var date);
             result.Add(new BankTransaction
             {
                 UserId = connection.UserId, ConnectionId = connection.Id, Provider = "tink", ExternalId = id,
                 AccountKey = Text(row, "accountId") ?? "tink", BookedAt = date == default ? DateOnly.FromDateTime(DateTime.UtcNow) : date,
-                Amount = Number(row, "amount"), Currency = Text(row, "currencyDenominatedAmount", "currencyCode") ?? Text(row, "currencyCode") ?? "EUR",
-                MerchantName = Text(row, "descriptions", "display") ?? Text(row, "descriptions", "original") ?? Text(row, "description") ?? "Transaction",
-                Category = Text(row, "categoryId") ?? "other",
+                Amount = Amount(row), Currency = Text(row, "amount", "currencyCode") ?? Text(row, "currencyDenominatedAmount", "currencyCode") ?? Text(row, "currencyCode") ?? "EUR",
+                MerchantName = Text(row, "merchantInformation", "merchantName") ?? Text(row, "descriptions", "display") ?? Text(row, "descriptions", "original") ?? Text(row, "description") ?? "Transaction",
+                Category = Text(row, "enrichedData", "categories", "pfm", "id") ?? Text(row, "categoryId") ?? "other",
             });
         }
         return result;
@@ -89,7 +89,19 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
     }
     private static string? Text(JsonElement value, string property) => value.TryGetProperty(property, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
     private static string? Text(JsonElement value, string parent, string property) => value.TryGetProperty(parent, out var p) ? Text(p, property) : null;
+    private static string? Text(JsonElement value, string a, string b, string c, string d) => value.TryGetProperty(a, out var p) && p.TryGetProperty(b, out p) && p.TryGetProperty(c, out p) ? Text(p, d) : null;
     private static decimal Number(JsonElement value, string property) => value.TryGetProperty(property, out var p) && p.TryGetDecimal(out var number) ? number : 0m;
+    private static decimal Amount(JsonElement row)
+    {
+        if (!row.TryGetProperty("amount", out var amount)) return 0m;
+        if (amount.TryGetDecimal(out var legacy)) return legacy;
+        if (!amount.TryGetProperty("value", out var value)) return 0m;
+        var unscaledText = Text(value, "unscaledValue");
+        var scaleText = Text(value, "scale");
+        if (!decimal.TryParse(unscaledText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var unscaled)) return 0m;
+        if (!int.TryParse(scaleText, out var scale)) scale = 0;
+        return unscaled / (decimal)Math.Pow(10, scale);
+    }
 }
 
 public sealed class TinkBankingException(string code, string userMessage) : Exception(code)
