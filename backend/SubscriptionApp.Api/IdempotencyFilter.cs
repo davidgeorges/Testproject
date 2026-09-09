@@ -16,7 +16,7 @@ public sealed class IdempotencyFilter(IIdempotencyStore store, TimeProvider time
 
         var rawCacheKey = $"{http.User.FindFirstValue(ClaimTypes.NameIdentifier)}:{http.Request.Method}:{http.Request.Path}:{key}";
         var cacheKey = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(rawCacheKey)));
-        var requestBody = context.Arguments.FirstOrDefault(a => a is CreateConnectionRequest or PurchaseVerificationRequest);
+        var requestBody = context.Arguments.FirstOrDefault(a => a is CreateConnectionRequest or TinkCallbackRequest or PurchaseVerificationRequest);
         var fingerprint = Convert.ToHexString(SHA256.HashData(requestBody is null ? [] : JsonSerializer.SerializeToUtf8Bytes(requestBody, requestBody.GetType())));
         var expiresAt = time.GetUtcNow().AddHours(24);
 

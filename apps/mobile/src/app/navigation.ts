@@ -14,6 +14,7 @@ export type RootStackParams = {
   Onboarding: { step?: number } | undefined;
   Main: NavigatorScreenParams<TabsParams> | undefined;
   Bank: undefined;
+  BankCallback: undefined;
   Sync: { connectionId?: string } | undefined;
   Subscription: { id: string };
   Recommendation: { id: string };

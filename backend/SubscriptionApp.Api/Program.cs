@@ -157,10 +157,25 @@ else if (!string.IsNullOrWhiteSpace(firebaseServiceAccount) && !string.IsNullOrW
         sp.GetRequiredService<IHttpClientFactory>().CreateClient("firebase-identity"), firebaseServiceAccount, firebaseMessagingProject));
 }
 else builder.Services.AddSingleton<IIdentityLifecycle, UnavailableIdentityLifecycle>();
-if (demo)
-    builder.Services.AddSingleton<IBankingProvider, SandboxBankingProvider>();
-else
-    builder.Services.AddSingleton<IBankingProvider, UnavailableBankingProvider>();
+var tinkClientId = builder.Configuration["Tink:ClientId"];
+var tinkClientSecret = builder.Configuration["Tink:ClientSecret"];
+var tinkRedirectUri = builder.Configuration["Tink:RedirectUri"];
+var tinkLinkUrl = builder.Configuration["Tink:LinkUrl"] ??
+    (!string.IsNullOrWhiteSpace(tinkClientId) && !string.IsNullOrWhiteSpace(tinkRedirectUri)
+        ? $"https://link.tink.com/1.0/transactions/connect-accounts/?client_id={Uri.EscapeDataString(tinkClientId)}&redirect_uri={Uri.EscapeDataString(tinkRedirectUri)}&market=FR&locale=fr_FR"
+        : null);
+if (!string.IsNullOrWhiteSpace(tinkClientId) && !string.IsNullOrWhiteSpace(tinkClientSecret) && !string.IsNullOrWhiteSpace(tinkLinkUrl))
+{
+    builder.Services.AddHttpClient<TinkBankingProvider>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.tink.com");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+    builder.Services.AddSingleton(new TinkLinkOptions(tinkLinkUrl));
+    builder.Services.AddSingleton<IBankingProvider>(sp => sp.GetRequiredService<TinkBankingProvider>());
+}
+else if (demo) builder.Services.AddSingleton<IBankingProvider, SandboxBankingProvider>();
+else builder.Services.AddSingleton<IBankingProvider, UnavailableBankingProvider>();
 if (demo)
 {
     var premiumVerificationSecret = builder.Configuration["Premium:VerificationSecret"];
@@ -427,6 +442,26 @@ api.MapGet(
         ? Results.Ok(provider.SupportedBanks.OrderBy(name => name).Select(name => new { name }))
         : Results.Json(new { code = "BANKING_NOT_CONFIGURED", message = "Le fournisseur bancaire doit être configuré." }, statusCode: 503)
 );
+api.MapGet(
+    "/bank/tink/link",
+    (IBankingProvider provider) => provider is TinkBankingProvider tink
+        ? Results.Ok(new { url = tink.LinkUrl })
+        : Results.Json(new { code = "TINK_NOT_CONFIGURED", message = "Tink doit être configuré." }, statusCode: 503)
+);
+api.MapPost(
+    "/bank/tink/callback",
+    async (TinkCallbackRequest request, HttpContext c, IWorkspaceStore store, IBankingProvider provider, BankSyncProcessor sync, CancellationToken ct) =>
+    {
+        if (provider is not TinkBankingProvider tink)
+            return Unavailable(c, "TINK_NOT_CONFIGURED", "Tink doit être configuré.");
+        if (string.IsNullOrWhiteSpace(request.Code))
+            return Results.BadRequest(new { code = "TINK_CODE_MISSING", message = "Le code Tink est absent.", correlationId = c.TraceIdentifier });
+        var bank = await tink.CompleteConnection(User(c), request.Code, request.CredentialsId, ct);
+        await store.AddConnection(bank, ct);
+        await sync.Synchronize(bank, ct);
+        return Results.Created($"/api/v1/bank/connections/{bank.Id}", SafeBank(bank));
+    }
+).AddEndpointFilter<IdempotencyFilter>();
 api.MapGet(
     "/bank/accounts",
     async (HttpContext c, IWorkspaceStore s, CancellationToken ct) =>
@@ -1055,6 +1090,8 @@ api.MapGet(
 app.Run();
 
 public sealed record CreateConnectionRequest(string BankName, bool ConsentGranted);
+public sealed record TinkCallbackRequest(string Code, string? CredentialsId);
+public sealed record TinkLinkOptions(string Url);
 
 public sealed record ProfileRequest(string FirstName, string Theme, bool NotificationsEnabled);
 

@@ -40,6 +40,7 @@ import {
   Onboarding,
   BankScreen,
   SyncScreen,
+  TinkCallbackScreen,
 } from '../design/EntryScreens';
 import {
   ProfileScreen,
@@ -177,6 +178,7 @@ function Navigator({ onChange }: { onChange: () => void }) {
   return (
     <NavigationContainer
       ref={navigation}
+      linking={{ prefixes: ['http://localhost:8081'], config: { screens: { BankCallback: 'banking/callback' } } }}
       onStateChange={onChange}
       theme={{
         ...base,
@@ -229,6 +231,7 @@ function Navigator({ onChange }: { onChange: () => void }) {
         />
         <Stack.Screen name="Onboarding" component={Onboarding} options={{ headerShown: false }} />
         <Stack.Screen name="Bank" component={BankScreen} />
+        <Stack.Screen name="BankCallback" component={TinkCallbackScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Sync" component={SyncScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Subscription" component={SubscriptionDetail} />
         <Stack.Screen

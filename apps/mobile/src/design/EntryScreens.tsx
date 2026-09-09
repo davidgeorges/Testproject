@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Pressable, Modal, ScrollView, ActivityIndicator, Linking, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRoute, type RouteProp } from '@react-navigation/native';
@@ -398,12 +398,13 @@ export function BankScreen() {
         const session = await api.session();
         useSession.getState().setToken(session.token);
       }
-      return api.connect('Banque démo', key.current);
+      const { url } = await api.tinkLink();
+      await Linking.openURL(url);
+      return null;
     },
-    onSuccess: (bank) => {
+    onSuccess: () => {
       setSelected(null);
       useSession.getState().setPreview(false);
-      nav.navigate('Sync', { connectionId: bank.id });
     },
   });
   const remove = useMutation({
@@ -515,8 +516,7 @@ export function BankScreen() {
           <Card style={{ width: '100%', maxWidth: 350, gap: 17, padding: 22 }}>
             <Label style={{ fontSize: 21, fontWeight: '700' }}>{selected}</Label>
             <Label muted>
-              Connexion de démonstration. Les noms de banques reproduisent la maquette ; seule une
-              banque fictive sera connectée.
+              Vous allez être redirigé vers Tink pour vous authentifier directement auprès de votre banque.
             </Label>
             <Pressable
               accessibilityRole="checkbox"
@@ -526,7 +526,7 @@ export function BankScreen() {
             >
               <Ionicons name={consent ? 'checkbox' : 'square-outline'} size={25} color="#168CFF" />
               <Label style={{ flex: 1, fontSize: 12 }}>
-                J’autorise l’analyse des transactions fictives.
+                J’autorise l’import et l’analyse de mes transactions bancaires.
               </Label>
             </Pressable>
             {connect.error && (
@@ -544,6 +544,24 @@ export function BankScreen() {
       </Modal>
     </Page>
   );
+}
+export function TinkCallbackScreen() {
+  const nav = useNav();
+  const cache = useQueryClient();
+  const [error, setError] = useState<Error | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (!code) { setError(new Error(params.get('message') ?? 'Tink n’a retourné aucun code.')); return; }
+    api.completeTink(code, params.get('credentials_id'), idempotencyKey())
+      .then((bank) => { cache.invalidateQueries(); nav.replace('Sync', { connectionId: bank.id }); })
+      .catch((reason) => setError(reason instanceof Error ? reason : new Error('Connexion Tink impossible.')));
+  }, []);
+  return <Page fill style={{ justifyContent: 'center', gap: 18 }}>
+    {error ? <><State error={error} /><Button title="Retour aux banques" onPress={() => nav.replace('Bank')} /></> :
+      <><ActivityIndicator color="#168CFF" size="large" /><Label style={{ textAlign: 'center' }}>Connexion bancaire en cours…</Label></>}
+  </Page>;
 }
 export function SyncScreen() {
   const route = useRoute<RouteProp<RootStackParams, 'Sync'>>();

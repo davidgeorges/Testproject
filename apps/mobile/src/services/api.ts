@@ -69,6 +69,13 @@ export const api = {
   recommendation: (id: string) =>
     request<Recommendation>(`/recommendations/${encodeURIComponent(id)}`),
   connections: () => request<Connection[]>('/bank/connections'),
+  tinkLink: () => request<{ url: string }>('/bank/tink/link'),
+  completeTink: (code: string, credentialsId: string | null, key: string) =>
+    request<Connection>('/bank/tink/callback', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': key },
+      body: JSON.stringify({ code, credentialsId }),
+    }),
   connect: (bankName: string, key: string) =>
     request<Connection>('/bank/connections', {
       method: 'POST',
