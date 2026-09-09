@@ -169,7 +169,7 @@ export function DashboardScreen() {
       </View>
       {!d ? (
         <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
-      ) : !d.hasConnectedBank ? (
+      ) : !d.hasConnectedBank && !d.lastSyncAt ? (
         <State
           title="Connectez votre première banque"
           description="Retrouvez vos abonnements et vos économies possibles."
