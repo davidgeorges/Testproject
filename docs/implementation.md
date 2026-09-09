@@ -18,12 +18,12 @@ Le document `SmartSave_Cahier_des_charges_V1_v2.docx` sert de référence foncti
 | Recommandations | Calcul, sélection du meilleur gain par paiement, frais inclus, hypothèses explicites |
 | Offres et affiliation | Catalogue derrière interface ; clic traçable et conversions reçues par webhook HMAC dédupliqué |
 | Profil et suppression | Prénom, thème, suppression des données et suppression préalable de l’identité Firebase |
-| Premium | Tarifs illustratifs de la maquette ; aucun achat ni droit Premium actif |
+| Premium | Achat mensuel/annuel et restauration via le SDK RevenueCat sur les builds natifs ; statut serveur affiché dans l’application |
 | PostgreSQL | Comptes, transactions, analyses, offres, préférences, consentements, notifications, appareils push, Premium et audit persistés |
 | Redis | Cache partagé du catalogue pendant 5 minutes, invalidation sur écriture et repli PostgreSQL |
 | Notifications | Succès, opportunité et échec de synchronisation, historique in-app, lecture, registre iOS/Android et isolation utilisateur |
 | Catalogue / back-office API | Offres administrables ; clé dédiée en démo, claim Firebase `admin` en production |
-| Premium backend | Vérification signée de démonstration, anti-rejeu, statut persistant et webhooks renouvellement/annulation/expiration dédupliqués |
+| Premium backend | Vérification de l’entitlement via l’API RevenueCat, anti-rejeu, statut persistant et webhook autorisé pour renouvellement/annulation/expiration |
 | IA explicative | Adaptateur Responses API optionnel, entrée limitée aux faits, `store: false`, validation et repli déterministe |
 | Push FCM | Registre, worker, tentatives et FCM HTTP v1 avec OAuth de compte de service |
 | Rétention | Purge quotidienne : idempotence expirée, jobs à 90 jours, notifications et audit à 2 ans |
@@ -51,7 +51,7 @@ Les créations de connexion, synchronisations, clics et validations Premium exig
 2. Choisir le prestataire Open Banking et implémenter ses redirections, webhooks signés, révocation distante et erreurs de synchronisation partielles derrière `IBankingProvider`.
 3. Brancher les événements ou webhooks du fournisseur bancaire réel sur la file durable de synchronisation.
 4. Connecter le catalogue partenaire réel et ses contrats commerciaux au catalogue administrable.
-5. Brancher App Store/Play Store ou RevenueCat sur les interfaces de vérification d’achat et d’événements ; les signatures HMAC actuelles sont réservées aux tests locaux.
+5. Créer les produits App Store/Play Store et leur offering RevenueCat, renseigner les clés de déploiement, puis valider les achats sandbox sur iOS et Android.
 6. Configurer le gestionnaire de secrets, le collecteur OTLP, l’alerting, les sauvegardes/restauration et les recettes de sécurité dans les environnements externes.
 
 ## Références techniques

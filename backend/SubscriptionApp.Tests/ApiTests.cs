@@ -27,6 +27,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                         {
                             ["Demo:Enabled"] = "true",
                             ["ConnectionStrings:Postgres"] = null,
+                            ["RevenueCat:WebhookAuthorization"] = "Bearer webhook-test-secret",
                         }
                     )
             );
@@ -618,6 +619,38 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         }
         Assert.False((await Send()).TryGetProperty("duplicate", out _));
         Assert.True((await Send()).GetProperty("duplicate").GetBoolean());
+    }
+
+    [Fact]
+    public async Task RevenueCatWebhookRequiresConfiguredAuthorization()
+    {
+        using var c = factory.CreateClient();
+        var body = new
+        {
+            @event = new
+            {
+                id = $"event-{Guid.NewGuid():N}",
+                type = "TEST",
+                app_user_id = "firebase-user",
+                product_id = "premium_monthly",
+                transaction_id = "transaction-id",
+                original_transaction_id = "original-transaction-id",
+                event_timestamp_ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            },
+        };
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await c.PostAsJsonAsync("/api/v1/webhooks/revenuecat", body)).StatusCode
+        );
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/webhooks/revenuecat")
+        {
+            Content = JsonContent.Create(body),
+        };
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer webhook-test-secret");
+        var response = await c.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        Assert.True((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("ignored").GetBoolean());
     }
 
     [Fact]

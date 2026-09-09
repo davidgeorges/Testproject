@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -209,7 +210,22 @@ if (demo)
 }
 else
 {
-    builder.Services.AddSingleton<IPremiumPurchaseVerifier, UnavailablePremiumPurchaseVerifier>();
+    var revenueCatSecret = builder.Configuration["RevenueCat:SecretApiKey"];
+    var revenueCatEntitlement = builder.Configuration["RevenueCat:EntitlementId"] ?? "premium";
+    if (!string.IsNullOrWhiteSpace(revenueCatSecret))
+    {
+        builder.Services.AddHttpClient("RevenueCat", client =>
+        {
+            client.BaseAddress = new Uri("https://api.revenuecat.com");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        builder.Services.AddSingleton<IPremiumPurchaseVerifier>(sp => new RevenueCatPurchaseVerifier(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("RevenueCat"),
+            revenueCatSecret,
+            revenueCatEntitlement
+        ));
+    }
+    else builder.Services.AddSingleton<IPremiumPurchaseVerifier, UnavailablePremiumPurchaseVerifier>();
     builder.Services.AddSingleton<IPremiumEventVerifier, UnavailablePremiumEventVerifier>();
 }
 builder.Services.AddScoped<AnalysisService>();
@@ -359,6 +375,37 @@ app.MapPost("/api/v1/webhooks/premium", async (PremiumWebhookRequest request, Ht
         EventType = verified.EventType,
         OccurredAt = verified.OccurredAt,
     }, verified.RenewsAt, ct);
+    return Results.Ok(new { accepted = true, duplicateOrStale = !applied });
+});
+app.MapPost("/api/v1/webhooks/revenuecat", async (RevenueCatWebhookRequest request, HttpContext c, IConfiguration configuration, IWorkspaceStore store, CancellationToken ct) =>
+{
+    var expected = configuration["RevenueCat:WebhookAuthorization"];
+    var supplied = c.Request.Headers.Authorization.ToString();
+    if (string.IsNullOrWhiteSpace(expected)
+        || supplied.Length != expected.Length
+        || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes(expected)))
+        return Results.Unauthorized();
+    var source = request.Event;
+    var eventType = source.Type.ToUpperInvariant() switch
+    {
+        "INITIAL_PURCHASE" or "RENEWAL" or "UNCANCELLATION" or "PRODUCT_CHANGE" => "renewed",
+        "CANCELLATION" => "cancelled",
+        "EXPIRATION" => "expired",
+        _ => null,
+    };
+    if (eventType is null) return Results.Ok(new { accepted = true, ignored = true });
+    var occurredAt = DateTimeOffset.FromUnixTimeMilliseconds(source.EventTimestampMs);
+    var renewsAt = source.ExpirationAtMs is { } expiry
+        ? DateTimeOffset.FromUnixTimeMilliseconds(expiry)
+        : (DateTimeOffset?)null;
+    var applied = await store.ApplyPremiumEvent(new PremiumWebhookEvent
+    {
+        Provider = "revenuecat",
+        ExternalEventId = source.Id,
+        ExternalSubscriptionId = source.OriginalTransactionId ?? source.TransactionId ?? "",
+        EventType = eventType,
+        OccurredAt = occurredAt,
+    }, renewsAt, ct);
     return Results.Ok(new { accepted = true, duplicateOrStale = !applied });
 });
 var api = app.MapGroup("/api/v1").RequireAuthorization();
@@ -1084,7 +1131,7 @@ api.MapPost(
             CancellationToken ct
         ) =>
         {
-            if (!demo)
+            if (!verifier.IsConfigured)
                 return Unavailable(
                     c,
                     "PURCHASE_PROVIDER_NOT_CONFIGURED",
@@ -1116,6 +1163,23 @@ api.MapPost(
                 RenewsAt = verified.RenewsAt,
             };
             if (!await store.SavePremium(subscription, ct))
+            {
+                var current = await store.Premium(User(c), ct);
+                if (verified.Provider == "revenuecat"
+                    && current?.Provider == verified.Provider
+                    && current.ExternalSubscriptionId == verified.TransactionId
+                    && current.RenewsAt > DateTimeOffset.UtcNow)
+                    return Results.Ok(
+                        new
+                        {
+                            status = current.Status,
+                            isPremium = true,
+                            current.Plan,
+                            current.RenewsAt,
+                            current.Provider,
+                            isDemo = demo,
+                        }
+                    );
                 return Results.Conflict(
                     new
                     {
@@ -1124,6 +1188,7 @@ api.MapPost(
                         correlationId = c.TraceIdentifier,
                     }
                 );
+            }
             await Audit(store, c, "premium.activated", "premium_subscription", subscription.Id.ToString(), ct);
             metrics.PremiumActivated();
             return Results.Ok(
@@ -1196,6 +1261,17 @@ public sealed record PremiumWebhookRequest(
     DateTimeOffset OccurredAt,
     DateTimeOffset? RenewsAt,
     string SignedPayload
+);
+public sealed record RevenueCatWebhookRequest(RevenueCatWebhookEvent Event);
+public sealed record RevenueCatWebhookEvent(
+    string Id,
+    string Type,
+    [property: JsonPropertyName("app_user_id")] string AppUserId,
+    [property: JsonPropertyName("product_id")] string? ProductId,
+    [property: JsonPropertyName("transaction_id")] string? TransactionId,
+    [property: JsonPropertyName("original_transaction_id")] string? OriginalTransactionId,
+    [property: JsonPropertyName("event_timestamp_ms")] long EventTimestampMs,
+    [property: JsonPropertyName("expiration_at_ms")] long? ExpirationAtMs
 );
 public sealed record PushDeviceRequest(string Platform, string Token);
 public sealed record AffiliateConversionRequest(string Provider, string ConversionId, Guid EventId, decimal Amount, string Currency);

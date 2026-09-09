@@ -34,6 +34,21 @@ npm start
 
 Le code cible Expo SDK 55 / React Native 0.83.10. Un émulateur Android utilise par défaut `http://10.0.2.2:5080`. Pour un téléphone physique, renseigner `EXPO_PUBLIC_API_URL` dans `apps/mobile/.env` avec une API joignable sur le réseau de développement et adapter les hôtes autorisés côté serveur. Ne pas exposer cette API de démonstration publiquement. Les builds natives et la validation sur appareils restent à effectuer.
 
+### Premium avec RevenueCat
+
+Le client mobile utilise `react-native-purchases`. Dans RevenueCat, créer l’entitlement `premium`, deux produits mensuel et annuel, puis une offering courante qui contient les packages `$rc_monthly` et `$rc_annual`. Copier les clés SDK publiques Apple et Google dans `apps/mobile/.env` à partir de `.env.example`. Les achats réels nécessitent un development build Expo ou une application signée ; Expo Go et le navigateur ne peuvent pas ouvrir les feuilles d’achat App Store/Play Store.
+
+Sur le backend Render, désactiver le mode démo et définir les variables suivantes :
+
+```text
+Demo__Enabled=false
+RevenueCat__SecretApiKey=<clé secrète RevenueCat v1>
+RevenueCat__EntitlementId=premium
+RevenueCat__WebhookAuthorization=Bearer <secret aléatoire long>
+```
+
+Dans RevenueCat, créer un webhook vers `https://testproject-s3qv.onrender.com/api/v1/webhooks/revenuecat` et lui donner exactement la même valeur dans le champ Authorization. Le backend vérifie l’entitlement directement auprès de RevenueCat après achat ou restauration, puis traite les renouvellements, annulations et expirations envoyés par le webhook. La clé secrète RevenueCat ne doit jamais être ajoutée au fichier `.env` du mobile.
+
 ## PostgreSQL facultatif
 
 Docker Desktop doit être démarré. La configuration Compose est destinée au développement local et n’écoute que sur loopback.
@@ -72,6 +87,6 @@ Pour inclure le test PostgreSQL, définir `TEST_POSTGRES` vers une **base dédi�
 
 ## État de la V1
 
-Ce dépôt constitue un parcours fonctionnel avancé, pas encore une V1 publiée. L’API accepte le mode production uniquement avec un identifiant de projet Firebase et valide alors les JWT Firebase ; la route de session fictive disparaît. Les connecteurs Open Banking et achats restent fermés hors démo tant que leurs fournisseurs réels ne sont pas configurés. Le catalogue administrable, les conversions d’affiliation signées, la file durable de synchronisation, les traitements de consentement, les notifications in-app et FCM, l’idempotence PostgreSQL, le cycle Premium côté serveur (achat, renouvellement, annulation, expiration), l’export et la rétention RGPD, l’explication IA contrôlée, les métriques produit et l’audit sont présents. Les adaptateurs stores réels, l’export des métriques et la configuration des environnements de déploiement restent à connecter.
+Ce dépôt constitue un parcours fonctionnel avancé, pas encore une V1 publiée. L’API accepte le mode production uniquement avec un identifiant de projet Firebase et valide alors les JWT Firebase ; la route de session fictive disparaît. Tink et RevenueCat disposent de connecteurs réels activés par configuration. Le catalogue administrable, les conversions d’affiliation signées, la file durable de synchronisation, les traitements de consentement, les notifications in-app et FCM, l’idempotence PostgreSQL, le cycle Premium côté serveur (achat, restauration, renouvellement, annulation, expiration), l’export et la rétention RGPD, l’explication IA contrôlée, les métriques produit et l’audit sont présents. L’enregistrement des produits dans App Store Connect/Google Play Console, la configuration RevenueCat, l’export des métriques et la validation sur appareils restent à effectuer.
 
 Le suivi détaillé des exigences et les décisions sont dans [docs/implementation.md](docs/implementation.md).

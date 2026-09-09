@@ -8,6 +8,7 @@ import type {
   Notification,
   Payment,
   Profile,
+  PremiumStatus,
   Recommendation,
 } from '../types/api';
 export const API_URL =
@@ -106,5 +107,12 @@ export const api = {
   notifications: () => request<Notification[]>('/notifications'),
   readNotification: (id: string) =>
     request(`/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
+  premiumStatus: () => request<PremiumStatus>('/premium/status'),
+  verifyRevenueCat: (productId: string, transactionId: string, key: string) =>
+    request<PremiumStatus>('/premium/verify-purchase', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': key },
+      body: JSON.stringify({ provider: 'revenuecat', productId, transactionId, signedPayload: '' }),
+    }),
   deleteAccount: () => request('/account', { method: 'DELETE' }),
 };

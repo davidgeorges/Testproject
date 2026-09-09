@@ -92,3 +92,11 @@ export interface Notification {
   readAt: string | null;
   createdAt: string;
 }
+export interface PremiumStatus {
+  status: 'active' | 'cancelled' | 'inactive' | string;
+  isPremium: boolean;
+  plan: 'monthly' | 'annual' | null;
+  renewsAt: string | null;
+  provider: string | null;
+  isDemo: boolean;
+}

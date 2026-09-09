@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, Switch, Share, Modal } from 'react-native';
+import { View, Pressable, Switch, Share, Modal, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +18,8 @@ import {
 import { useNav } from './MainScreens';
 import { useProfile } from './reference';
 import { useSession, useLiveToken } from '../store/session';
-import { api } from '../services/api';
+import { api, idempotencyKey } from '../services/api';
+import { purchasePremium, restorePremium } from '../services/revenuecat';
 import { signOutFirebase } from '../services/firebase';
 import type { RootStackParams } from '../app/navigation';
 function Row({
@@ -327,8 +328,34 @@ export function SettingsScreen() {
 }
 export function PremiumScreen() {
   const c = useColors();
-  const [plan, setPlan] = useState('monthly');
+  const token = useLiveToken();
+  const profile = useProfile();
+  const cache = useQueryClient();
+  const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
   const [message, setMessage] = useState('');
+  const status = useQuery({
+    queryKey: ['premium-status', token],
+    queryFn: api.premiumStatus,
+    enabled: !!token,
+  });
+  const activate = useMutation({
+    mutationFn: async ({ restore = false }: { restore?: boolean }) => {
+      if (!profile.data || !token) throw new Error('Connectez-vous avant d’activer Premium.');
+      const purchase = restore
+        ? await restorePremium(profile.data.id)
+        : await purchasePremium(profile.data.id, plan);
+      return api.verifyRevenueCat(
+        purchase.productId,
+        purchase.transactionId,
+        idempotencyKey(),
+      );
+    },
+    onSuccess: (premium) => {
+      cache.setQueryData(['premium-status', token], premium);
+      setMessage('Premium est maintenant actif sur votre compte.');
+    },
+  });
+  const premium = status.data?.isPremium === true;
   return (
     <LinearGradient
       colors={
@@ -374,7 +401,7 @@ export function PremiumScreen() {
               key={id}
               accessibilityRole="radio"
               accessibilityState={{ checked: plan === id }}
-              onPress={() => setPlan(id!)}
+              onPress={() => setPlan(id as 'monthly' | 'annual')}
               style={{ flex: 1 }}
             >
               <LinearGradient
@@ -425,14 +452,44 @@ export function PremiumScreen() {
             </Pressable>
           ))}
         </View>
-        <Button
-          title="Commencer maintenant"
-          onPress={() =>
-            setMessage(
-              'Tarifs illustratifs de la maquette. Les achats via les stores ne sont pas encore activés ; aucun paiement ne sera effectué.',
-            )
-          }
-        />
+        {premium ? (
+          <Card style={{ alignItems: 'center', padding: 18 }}>
+            <Badge text="Premium actif" />
+            <Label style={{ fontSize: 17, fontWeight: '700' }}>
+              Offre {status.data?.plan === 'annual' ? 'annuelle' : 'mensuelle'}
+            </Label>
+            {status.data?.renewsAt && (
+              <Label muted>Prochaine échéance : {new Date(status.data.renewsAt).toLocaleDateString('fr-FR')}</Label>
+            )}
+          </Card>
+        ) : (
+          <Button
+            title={Platform.OS === 'web' ? 'Configurer RevenueCat pour acheter' : 'Commencer maintenant'}
+            loading={activate.isPending}
+            onPress={() => {
+              setMessage('');
+              activate.mutate({});
+            }}
+          />
+        )}
+        {!premium && (
+          <Pressable
+            accessibilityRole="button"
+            disabled={activate.isPending}
+            onPress={() => {
+              setMessage('');
+              activate.mutate({ restore: true });
+            }}
+            style={{ alignItems: 'center', padding: 10 }}
+          >
+            <Label style={{ color: '#168CFF', fontWeight: '600' }}>Restaurer mes achats</Label>
+          </Pressable>
+        )}
+        {activate.error && (
+          <Card>
+            <Label style={{ color: '#FF7485', fontSize: 12 }}>{activate.error.message}</Label>
+          </Card>
+        )}
         {message && (
           <Card>
             <Label muted style={{ fontSize: 12 }}>
