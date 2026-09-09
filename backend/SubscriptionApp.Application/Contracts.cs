@@ -7,6 +7,7 @@ public interface IWorkspaceStore
     Task<UserProfile> Profile(string userId, CancellationToken ct);
     Task SaveProfile(UserProfile profile, CancellationToken ct);
     Task<IReadOnlyList<BankConnection>> Connections(string userId, CancellationToken ct);
+    Task<BankConnection?> ConnectionByProviderReference(string provider, string externalId, CancellationToken ct);
     Task<IReadOnlyList<BankConnection>> ExpiringConnections(
         DateTimeOffset from,
         DateTimeOffset until,

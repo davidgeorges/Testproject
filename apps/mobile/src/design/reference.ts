@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
-import { useSession, useLiveToken } from '../store/session';
+import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import type { Payment, Recommendation, Dashboard } from '../types/api';
 
 // Visual fixtures from the supplied mockup, never commercial quotes or live bank data.
@@ -143,21 +143,41 @@ export function useOverview() {
   const token = useLiveToken();
   return useQuery({
     queryKey: ['dashboard', token],
-    queryFn: token ? api.dashboard : async () => referenceDashboard,
+    queryFn: token
+      ? api.dashboard
+      : async () =>
+          PREVIEW_ENABLED
+            ? referenceDashboard
+            : {
+                subscriptionCount: 0,
+                monthlyRecurringCost: 0,
+                annualPotentialSaving: 0,
+                lastSyncAt: null,
+                topRecommendations: [],
+                hasConnectedBank: false,
+                isDemo: false,
+              },
   });
 }
 export function usePayments() {
   const token = useLiveToken();
   return useQuery({
     queryKey: ['subscriptions', token],
-    queryFn: token ? api.subscriptions : async () => ({ items: referencePayments, total: 12 }),
+    queryFn: token
+      ? api.subscriptions
+      : async () => ({
+          items: PREVIEW_ENABLED ? referencePayments : [],
+          total: PREVIEW_ENABLED ? 12 : 0,
+        }),
   });
 }
 export function useRecommendations() {
   const token = useLiveToken();
   return useQuery({
     queryKey: ['recommendations', token],
-    queryFn: token ? api.recommendations : async () => referenceRecommendations,
+    queryFn: token
+      ? api.recommendations
+      : async () => (PREVIEW_ENABLED ? referenceRecommendations : []),
   });
 }
 export function useProfile() {
@@ -167,8 +187,8 @@ export function useProfile() {
     queryFn: token
       ? api.profile
       : async () => ({
-          id: 'preview',
-          firstName: 'Thomas',
+          id: 'anonymous',
+          firstName: PREVIEW_ENABLED ? 'Thomas' : 'Utilisateur',
           theme: useSession.getState().theme,
           notificationsEnabled: true,
         }),

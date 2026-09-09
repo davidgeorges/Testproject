@@ -134,55 +134,6 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<PartnerOffer>().HasIndex(o => new { o.Category, o.Active });
         b.Entity<PartnerOffer>().Property(o => o.MonthlyPrice).HasPrecision(18, 2);
         b.Entity<PartnerOffer>().Property(o => o.SetupFee).HasPrecision(18, 2);
-        var catalogUpdatedAt = new DateTimeOffset(2026, 9, 8, 0, 0, 0, TimeSpan.Zero);
-        b.Entity<PartnerOffer>()
-            .HasData(
-                new PartnerOffer
-                {
-                    Id = "mobile-demo",
-                    Category = "mobile",
-                    ProviderName = "Offre mobile démo",
-                    MonthlyPrice = 14.99m,
-                    Benefits = ["Sans engagement", "Exemple de forfait mobile"],
-                    Assumptions = ["Catalogue fictif : aucun tarif commercial vérifié."],
-                    Active = true,
-                    IsPartner = true,
-                    UpdatedAt = catalogUpdatedAt,
-                },
-                new PartnerOffer
-                {
-                    Id = "internet-demo",
-                    Category = "internet",
-                    ProviderName = "Offre fibre démo",
-                    MonthlyPrice = 29.99m,
-                    SetupFee = 39m,
-                    Benefits = ["Exemple de connexion fibre", "39 € de mise en service"],
-                    Assumptions =
-                    [
-                        "Éligibilité du logement inconnue.",
-                        "Catalogue fictif : aucun tarif commercial vérifié.",
-                    ],
-                    Active = true,
-                    IsPartner = true,
-                    UpdatedAt = catalogUpdatedAt,
-                },
-                new PartnerOffer
-                {
-                    Id = "insurance-demo",
-                    Category = "insurance",
-                    ProviderName = "Offre assurance démo",
-                    MonthlyPrice = 49m,
-                    Benefits = ["Exemple de contrat automobile"],
-                    Assumptions =
-                    [
-                        "Garanties, franchises et profil conducteur à comparer.",
-                        "Catalogue fictif : aucun tarif commercial vérifié.",
-                    ],
-                    Active = true,
-                    IsPartner = true,
-                    UpdatedAt = catalogUpdatedAt,
-                }
-            );
         b.Entity<AuditLog>().ToTable("audit_logs").HasIndex(a => new { a.UserId, a.CreatedAt });
         b.Entity<AuditLog>()
             .HasOne<UserProfile>()

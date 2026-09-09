@@ -16,6 +16,7 @@ public sealed class BankConnection
     public string BankName { get; set; } = "";
     public string Provider { get; set; } = "sandbox";
     public string? ExternalConnectionId { get; set; }
+    public string? ProviderSecret { get; set; }
     public string? AuthorizationUrl { get; set; }
     public string Status { get; set; } = "pending";
     public DateTimeOffset? LastSyncAt { get; set; }

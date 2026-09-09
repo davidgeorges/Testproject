@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Google.Apis.Auth.OAuth2;
 using SubscriptionApp.Application;
 using SubscriptionApp.Domain;
@@ -11,6 +12,44 @@ public sealed class UnavailablePushSender : IPushSender
 {
     public bool IsConfigured => false;
     public Task<PushSendResult> Send(PushDevice device, UserNotification notification, CancellationToken ct) => Task.FromResult(PushSendResult.Retry);
+}
+
+public sealed class ExpoPushSender(HttpClient http, string? accessToken = null) : IPushSender
+{
+    public bool IsConfigured => true;
+
+    public async Task<PushSendResult> Send(PushDevice device, UserNotification notification, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "--/api/v2/push/send");
+        if (!string.IsNullOrWhiteSpace(accessToken))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Content = JsonContent.Create(new
+        {
+            to = device.Token,
+            title = notification.Title,
+            body = notification.Body,
+            sound = "default",
+            data = new { type = notification.Type, resourceId = notification.ResourceId ?? "" },
+        });
+        using var response = await http.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode) return response.StatusCode == HttpStatusCode.BadRequest
+            ? PushSendResult.InvalidToken
+            : PushSendResult.Retry;
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        var ticket = json.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array
+            ? data.EnumerateArray().FirstOrDefault()
+            : data;
+        var status = ticket.ValueKind == JsonValueKind.Object && ticket.TryGetProperty("status", out var value)
+            ? value.GetString()
+            : null;
+        if (status == "ok") return PushSendResult.Sent;
+        var error = ticket.ValueKind == JsonValueKind.Object
+            && ticket.TryGetProperty("details", out var details)
+            && details.TryGetProperty("error", out var errorValue)
+                ? errorValue.GetString()
+                : null;
+        return error == "DeviceNotRegistered" ? PushSendResult.InvalidToken : PushSendResult.Retry;
+    }
 }
 
 public sealed class FirebasePushSender : IPushSender
@@ -49,6 +88,12 @@ public sealed class PushDeliveryProcessor(IWorkspaceStore store, IPushSender sen
         var delivered = 0;
         foreach (var notification in await store.ClaimPushNotifications(50, time.GetUtcNow(), TimeSpan.FromMinutes(2), ct))
         {
+            var profile = await store.Profile(notification.UserId, ct);
+            if (!profile.NotificationsEnabled)
+            {
+                await store.MarkPushResult(notification.Id, false, false, time.GetUtcNow(), ct);
+                continue;
+            }
             var devices = await store.PushDevices(notification.UserId, ct);
             if (devices.Count == 0) { await store.MarkPushResult(notification.Id, false, false, time.GetUtcNow(), ct); continue; }
             var results = new List<PushSendResult>();

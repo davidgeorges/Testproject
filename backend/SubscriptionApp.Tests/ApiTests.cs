@@ -526,6 +526,8 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
                 .UseSetting("Demo:Enabled", "false")
                 .UseSetting("Firebase:ProjectId", "test-firebase-project")
                 .UseSetting("Cors:Origins:0", "https://app.example.test")
+                .UseSetting("ConnectionStrings:Postgres", "Host=127.0.0.1;Port=1;Database=test;Username=test;Password=test;Timeout=1;Command Timeout=1")
+                .UseSetting("Database:ApplyMigrationsOnStartup", "false")
         );
         using var client = production.CreateClient();
 

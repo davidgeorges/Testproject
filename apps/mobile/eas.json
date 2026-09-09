@@ -12,7 +12,16 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://testproject-s3qv.onrender.com",
-        "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY": "test_AdTSMmBnAQSUvAvcXtLqBdxIjIm"
+        "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY": "test_AdTSMmBnAQSUvAvcXtLqBdxIjIm",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCSSX7dVj63i7Nur6xu8k70qlLTUxwTzTo",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "testproject-5ad6b.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "testproject-5ad6b",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "testproject-5ad6b.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "120450519440",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:120450519440:web:2955c197a036d97ced2315",
+        "EXPO_PUBLIC_ENABLE_PREVIEW": "false",
+        "EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID": "premium",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "120450519440-3dqeaasofhivn127lvm6pvlmo08jmqd4.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -22,11 +31,32 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://testproject-s3qv.onrender.com",
-        "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY": "test_AdTSMmBnAQSUvAvcXtLqBdxIjIm"
+        "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY": "test_AdTSMmBnAQSUvAvcXtLqBdxIjIm",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCSSX7dVj63i7Nur6xu8k70qlLTUxwTzTo",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "testproject-5ad6b.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "testproject-5ad6b",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "testproject-5ad6b.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "120450519440",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:120450519440:web:2955c197a036d97ced2315",
+        "EXPO_PUBLIC_ENABLE_PREVIEW": "false",
+        "EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID": "premium",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "120450519440-3dqeaasofhivn127lvm6pvlmo08jmqd4.apps.googleusercontent.com"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://testproject-s3qv.onrender.com",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCSSX7dVj63i7Nur6xu8k70qlLTUxwTzTo",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "testproject-5ad6b.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "testproject-5ad6b",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "testproject-5ad6b.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "120450519440",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:120450519440:web:2955c197a036d97ced2315",
+        "EXPO_PUBLIC_ENABLE_PREVIEW": "false",
+        "EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID": "premium",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "120450519440-3dqeaasofhivn127lvm6pvlmo08jmqd4.apps.googleusercontent.com"
+      }
     }
   }
 }

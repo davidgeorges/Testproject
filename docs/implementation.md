@@ -9,15 +9,15 @@ Le document `SmartSave_Cahier_des_charges_V1_v2.docx` sert de référence foncti
 | Expo, TypeScript, React Navigation, TanStack Query | Implémenté |
 | Thèmes centralisés sombre et clair | Implémenté ; sombre au premier lancement |
 | Splash et quatre étapes d’onboarding | Accueil de présentation et onboarding implémentés |
-| Authentification Firebase côté API | Validation JWT et clés publiques mise en cache ; configuration du projet requise |
-| Connexion bancaire et consentement | Identifiant fournisseur interne, URL d’autorisation transitoire, consentement et révocation derrière interface |
+| Authentification Firebase | E-mail, inscription, réinitialisation, Google Web, persistance native et validation JWT serveur |
+| Connexion bancaire et consentement | Tink Transactions, jeton fournisseur chiffré, synchronisation, révocation distante et reconnexion |
 | Synchronisation | Synchrone pour le parcours mobile et file durable avec baux, reprises et états consultables |
 | Récurrences | Détection configurable mensuelle, trimestrielle, annuelle ; calculs `decimal` |
 | Dashboard et abonnements | Listes, détails, recherche, filtres, historique et prochaine date estimée |
 | Corrections d’abonnement | Catégorie modifiable et retrait des analyses, persistés par utilisateur |
 | Recommandations | Calcul, sélection du meilleur gain par paiement, frais inclus, hypothèses explicites |
 | Offres et affiliation | Catalogue derrière interface ; clic traçable et conversions reçues par webhook HMAC dédupliqué |
-| Profil et suppression | Prénom, thème, suppression des données et suppression préalable de l’identité Firebase |
+| Profil et suppression | Prénom, thème, export, suppression serveur et suppression Firebase côté client ou compte de service |
 | Premium | Achat mensuel/annuel et restauration via le SDK RevenueCat sur les builds natifs ; statut serveur affiché dans l’application |
 | PostgreSQL | Comptes, transactions, analyses, offres, préférences, consentements, notifications, appareils push, Premium et audit persistés |
 | Redis | Cache partagé du catalogue pendant 5 minutes, invalidation sur écriture et repli PostgreSQL |
@@ -25,9 +25,9 @@ Le document `SmartSave_Cahier_des_charges_V1_v2.docx` sert de référence foncti
 | Catalogue / back-office API | Offres administrables ; clé dédiée en démo, claim Firebase `admin` en production |
 | Premium backend | Vérification de l’entitlement via l’API RevenueCat, anti-rejeu, statut persistant et webhook autorisé pour renouvellement/annulation/expiration |
 | IA explicative | Adaptateur Responses API optionnel, entrée limitée aux faits, `store: false`, validation et repli déterministe |
-| Push FCM | Registre, worker, tentatives et FCM HTTP v1 avec OAuth de compte de service |
+| Push | Registre Expo, permissions mobiles, worker, préférences, tentatives, invalidation des jetons ; FCM direct reste disponible |
 | Rétention | Purge quotidienne : idempotence expirée, jobs à 90 jours, notifications et audit à 2 ans |
-| Stores réels, export métriques | Adaptateurs externes à finaliser avec les comptes fournisseurs |
+| Stores réels, export métriques | Les adaptateurs sont prêts ; produits Apple/Google et collecteur OTLP externes à renseigner |
 | CI | Workflow de build, TypeScript, format, tests HTTP/métier/PostgreSQL et export des bundles mobiles |
 | Release iOS et Android | À configurer et valider avec les comptes développeur |
 
@@ -41,31 +41,31 @@ Pour les économies, les offres inactives, les prix invalides et les gains nuls 
 
 Le schéma exact est généré par `/openapi/v1.json`. Les routes métier exigent `Authorization: Bearer <jeton-démo>`. `POST /api/v1/demo/sessions` crée une session temporaire dans l’environnement Development.
 
-Routes implémentées : profil GET/PATCH, connexions et comptes bancaires GET/POST/DELETE, synchronisation immédiate ou mise en file et état GET, dashboard GET, abonnements GET liste/détail et PATCH préférences, recommandations GET liste/détail/alternatives et suivi vue/clic, offres GET et administration PUT/DELETE, webhooks d’affiliation et Premium signés, consentements GET/DELETE, notifications GET/lecture POST, appareils push GET/POST/DELETE, Premium GET/vérification POST, export RGPD GET et suppression du compte DELETE. La liste des abonnements accepte `page` et `limit` (1 à 100). Les autres petites listes restent non paginées.
+Routes implémentées : profil GET/PATCH, connexions et comptes bancaires GET/POST/DELETE, synchronisation immédiate ou mise en file et état GET, dashboard GET, abonnements GET liste/détail et PATCH préférences, recommandations GET liste/détail/alternatives et suivi vue/clic, offres GET et administration GET/PUT/DELETE, webhooks Tink, affiliation et Premium, consentements GET/DELETE, notifications GET/lecture POST, appareils push GET/POST/DELETE, Premium GET/vérification POST, export RGPD GET et suppression du compte DELETE.
 
 Les créations de connexion, synchronisations, clics et validations Premium exigent `Idempotency-Key` (8 à 128 caractères). Une réservation atomique PostgreSQL conserve la réponse réussie pendant 24 heures et permet son rejeu entre plusieurs réplicas ; un contenu différent avec la même clé renvoie 409. En mode mémoire, le même contrat est appliqué dans le processus. L’import PostgreSQL utilise un verrou transactionnel par connexion et des contraintes d’unicité. La déconnexion et la révocation locale bloquent immédiatement toute nouvelle synchronisation ; la révocation distante passe par l’interface du prestataire Open Banking.
 
-## Prochaines tranches
+## Dépendances externes restantes
 
-1. Configurer le projet Firebase réel, brancher la création/connexion/réinitialisation mobile, puis ajouter la révocation et la suppression de l’identité via un compte de service.
-2. Choisir le prestataire Open Banking et implémenter ses redirections, webhooks signés, révocation distante et erreurs de synchronisation partielles derrière `IBankingProvider`.
-3. Brancher les événements ou webhooks du fournisseur bancaire réel sur la file durable de synchronisation.
-4. Connecter le catalogue partenaire réel et ses contrats commerciaux au catalogue administrable.
-5. Créer les produits App Store/Play Store et leur offering RevenueCat, renseigner les clés de déploiement, puis valider les achats sandbox sur iOS et Android.
-6. Configurer le gestionnaire de secrets, le collecteur OTLP, l’alerting, les sauvegardes/restauration et les recettes de sécurité dans les environnements externes.
+1. Créer les clients OAuth Android et iOS dans Google Cloud et les renseigner dans EAS.
+2. Enregistrer l’URL du webhook Tink et son en-tête d’autorisation dans la console Tink.
+3. Importer les offres vérifiées après signature des contrats partenaires ; aucune offre fictive n’est livrée en production.
+4. Créer les produits App Store/Play Store et les associer à l’offering RevenueCat. Cette étape nécessite les comptes développeur payants et n’a pas été exécutée.
+5. Renseigner un compte de service Firebase si la suppression administrative de l’identité et FCM direct sont souhaités.
+6. Brancher OTLP/alerting et exécuter une recette sur appareils physiques avant publication.
 
 ## Références techniques
 
 - [Expo SDK 55](https://expo.dev/changelog/sdk-55) : ligne de base conservée conformément au cahier des charges ; compatibilité des modules vérifiée avec `expo/bundledNativeModules.json` installé.
 - [Politique de support .NET](https://dotnet.microsoft.com/en-us/platform/support/policy) : backend sur .NET 10 LTS.
 - [Responses API](https://developers.openai.com/api/reference/cli/resources/responses/methods/create) : requêtes stateless avec sortie JSON structurée pour l’explication optionnelle.
-- [FCM HTTP v1](https://firebase.google.com/docs/cloud-messaging/send/v1-api) : envoi serveur avec jeton OAuth 2.0 de compte de service.
+- [Expo Push](https://docs.expo.dev/push-notifications/sending-notifications/) : envoi serveur vers les jetons Expo enregistrés par les builds EAS.
 
-Les dépendances npm sont figées par `package-lock.json`, celles .NET par les versions explicites et `packages.lock.json`. La CI est créée localement ; aucun dépôt distant ni déploiement n’a été configuré dans cette tranche.
+Les dépendances npm sont figées par `package-lock.json`, celles .NET par les versions explicites et `packages.lock.json`. La CI, le dépôt GitHub et le service Render sont configurés.
 
 ## Vérifications locales du premier lot
 
-50 tests métier, sécurité et HTTP réussis ; les 2 tests PostgreSQL et Redis sont ignorés explicitement faute de serveurs Docker démarrés. La CI démarre les deux services et exécute ces tests. Le build backend Release passe sans erreur. Les migrations couvrent désormais le modèle persistant étendu.
+62 tests métier, sécurité et HTTP réussissent localement ; les 2 tests PostgreSQL et Redis sont ignorés faute de services Docker locaux. La CI démarre les deux services. Le typecheck mobile et le build backend Release passent.
 
 Parcours vérifié dans le navigateur : quatre étapes de présentation, session de test, consentement fictif, connexion/synchronisation, tableau de bord, détail d’une recommandation et enregistrement du clic. Vérification visuelle aux largeurs desktop et 390 px ; ajustement de la taille du montant mensuel pour éviter le retour à la ligne.
 

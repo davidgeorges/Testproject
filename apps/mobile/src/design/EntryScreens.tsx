@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Pressable, Modal, ScrollView, ActivityIndicator, Linking, Platform } from 'react-native';
+import {
+  View,
+  Pressable,
+  Modal,
+  ScrollView,
+  ActivityIndicator,
+  Linking,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRoute, type RouteProp } from '@react-navigation/native';
@@ -19,8 +27,14 @@ import {
 } from './ui';
 import { useNav } from './MainScreens';
 import { api, ApiError, idempotencyKey } from '../services/api';
-import { signInWithGoogle } from '../services/firebase';
-import { useSession, useLiveToken } from '../store/session';
+import {
+  registerWithEmail,
+  resetPassword,
+  signInWithEmail,
+  useGoogleSignIn,
+  type FirebaseSession,
+} from '../services/firebase';
+import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import type { RootStackParams } from '../app/navigation';
 import { date, money } from '../utils/format';
 export function Welcome() {
@@ -106,14 +120,26 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
   const [accept, setAccept] = useState(false);
   const [message, setMessage] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const googleSignIn = useGoogleSignIn();
   const rules = [
     ['Au moins 8 caractères', password.length >= 8],
     ['Une majuscule', /[A-Z]/.test(password)],
     ['Un chiffre', /\d/.test(password)],
   ] as const;
-  function submit() {
+  async function finishAuthentication(firebase: FirebaseSession) {
+    useSession.getState().setToken(firebase.token);
+    useSession.getState().setIdentity(firebase);
+    useSession.getState().setPreview(false);
+    const firstName =
+      firebase.displayName?.trim().split(/\s+/)[0] ??
+      firebase.email?.split('@')[0] ??
+      'Utilisateur';
+    const profile = await api.saveProfile({ firstName, theme: 'dark', notificationsEnabled: true });
+    queryClient.setQueryData(['profile', firebase.token], profile);
+  }
+  async function submit() {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      setMessage('Indiquez une adresse e-mail valide, fictive pour cette démonstration.');
+      setMessage('Indiquez une adresse e-mail valide.');
       return;
     }
     if (
@@ -123,27 +149,27 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
       setMessage('Complétez les informations et les critères indiqués.');
       return;
     }
-    setPassword('');
+    setAuthBusy(true);
     setMessage('');
-    nav.navigate(register ? 'Onboarding' : 'Main');
+    try {
+      const firebase = register
+        ? await registerWithEmail(email, password, name)
+        : await signInWithEmail(email, password);
+      await finishAuthentication(firebase);
+      setPassword('');
+      nav.navigate(register ? 'Onboarding' : 'Main');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Authentification impossible.');
+    } finally {
+      setAuthBusy(false);
+    }
   }
   async function googleLogin() {
     setAuthBusy(true);
     setMessage('');
     try {
-      const firebase = await signInWithGoogle();
-      useSession.getState().setToken(firebase.token);
-      useSession.getState().setPreview(false);
-      const firstName =
-        firebase.displayName?.trim().split(/\s+/)[0] ??
-        firebase.email?.split('@')[0] ??
-        'Utilisateur';
-      const profile = await api.saveProfile({
-        firstName,
-        theme: 'dark',
-        notificationsEnabled: true,
-      });
-      queryClient.setQueryData(['profile', firebase.token], profile);
+      const firebase = await googleSignIn();
+      await finishAuthentication(firebase);
       nav.navigate('Main');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Connexion Google impossible.');
@@ -207,7 +233,11 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
         </Pressable>
       )}
       {message && <Label style={{ fontSize: 12, color: '#FF7485' }}>{message}</Label>}
-      <Button title={register ? 'Créer mon compte' : 'Se connecter'} onPress={submit} />
+      <Button
+        title={register ? 'Créer mon compte' : 'Se connecter'}
+        loading={authBusy}
+        onPress={() => void submit()}
+      />
       {!register && (
         <>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
@@ -229,7 +259,9 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                 onPress={() =>
                   i === 1
                     ? void googleLogin()
-                    : setMessage('Cette méthode de connexion sera disponible dans une prochaine étape.')
+                    : setMessage(
+                        'Cette méthode de connexion sera disponible dans une prochaine étape.',
+                      )
                 }
                 style={{
                   flex: 1,
@@ -267,8 +299,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
       )}
       <View style={{ flex: 1 }} />
       <Label muted style={{ fontSize: 10, lineHeight: 15, textAlign: 'center' }}>
-        Démonstration visuelle : utilisez des informations fictives.{'\n'}Aucun compte ni
-        consentement légal n’est créé.
+        Vos identifiants sont protégés par Firebase Authentication.
       </Label>
     </Page>
   );
@@ -282,6 +313,24 @@ export function Register() {
 export function ResetPassword() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const submit = async () => {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setMessage('Indiquez une adresse e-mail valide.');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      await resetPassword(email);
+      setSent(true);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Envoi impossible.');
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Page>
       <Label style={{ fontSize: 24, lineHeight: 31, fontWeight: '700' }}>
@@ -289,13 +338,11 @@ export function ResetPassword() {
       </Label>
       <Label muted>Indiquez votre adresse e-mail pour retrouver l’accès à votre compte.</Label>
       <Field label="Email" placeholder="votre@email.com" value={email} onChangeText={setEmail} />
-      <Button title="Réinitialiser mon mot de passe" onPress={() => setSent(true)} />
+      <Button title="Réinitialiser mon mot de passe" loading={busy} onPress={() => void submit()} />
+      {message && <Label style={{ color: '#FF7485' }}>{message}</Label>}
       {sent && (
         <Card>
-          <Label muted>
-            L’envoi d’e-mail n’est pas activé dans cette démonstration. Aucun message n’a été
-            envoyé.
-          </Label>
+          <Label muted>Un e-mail de réinitialisation vient de vous être envoyé.</Label>
         </Card>
       )}
     </Page>
@@ -434,75 +481,173 @@ export function BankScreen() {
         <>
           <Label style={{ fontSize: 23, lineHeight: 30, fontWeight: '700' }}>Mes banques</Label>
           {connections.data.map((bank) => {
-            const bankAccounts = accounts.data?.filter((account) => account.connectionId === bank.id) ?? [];
+            const bankAccounts =
+              accounts.data?.filter((account) => account.connectionId === bank.id) ?? [];
             const expired = new Date(bank.consentExpiresAt).getTime() <= Date.now();
             const connected = bank.status === 'connected' && !expired;
             return (
               <Card key={bank.id} style={{ gap: 12 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: '#087BFF22', alignItems: 'center', justifyContent: 'center' }}>
+                  <View
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      backgroundColor: '#087BFF22',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <Ionicons name="business" color="#168CFF" size={23} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Label style={{ fontSize: 17, fontWeight: '700' }}>{bank.bankName}</Label>
                     <Label muted style={{ fontSize: 12 }}>
-                      {bank.lastSyncAt ? `Synchronisée le ${date(bank.lastSyncAt)}` : 'Jamais synchronisée'}
+                      {bank.lastSyncAt
+                        ? `Synchronisée le ${date(bank.lastSyncAt)}`
+                        : 'Jamais synchronisée'}
                     </Label>
                   </View>
-                  <View style={{ backgroundColor: connected ? '#005439' : '#4A3315', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
-                    <Label style={{ color: connected ? '#3DFFB0' : '#FBBF24', fontSize: 10, fontWeight: '700' }}>
+                  <View
+                    style={{
+                      backgroundColor: connected ? '#005439' : '#4A3315',
+                      borderRadius: 20,
+                      paddingHorizontal: 9,
+                      paddingVertical: 4,
+                    }}
+                  >
+                    <Label
+                      style={{
+                        color: connected ? '#3DFFB0' : '#FBBF24',
+                        fontSize: 10,
+                        fontWeight: '700',
+                      }}
+                    >
                       {connected ? 'Connectée' : 'À reconnecter'}
                     </Label>
                   </View>
                 </View>
-                {bankAccounts.length > 0 ? bankAccounts.map((account) => (
-                  <View key={account.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 10, backgroundColor: c.elevated }}>
-                    <Ionicons name="card-outline" color={c.muted} size={20} />
-                    <View style={{ flex: 1 }}>
-                      <Label style={{ fontWeight: '600' }}>{account.maskedName || 'Compte bancaire'}</Label>
-                      <Label muted style={{ fontSize: 11 }}>{account.accountType || 'Compte'}</Label>
+                {bankAccounts.length > 0 ? (
+                  bankAccounts.map((account) => (
+                    <View
+                      key={account.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: 11,
+                        borderRadius: 10,
+                        backgroundColor: c.elevated,
+                      }}
+                    >
+                      <Ionicons name="card-outline" color={c.muted} size={20} />
+                      <View style={{ flex: 1 }}>
+                        <Label style={{ fontWeight: '600' }}>
+                          {account.maskedName || 'Compte bancaire'}
+                        </Label>
+                        <Label muted style={{ fontSize: 11 }}>
+                          {account.accountType || 'Compte'}
+                        </Label>
+                      </View>
                     </View>
-                  </View>
-                )) : (
-                  <Label muted style={{ fontSize: 12 }}>Aucun compte détaillé transmis par la banque.</Label>
+                  ))
+                ) : (
+                  <Label muted style={{ fontSize: 12 }}>
+                    Aucun compte détaillé transmis par la banque.
+                  </Label>
                 )}
                 {connected ? (
-                  <Button title="Synchroniser maintenant" secondary onPress={() => nav.navigate('Sync', { connectionId: bank.id })} />
+                  <Button
+                    title="Synchroniser maintenant"
+                    secondary
+                    onPress={() => nav.navigate('Sync', { connectionId: bank.id })}
+                  />
                 ) : (
-                  <Button title="Reconnecter avec Tink" onPress={() => openConsent(bank.bankName)} />
+                  <Button
+                    title="Reconnecter avec Tink"
+                    onPress={() => openConsent(bank.bankName)}
+                  />
                 )}
-                <Button title="Retirer la connexion" secondary loading={remove.isPending} onPress={() => remove.mutate(bank.id)} />
+                <Button
+                  title="Retirer la connexion"
+                  secondary
+                  loading={remove.isPending}
+                  onPress={() => remove.mutate(bank.id)}
+                />
               </Card>
             );
           })}
-          <Label style={{ fontSize: 19, fontWeight: '700', marginTop: 4 }}>Dernières transactions</Label>
+          <Label style={{ fontSize: 19, fontWeight: '700', marginTop: 4 }}>
+            Dernières transactions
+          </Label>
           <Card style={{ paddingVertical: 4 }}>
             {transactions.isLoading ? (
               <ActivityIndicator color="#168CFF" style={{ margin: 20 }} />
-            ) : transactions.data?.items.length ? transactions.data.items.map((transaction, index) => (
-              <View key={transaction.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 11, borderBottomWidth: index === transactions.data!.items.length - 1 ? 0 : 0.5, borderColor: c.border }}>
-                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: c.elevated, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={transaction.amount >= 0 ? 'arrow-down' : 'arrow-up'} color={transaction.amount >= 0 ? '#3DFFB0' : '#FF7485'} size={18} />
+            ) : transactions.data?.items.length ? (
+              transactions.data.items.map((transaction, index) => (
+                <View
+                  key={transaction.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 11,
+                    paddingVertical: 11,
+                    borderBottomWidth: index === transactions.data!.items.length - 1 ? 0 : 0.5,
+                    borderColor: c.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: c.elevated,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons
+                      name={transaction.amount >= 0 ? 'arrow-down' : 'arrow-up'}
+                      color={transaction.amount >= 0 ? '#3DFFB0' : '#FF7485'}
+                      size={18}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Label numberOfLines={1} style={{ fontWeight: '600' }}>
+                      {transaction.merchantName || 'Transaction bancaire'}
+                    </Label>
+                    <Label muted style={{ fontSize: 11 }}>
+                      {date(transaction.bookedAt)} · {transaction.category || 'Autre'}
+                    </Label>
+                  </View>
+                  <Label
+                    style={{
+                      fontWeight: '700',
+                      color: transaction.amount >= 0 ? '#3DFFB0' : c.text,
+                    }}
+                  >
+                    {transaction.amount > 0 ? '+' : ''}
+                    {money(transaction.amount)}
+                  </Label>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Label numberOfLines={1} style={{ fontWeight: '600' }}>{transaction.merchantName || 'Transaction bancaire'}</Label>
-                  <Label muted style={{ fontSize: 11 }}>{date(transaction.bookedAt)} · {transaction.category || 'Autre'}</Label>
-                </View>
-                <Label style={{ fontWeight: '700', color: transaction.amount >= 0 ? '#3DFFB0' : c.text }}>
-                  {transaction.amount > 0 ? '+' : ''}{money(transaction.amount)}
-                </Label>
-              </View>
-            )) : (
+              ))
+            ) : (
               <View style={{ padding: 18, alignItems: 'center', gap: 6 }}>
                 <Ionicons name="receipt-outline" color={c.muted} size={26} />
-                <Label muted style={{ textAlign: 'center' }}>Aucune transaction importée pour le moment.</Label>
+                <Label muted style={{ textAlign: 'center' }}>
+                  Aucune transaction importée pour le moment.
+                </Label>
               </View>
             )}
           </Card>
           <Label muted style={{ fontSize: 11, textAlign: 'center' }}>
-            {transactions.data ? `${transactions.data.total} transaction${transactions.data.total > 1 ? 's' : ''} importée${transactions.data.total > 1 ? 's' : ''}` : ''}
+            {transactions.data
+              ? `${transactions.data.total} transaction${transactions.data.total > 1 ? 's' : ''} importée${transactions.data.total > 1 ? 's' : ''}`
+              : ''}
           </Label>
-          <Label style={{ fontSize: 19, fontWeight: '700', marginTop: 8 }}>Ajouter une banque</Label>
+          <Label style={{ fontSize: 19, fontWeight: '700', marginTop: 8 }}>
+            Ajouter une banque
+          </Label>
         </>
       )}
       <Label style={{ fontSize: 23, lineHeight: 30, fontWeight: '700' }}>
@@ -588,7 +733,8 @@ export function BankScreen() {
           <Card style={{ width: '100%', maxWidth: 350, gap: 17, padding: 22 }}>
             <Label style={{ fontSize: 21, fontWeight: '700' }}>{selected}</Label>
             <Label muted>
-              Vous allez être redirigé vers Tink pour vous authentifier directement auprès de votre banque.
+              Vous allez être redirigé vers Tink pour vous authentifier directement auprès de votre
+              banque.
             </Label>
             <Pressable
               accessibilityRole="checkbox"
@@ -628,22 +774,46 @@ export function TinkCallbackScreen() {
     submitted.current = true;
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
-    if (!code) { setError(new Error(params.get('message') ?? 'Tink n’a retourné aucun code.')); return; }
-    api.completeTink(code, params.get('credentials_id'), idempotencyKey())
-      .then((bank) => { cache.invalidateQueries(); nav.replace('Sync', { connectionId: bank.id }); })
-      .catch((reason) => setError(reason instanceof Error ? reason : new Error('Connexion Tink impossible.')));
+    if (!code) {
+      setError(new Error(params.get('message') ?? 'Tink n’a retourné aucun code.'));
+      return;
+    }
+    api
+      .completeTink(code, params.get('credentials_id'), idempotencyKey())
+      .then((bank) => {
+        cache.invalidateQueries();
+        nav.replace('Sync', { connectionId: bank.id });
+      })
+      .catch((reason) =>
+        setError(reason instanceof Error ? reason : new Error('Connexion Tink impossible.')),
+      );
   }, [token]);
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!useSession.getState().token)
-        setError(new Error('Votre session Google n’est plus active. Reconnectez-vous avant de relier votre banque.'));
+        setError(
+          new Error(
+            'Votre session Google n’est plus active. Reconnectez-vous avant de relier votre banque.',
+          ),
+        );
     }, 3000);
     return () => clearTimeout(timeout);
   }, []);
-  return <Page fill style={{ justifyContent: 'center', gap: 18 }}>
-    {error ? <><State error={error} /><Button title="Retour aux banques" onPress={() => nav.replace('Bank')} /></> :
-      <><ActivityIndicator color="#168CFF" size="large" /><Label style={{ textAlign: 'center' }}>Connexion bancaire en cours…</Label></>}
-  </Page>;
+  return (
+    <Page fill style={{ justifyContent: 'center', gap: 18 }}>
+      {error ? (
+        <>
+          <State error={error} />
+          <Button title="Retour aux banques" onPress={() => nav.replace('Bank')} />
+        </>
+      ) : (
+        <>
+          <ActivityIndicator color="#168CFF" size="large" />
+          <Label style={{ textAlign: 'center' }}>Connexion bancaire en cours…</Label>
+        </>
+      )}
+    </Page>
+  );
 }
 export function SyncScreen() {
   const route = useRoute<RouteProp<RootStackParams, 'Sync'>>();
@@ -663,11 +833,13 @@ export function SyncScreen() {
       mutation.mutate(connectionId);
     }
   }, [connectionId]);
-  const preview = !connectionId;
+  const preview = PREVIEW_ENABLED && !connectionId;
   const percent = preview ? 75 : mutation.isSuccess ? 100 : 0;
   const reconnectRequired =
     mutation.error instanceof ApiError &&
-    ['CONSENT_EXPIRED', 'TINK_TRANSACTIONS_401', 'TINK_TRANSACTIONS_403'].includes(mutation.error.code);
+    ['CONSENT_EXPIRED', 'TINK_TRANSACTIONS_401', 'TINK_TRANSACTIONS_403'].includes(
+      mutation.error.code,
+    );
   const retry = () => {
     key.current = idempotencyKey();
     mutation.mutate(connectionId!);
@@ -737,7 +909,9 @@ export function SyncScreen() {
       {mutation.error && (
         <View style={{ width: '100%', gap: 10 }}>
           <State error={mutation.error} retry={reconnectRequired ? undefined : retry} />
-          {reconnectRequired && <Button title="Reconnecter la banque" onPress={() => nav.replace('Bank')} />}
+          {reconnectRequired && (
+            <Button title="Reconnecter la banque" onPress={() => nav.replace('Bank')} />
+          )}
         </View>
       )}
       {(preview || mutation.isSuccess) && (

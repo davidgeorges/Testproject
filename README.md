@@ -1,10 +1,10 @@
 # Projet abonnements
 
-Première tranche de développement issue du cahier des charges fourni. Le nom commercial reste à choisir. Les noms techniques `SubscriptionApp` et `subscription-project` sont provisoires.
+Application de gestion d’abonnements issue du cahier des charges fourni. Le nom commercial reste à choisir. Les noms techniques `SubscriptionApp` et `subscription-project` sont provisoires.
 
-L’application Expo communique avec une API ASP.NET Core .NET 10. Son interface reproduit la composition mobile de la maquette sombre fournie. Sur ordinateur, un sélecteur permet d’explorer les 23 vues dans un cadre de téléphone. Le mode maquette emploie les chiffres d’exemple du document ; le parcours bancaire simulé affiche ensuite les valeurs calculées par le backend. Les détails de la refonte sont dans [docs/ui-reference.md](docs/ui-reference.md).
+L’application Expo communique avec une API ASP.NET Core .NET 10. Son interface reproduit la composition mobile de la maquette sombre fournie. En production, les données viennent exclusivement de Firebase, Tink, PostgreSQL et RevenueCat. Les données de présentation ne sont accessibles que si `EXPO_PUBLIC_ENABLE_PREVIEW=true` est explicitement défini en développement. Les détails de l’interface sont dans [docs/ui-reference.md](docs/ui-reference.md).
 
-## Démarrer la démonstration
+## Démarrer en local
 
 Prérequis : Node.js 22, npm et SDK .NET 10. Les commandes se lancent à la racine du dépôt.
 
@@ -20,11 +20,9 @@ Dans un second terminal :
 npm run web
 ```
 
-Ouvrir http://localhost:8081. L’accueil de la maquette s’affiche immédiatement. Utiliser le sélecteur pour explorer les écrans, ou choisir **Connexion bancaire → une banque → autoriser l’analyse fictive → Autoriser et continuer → Voir mon résumé** pour tester le backend. Le serveur écoute sur http://localhost:5080. Son contrat OpenAPI est disponible sur http://localhost:5080/openapi/v1.json.
+Créer `apps/mobile/.env` à partir de `.env.example`, puis ouvrir http://localhost:8081. Le serveur écoute sur http://localhost:5080. Son contrat OpenAPI est disponible sur http://localhost:5080/openapi/v1.json.
 
-Sans chaîne de connexion PostgreSQL, les données restent en mémoire. Le serveur les perd à son arrêt. Le jeton de démonstration est conservé uniquement en mémoire dans l’application : un rechargement revient à l’accueil en mode maquette et efface la session locale. Ce jeton expire après huit heures.
-
-Les exemples génèrent 8 services, un coût mensuel total de **223,84 €** et **501 € d’économies annuelles estimées**, dont 39 € de frais de mise en service déduits pour l’offre Internet. Ces montants proviennent de données fictives et ne constituent pas des tarifs commerciaux vérifiés.
+Le backend exige Firebase et PostgreSQL hors du mode de développement. Le mode simulé est limité à `Development` et doit être activé explicitement avec `Demo__Enabled=true`.
 
 ## Mobile
 
@@ -32,7 +30,7 @@ Les exemples génèrent 8 services, un coût mensuel total de **223,84 €** et 
 npm start
 ```
 
-Le code cible Expo SDK 55 / React Native 0.83.10. Un émulateur Android utilise par défaut `http://10.0.2.2:5080`. Pour un téléphone physique, renseigner `EXPO_PUBLIC_API_URL` dans `apps/mobile/.env` avec une API joignable sur le réseau de développement et adapter les hôtes autorisés côté serveur. Ne pas exposer cette API de démonstration publiquement. Les builds natives et la validation sur appareils restent à effectuer.
+Le code cible Expo SDK 55 / React Native 0.83.10. Firebase conserve la session native dans AsyncStorage, Expo enregistre les appareils pour le push et RevenueCat gère Premium. Google fonctionne sur le Web ; les builds Android/iOS exigent leurs identifiants OAuth propres dans les variables décrites par `.env.example`.
 
 ### Premium avec RevenueCat
 
@@ -49,7 +47,7 @@ RevenueCat__WebhookAuthorization=Bearer <secret aléatoire long>
 
 Dans RevenueCat, créer un webhook vers `https://testproject-s3qv.onrender.com/api/v1/webhooks/revenuecat` et lui donner exactement la même valeur dans le champ Authorization. Le backend vérifie l’entitlement directement auprès de RevenueCat après achat ou restauration, puis traite les renouvellements, annulations et expirations envoyés par le webhook. La clé secrète RevenueCat ne doit jamais être ajoutée au fichier `.env` du mobile.
 
-## PostgreSQL facultatif
+## PostgreSQL local
 
 Docker Desktop doit être démarré. La configuration Compose est destinée au développement local et n’écoute que sur loopback.
 
@@ -61,7 +59,7 @@ dotnet ef database update --project backend/SubscriptionApp.Persistence
 npm run api
 ```
 
-Les migrations créent notamment les profils, connexions, comptes et transactions bancaires, consentements, analyses, notifications, appareils push, clés d’idempotence, abonnements et événements Premium, et événements d’audit. Les suppressions de profil effacent les données liées par cascade. Les réponses idempotentes sont partagées par PostgreSQL entre les réplicas ; Redis fournit le cache court partagé du catalogue d’offres lorsqu’il est configuré. Aucun changement de schéma n’est appliqué automatiquement au démarrage de l’API.
+Les migrations créent notamment les profils, connexions, comptes et transactions bancaires, consentements, analyses, notifications, appareils push, clés d’idempotence, abonnements et événements Premium, et événements d’audit. En production elles sont appliquées au démarrage avant l’ouverture de l’API. `Database__ApplyMigrationsOnStartup=false` permet de déléguer cette étape à une procédure externe.
 
 ## Vérifier le code
 
@@ -87,6 +85,6 @@ Pour inclure le test PostgreSQL, définir `TEST_POSTGRES` vers une **base dédi�
 
 ## État de la V1
 
-Ce dépôt constitue un parcours fonctionnel avancé, pas encore une V1 publiée. L’API accepte le mode production uniquement avec un identifiant de projet Firebase et valide alors les JWT Firebase ; la route de session fictive disparaît. Tink et RevenueCat disposent de connecteurs réels activés par configuration. Le catalogue administrable, les conversions d’affiliation signées, la file durable de synchronisation, les traitements de consentement, les notifications in-app et FCM, l’idempotence PostgreSQL, le cycle Premium côté serveur (achat, restauration, renouvellement, annulation, expiration), l’export et la rétention RGPD, l’explication IA contrôlée, les métriques produit et l’audit sont présents. L’enregistrement des produits dans App Store Connect/Google Play Console, la configuration RevenueCat, l’export des métriques et la validation sur appareils restent à effectuer.
+La V1 technique relie Firebase, Tink, Neon PostgreSQL, Upstash Redis, RevenueCat et Expo Push. Le catalogue de production démarre vide et s’administre via les routes réservées aux comptes portant le claim Firebase `admin=true`. Les produits réels App Store/Google Play, les contrats de partenaires et la publication sur les stores demandent des comptes commerciaux et restent hors de ce lot.
 
 Le suivi détaillé des exigences et les décisions sont dans [docs/implementation.md](docs/implementation.md).

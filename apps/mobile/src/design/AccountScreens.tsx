@@ -17,10 +17,10 @@ import {
 } from './ui';
 import { useNav } from './MainScreens';
 import { useProfile } from './reference';
-import { useSession, useLiveToken } from '../store/session';
+import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import { api, idempotencyKey } from '../services/api';
-import { purchasePremium, restorePremium } from '../services/revenuecat';
-import { signOutFirebase } from '../services/firebase';
+import { logOutRevenueCat, purchasePremium, restorePremium } from '../services/revenuecat';
+import { deleteCurrentFirebaseUser, signOutFirebase } from '../services/firebase';
 import type { RootStackParams } from '../app/navigation';
 function Row({
   icon,
@@ -90,6 +90,7 @@ export function ProfileScreen() {
   const profile = useProfile();
   const cache = useQueryClient();
   const token = useLiveToken();
+  const email = useSession((s) => s.email);
   return (
     <Page style={{ gap: 12, paddingTop: 4 }}>
       <View style={{ alignItems: 'center', gap: 5, paddingBottom: 11 }}>
@@ -99,10 +100,10 @@ export function ProfileScreen() {
           style={{ borderRadius: 50, borderWidth: 2, borderColor: '#3C5068' }}
         />
         <Label style={{ fontSize: 21, lineHeight: 27, fontWeight: '700' }}>
-          {profile.data?.firstName ?? 'Thomas'} {!token ? 'Dupont' : ''}
+          {profile.data?.firstName ?? 'Utilisateur'} {PREVIEW_ENABLED && !token ? 'Dupont' : ''}
         </Label>
         <Label muted style={{ fontSize: 12 }}>
-          {token ? 'Compte de démonstration' : 'thomas@email.com'}
+          {token ? (email ?? 'Compte Firebase') : 'Aperçu de l’interface'}
         </Label>
         <View
           style={{
@@ -117,7 +118,7 @@ export function ProfileScreen() {
         >
           <Ionicons name="diamond" color="white" size={11} />
           <Label style={{ fontSize: 10, color: 'white', lineHeight: 14 }}>
-            {token ? 'Démo' : 'Premium'}
+            {token ? 'Compte' : 'Aperçu'}
           </Label>
         </View>
       </View>
@@ -125,20 +126,20 @@ export function ProfileScreen() {
         <Row
           icon="home-outline"
           title="Mes banques"
-          subtitle={!token ? '2 banques connectées' : 'Gérer mes connexions'}
+          subtitle={PREVIEW_ENABLED && !token ? '2 banques connectées' : 'Gérer mes connexions'}
           onPress={() => nav.navigate('Bank')}
         />
         <Row
           icon="notifications-outline"
           title="Notifications"
-          subtitle={token ? 'Bientôt disponibles' : 'Activées'}
+          subtitle={token ? 'Activées sur cet appareil' : 'Aperçu'}
           color="#FB375A"
           onPress={() => nav.navigate('Notifications')}
         />
         <Row
           icon="shield-checkmark-outline"
           title="Sécurité"
-          subtitle={!token ? 'Face ID activé' : 'Gérer mon accès'}
+          subtitle={PREVIEW_ENABLED && !token ? 'Face ID activé' : 'Gérer mon accès'}
           onPress={() => nav.navigate('Info', { kind: 'security' })}
         />
         <Row
@@ -168,6 +169,8 @@ export function ProfileScreen() {
         onPress={() => {
           cache.clear();
           useSession.getState().setToken(null);
+          useSession.getState().setIdentity(null);
+          void logOutRevenueCat();
           void signOutFirebase();
           nav.navigate('Login');
         }}
@@ -204,11 +207,18 @@ export function SettingsScreen() {
     },
   });
   const deletion = useMutation({
-    mutationFn: async () => (token ? api.deleteAccount() : undefined),
+    mutationFn: async () => {
+      if (token) await api.deleteAccount();
+      try {
+        await deleteCurrentFirebaseUser();
+      } catch {
+        await signOutFirebase();
+      }
+    },
     onSuccess: () => {
       cache.clear();
       useSession.getState().setToken(null);
-      void signOutFirebase();
+      useSession.getState().setIdentity(null);
       nav.navigate('Welcome');
     },
   });
@@ -267,7 +277,7 @@ export function SettingsScreen() {
             color="#263950"
             title="Modifier mes informations"
             onPress={() => {
-              setName(q.data?.firstName ?? 'Thomas');
+              setName(q.data?.firstName ?? '');
               setEdit(!edit);
             }}
           />
@@ -310,7 +320,7 @@ export function SettingsScreen() {
       )}
       {confirm ? (
         <Card>
-          <Label>Supprimer les données de cette démonstration ?</Label>
+          <Label>Supprimer définitivement votre compte et toutes ses données ?</Label>
           <Button
             title="Confirmer la suppression"
             danger
@@ -344,11 +354,7 @@ export function PremiumScreen() {
       const purchase = restore
         ? await restorePremium(profile.data.id)
         : await purchasePremium(profile.data.id, plan);
-      return api.verifyRevenueCat(
-        purchase.productId,
-        purchase.transactionId,
-        idempotencyKey(),
-      );
+      return api.verifyRevenueCat(purchase.productId, purchase.transactionId, idempotencyKey());
     },
     onSuccess: (premium) => {
       cache.setQueryData(['premium-status', token], premium);
@@ -459,12 +465,16 @@ export function PremiumScreen() {
               Offre {status.data?.plan === 'annual' ? 'annuelle' : 'mensuelle'}
             </Label>
             {status.data?.renewsAt && (
-              <Label muted>Prochaine échéance : {new Date(status.data.renewsAt).toLocaleDateString('fr-FR')}</Label>
+              <Label muted>
+                Prochaine échéance : {new Date(status.data.renewsAt).toLocaleDateString('fr-FR')}
+              </Label>
             )}
           </Card>
         ) : (
           <Button
-            title={Platform.OS === 'web' ? 'Configurer RevenueCat pour acheter' : 'Commencer maintenant'}
+            title={
+              Platform.OS === 'web' ? 'Configurer RevenueCat pour acheter' : 'Commencer maintenant'
+            }
             loading={activate.isPending}
             onPress={() => {
               setMessage('');
@@ -566,8 +576,8 @@ export function NotificationsScreen() {
       minute: '2-digit',
     }),
   }));
-  const notices = token ? liveNotices : initialNotices;
-  const groups = token ? ['Aujourd’hui'] : ['Aujourd’hui', 'Hier'];
+  const notices = token ? liveNotices : PREVIEW_ENABLED ? initialNotices : [];
+  const groups = token ? ['Aujourd’hui'] : PREVIEW_ENABLED ? ['Aujourd’hui', 'Hier'] : [];
   const openNotice = (notice: (typeof notices)[number]) => {
     if (token && !notice.readAt) markRead.mutate(notice.id);
     if (!token) setRead([...read, notice.id]);
@@ -740,10 +750,10 @@ export function InfoScreen() {
       <Card>
         <Label muted>
           {kind === 'security'
-            ? 'La connexion Google utilise Firebase sur le Web. Apple et la biométrie seront activés avec les builds mobiles. Aucun identifiant bancaire n’est demandé.'
+            ? 'La connexion Google et la connexion par e-mail utilisent Firebase. Les identifiants bancaires sont saisis uniquement dans le parcours sécurisé de la banque.'
             : kind === 'privacy'
-              ? 'Les données de cette version sont fictives. Vous pouvez supprimer une connexion bancaire depuis Mes banques ou supprimer les données de votre session depuis les paramètres.'
-              : 'Pour tester le parcours, ouvrez Mes banques, sélectionnez une banque et autorisez la connexion fictive. Aucune souscription ni aucun paiement ne sont effectués.'}
+              ? 'Vous pouvez révoquer une connexion bancaire depuis Mes banques, exporter vos données ou supprimer définitivement votre compte depuis les paramètres.'
+              : 'Pour connecter une banque, ouvrez Mes banques et suivez le parcours sécurisé. Le support pourra utiliser l’identifiant de corrélation affiché lorsqu’une requête échoue.'}
         </Label>
       </Card>
       <Button

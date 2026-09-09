@@ -7,7 +7,8 @@
     "userInterfaceStyle": "automatic",
     "scheme": "subscriptionapp",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.davidgeorges.subscriptionapp"
     },
     "android": {
       "package": "com.davidgeorges.subscriptionapp",
@@ -22,6 +23,11 @@
         "projectId": "b55cc19c-4ea7-410d-891c-7fe38657a84f"
       }
     },
-    "owner": "azetoxvii"
+    "owner": "azetoxvii",
+    "plugins": [
+      "expo-web-browser",
+      "expo-notifications",
+      "expo-font"
+    ]
   }
 }

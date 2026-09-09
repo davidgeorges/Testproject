@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SubscriptionApp.Persistence;
@@ -11,9 +12,11 @@ using SubscriptionApp.Persistence;
 namespace SubscriptionApp.Persistence.Migrations
 {
     [DbContext(typeof(WorkspaceDbContext))]
-    partial class WorkspaceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909233008_AddBankProviderSecret")]
+    partial class AddBankProviderSecret
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -392,6 +395,47 @@ namespace SubscriptionApp.Persistence.Migrations
                     b.HasIndex("Category", "Active");
 
                     b.ToTable("offers", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "mobile-demo",
+                            Active = true,
+                            Assumptions = new[] { "Catalogue fictif : aucun tarif commercial vérifié." },
+                            Benefits = new[] { "Sans engagement", "Exemple de forfait mobile" },
+                            Category = "mobile",
+                            IsPartner = true,
+                            MonthlyPrice = 14.99m,
+                            ProviderName = "Offre mobile démo",
+                            SetupFee = 0m,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 9, 8, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = "internet-demo",
+                            Active = true,
+                            Assumptions = new[] { "Éligibilité du logement inconnue.", "Catalogue fictif : aucun tarif commercial vérifié." },
+                            Benefits = new[] { "Exemple de connexion fibre", "39 € de mise en service" },
+                            Category = "internet",
+                            IsPartner = true,
+                            MonthlyPrice = 29.99m,
+                            ProviderName = "Offre fibre démo",
+                            SetupFee = 39m,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 9, 8, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = "insurance-demo",
+                            Active = true,
+                            Assumptions = new[] { "Garanties, franchises et profil conducteur à comparer.", "Catalogue fictif : aucun tarif commercial vérifié." },
+                            Benefits = new[] { "Exemple de contrat automobile" },
+                            Category = "insurance",
+                            IsPartner = true,
+                            MonthlyPrice = 49m,
+                            ProviderName = "Offre assurance démo",
+                            SetupFee = 0m,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 9, 8, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
                 });
 
             modelBuilder.Entity("SubscriptionApp.Domain.PremiumSubscription", b =>

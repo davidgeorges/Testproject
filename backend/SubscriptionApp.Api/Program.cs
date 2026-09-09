@@ -158,7 +158,19 @@ if (!string.IsNullOrWhiteSpace(openAiApiKey) && !string.IsNullOrWhiteSpace(openA
 else builder.Services.AddSingleton<IRecommendationExplainer, DeterministicRecommendationExplainer>();
 var firebaseServiceAccount = builder.Configuration["Firebase:ServiceAccountJson"];
 var firebaseMessagingProject = builder.Configuration["Firebase:MessagingProjectId"] ?? builder.Configuration["Firebase:ProjectId"];
-if (!string.IsNullOrWhiteSpace(firebaseServiceAccount) && !string.IsNullOrWhiteSpace(firebaseMessagingProject))
+var pushProvider = builder.Configuration["Push:Provider"]?.Trim().ToLowerInvariant();
+if (pushProvider == "expo")
+{
+    builder.Services.AddHttpClient("expo-push", client =>
+    {
+        client.BaseAddress = new Uri("https://exp.host/");
+        client.Timeout = TimeSpan.FromSeconds(15);
+    });
+    builder.Services.AddSingleton<IPushSender>(sp => new ExpoPushSender(
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient("expo-push"),
+        builder.Configuration["Push:ExpoAccessToken"]));
+}
+else if (!string.IsNullOrWhiteSpace(firebaseServiceAccount) && !string.IsNullOrWhiteSpace(firebaseMessagingProject))
 {
     builder.Services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
     builder.Services.AddSingleton<IPushSender>(sp => FirebasePushSender.Create(
@@ -228,6 +240,8 @@ builder.Services.AddHostedService<BankSyncWorker>();
 builder.Services.AddHostedService<PushDeliveryWorker>();
 builder.Services.AddHostedService<DataRetentionWorker>();
 var connectionString = builder.Configuration.GetConnectionString("Postgres");
+if (!demo && string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException("ConnectionStrings:Postgres is required outside demo mode.");
 if (string.IsNullOrEmpty(connectionString))
 {
     builder.Services.AddSingleton<IWorkspaceStore, InMemoryWorkspaceStore>();
@@ -243,6 +257,11 @@ else
     builder.Services.AddScoped<IIdempotencyStore, PostgresIdempotencyStore>();
 }
 var app = builder.Build();
+if (connectionString is not null && builder.Configuration.GetValue("Database:ApplyMigrationsOnStartup", !demo))
+{
+    await using var migrationScope = app.Services.CreateAsyncScope();
+    await migrationScope.ServiceProvider.GetRequiredService<WorkspaceDbContext>().Database.MigrateAsync();
+}
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.Use(
     async (ctx, next) =>
@@ -320,9 +339,11 @@ app.MapGet("/health/ready", async (IServiceScopeFactory scopeFactory, IBankingPr
         await using var scope = scopeFactory.CreateAsyncScope();
         databaseReady = await scope.ServiceProvider.GetRequiredService<WorkspaceDbContext>().Database.CanConnectAsync(ct);
     }
-    var integrationsReady = demo || (banking.IsConfigured && identity.IsConfigured && push.IsConfigured && purchase.IsConfigured && premiumEvents.IsConfigured);
+    var identityReady = identity.IsConfigured || !string.IsNullOrWhiteSpace(firebaseProjectId);
+    var premiumEventsReady = premiumEvents.IsConfigured || !string.IsNullOrWhiteSpace(builder.Configuration["RevenueCat:WebhookAuthorization"]);
+    var integrationsReady = demo || (banking.IsConfigured && identityReady && push.IsConfigured && purchase.IsConfigured && premiumEventsReady);
     var ready = databaseReady && integrationsReady;
-    return Results.Json(new { status = ready ? "ready" : "not_ready", database = databaseReady, banking = banking.IsConfigured, identity = identity.IsConfigured, push = push.IsConfigured, premiumPurchase = purchase.IsConfigured, premiumEvents = premiumEvents.IsConfigured }, statusCode: ready ? 200 : 503);
+    return Results.Json(new { status = ready ? "ready" : "not_ready", database = databaseReady, banking = banking.IsConfigured, identity = identityReady, identityAdmin = identity.IsConfigured, push = push.IsConfigured, premiumPurchase = purchase.IsConfigured, premiumEvents = premiumEventsReady }, statusCode: ready ? 200 : 503);
 });
 app.MapOpenApi();
 if (demo)
@@ -398,6 +419,64 @@ app.MapPost("/api/v1/webhooks/revenuecat", async (RevenueCatWebhookRequest reque
         OccurredAt = occurredAt,
     }, renewsAt, ct);
     return Results.Ok(new { accepted = true, duplicateOrStale = !applied });
+});
+app.MapPost("/api/v1/webhooks/tink", async (TinkWebhookRequest request, HttpContext c, IConfiguration configuration, IWorkspaceStore store, IIdempotencyStore idempotency, TimeProvider time, CancellationToken ct) =>
+{
+    var expected = configuration["Tink:WebhookAuthorization"];
+    var supplied = c.Request.Headers.Authorization.ToString();
+    if (string.IsNullOrWhiteSpace(expected)
+        || supplied.Length != expected.Length
+        || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes(expected)))
+        return Results.Unauthorized();
+    if (string.IsNullOrWhiteSpace(request.CredentialsId) || string.IsNullOrWhiteSpace(request.EventId))
+        return Results.BadRequest(new { code = "INVALID_TINK_EVENT", message = "L’événement Tink est incomplet.", correlationId = c.TraceIdentifier });
+    var cacheKey = $"tink-webhook:{request.EventId}";
+    var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{request.CredentialsId}|{request.Type}")));
+    var decision = await idempotency.Begin(cacheKey, fingerprint, time.GetUtcNow().AddDays(7), ct);
+    if (decision.State == IdempotencyState.Conflict)
+        return Results.Conflict(new { code = "TINK_EVENT_CONFLICT", message = "Cet identifiant d’événement a déjà été utilisé.", correlationId = c.TraceIdentifier });
+    if (decision.State is IdempotencyState.Pending or IdempotencyState.Completed)
+        return Results.Ok(new { accepted = true, duplicate = true });
+    try
+    {
+        var connection = await store.ConnectionByProviderReference("tink", request.CredentialsId, ct);
+        if (connection is null)
+        {
+            await idempotency.Complete(cacheKey, fingerprint, 200, null, ct);
+            return Results.Ok(new { accepted = true, ignored = true });
+        }
+        var eventType = request.Type.Trim().ToUpperInvariant();
+        if (eventType is "AUTHORIZATION_REVOKED" or "CREDENTIALS_INVALID")
+        {
+            await store.SetConnectionStatus(connection, "reconnect_required", ct);
+            await store.AddNotification(new()
+            {
+                UserId = connection.UserId,
+                Type = "bank_reconnect_required",
+                Title = "Reconnectez votre banque",
+                Body = "Votre banque demande une nouvelle authentification.",
+                ResourceId = connection.Id.ToString(),
+                SourceKey = $"tink:{request.EventId}",
+            }, ct);
+            await idempotency.Complete(cacheKey, fingerprint, 200, null, ct);
+            return Results.Ok(new { accepted = true, reconnectRequired = true });
+        }
+        var now = time.GetUtcNow();
+        var job = await store.EnqueueSync(new BankSyncJob
+        {
+            UserId = connection.UserId,
+            ConnectionId = connection.Id,
+            CreatedAt = now,
+            UpdatedAt = now,
+        }, ct);
+        await idempotency.Complete(cacheKey, fingerprint, 202, null, ct);
+        return Results.Accepted($"/api/v1/bank/sync-jobs/{job.Id}", new { accepted = true, job.Id });
+    }
+    catch
+    {
+        await idempotency.Abandon(cacheKey, fingerprint, ct);
+        throw;
+    }
 });
 var api = app.MapGroup("/api/v1").RequireAuthorization();
 static string User(HttpContext c) => c.User.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -939,6 +1018,11 @@ api.MapGet(
             )
         )
 );
+api.MapGet(
+    "/admin/offers",
+    async (HttpContext c, IConfiguration configuration, IOfferCatalog offers, CancellationToken ct) =>
+        !IsAdmin(c, configuration) ? Results.NotFound() : Results.Ok(await offers.GetOffers(ct))
+);
 api.MapPut(
     "/admin/offers/{id}",
     async (
@@ -1201,8 +1285,7 @@ api.MapDelete(
     async (HttpContext c, IWorkspaceStore s, IIdentityLifecycle identity, TimeProvider time, CancellationToken ct) =>
     {
         if (!HasRecentAuthentication(c, time, demo)) return Results.Json(new { code = "RECENT_AUTH_REQUIRED", message = "Reconnectez-vous avant de supprimer le compte.", correlationId = c.TraceIdentifier }, statusCode: 403);
-        if (!identity.IsConfigured) return Unavailable(c, "IDENTITY_LIFECYCLE_NOT_CONFIGURED", "La suppression de l’identité doit être configurée.");
-        await identity.DeleteIdentity(User(c), ct);
+        if (identity.IsConfigured) await identity.DeleteIdentity(User(c), ct);
         await s.DeleteAccount(User(c), ct);
         return Results.NoContent();
     }
@@ -1254,6 +1337,7 @@ public sealed record PremiumWebhookRequest(
     string SignedPayload
 );
 public sealed record RevenueCatWebhookRequest(RevenueCatWebhookEvent Event);
+public sealed record TinkWebhookRequest(string EventId, string CredentialsId, string Type);
 public sealed record RevenueCatWebhookEvent(
     string Id,
     string Type,

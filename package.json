@@ -15,5 +15,8 @@
   },
   "devDependencies": {
     "prettier": "3.6.2"
+  },
+  "overrides": {
+    "expo-font": "55.0.8"
   }
 }

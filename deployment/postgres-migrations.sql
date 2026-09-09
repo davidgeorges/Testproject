@@ -818,3 +818,21 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260909233008_AddBankProviderSecret') THEN
+    ALTER TABLE bank_connections ADD "ProviderSecret" text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260909233008_AddBankProviderSecret') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260909233008_AddBankProviderSecret', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

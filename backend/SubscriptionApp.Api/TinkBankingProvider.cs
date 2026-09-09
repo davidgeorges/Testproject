@@ -33,10 +33,12 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
             using var json = JsonDocument.Parse(body);
             if (!json.RootElement.TryGetProperty("access_token", out var accessToken) || string.IsNullOrWhiteSpace(accessToken.GetString()))
                 throw new TinkBankingException("TINK_TOKEN_MISSING", "Tink n’a retourné aucun jeton d’accès.");
+            var token = accessToken.GetString()!;
             return new BankConnection
             {
                 UserId = userId, BankName = "Banque connectée via Tink", Provider = "tink",
-                ExternalConnectionId = Protect(accessToken.GetString()!), Status = "connected",
+                ExternalConnectionId = string.IsNullOrWhiteSpace(credentialsId) ? $"unknown-{Guid.NewGuid():N}" : credentialsId,
+                ProviderSecret = Protect(token), Status = "connected",
                 ConsentExpiresAt = DateTimeOffset.UtcNow.AddDays(90), AuthorizationUrl = null,
             };
         }
@@ -49,7 +51,7 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
 
     public async Task<IReadOnlyList<BankTransaction>> FetchTransactions(BankConnection connection, CancellationToken ct)
     {
-        var accessToken = Unprotect(connection.ExternalConnectionId!);
+        var accessToken = AccessToken(connection);
         var result = new List<BankTransaction>();
         string? pageToken = null;
         for (var page = 0; page < 5; page++)
@@ -93,7 +95,31 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
         return result;
     }
 
-    public Task RevokeConnection(BankConnection connection, CancellationToken ct) => Task.CompletedTask;
+    public async Task RevokeConnection(BankConnection connection, CancellationToken ct)
+    {
+        var accessToken = AccessToken(connection);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/oauth/revoke-all");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        using var response = await http.SendAsync(request, ct);
+        if (response.IsSuccessStatusCode || response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.NotFound)
+            return;
+        throw new TinkBankingException("TINK_REVOKE_FAILED", $"Tink n’a pas pu révoquer la connexion (HTTP {(int)response.StatusCode}).");
+    }
+
+    private string AccessToken(BankConnection connection)
+    {
+        var encrypted = connection.ProviderSecret ?? connection.ExternalConnectionId;
+        if (string.IsNullOrWhiteSpace(encrypted))
+            throw new TinkBankingException("TINK_TOKEN_MISSING", "La connexion bancaire doit être renouvelée.");
+        try
+        {
+            return Unprotect(encrypted);
+        }
+        catch (Exception exception) when (exception is CryptographicException or FormatException or ArgumentException)
+        {
+            throw new TinkBankingException("TINK_TOKEN_INVALID", "Cette ancienne connexion bancaire doit être renouvelée.");
+        }
+    }
 
     private string Protect(string value)
     {

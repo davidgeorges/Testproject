@@ -49,6 +49,12 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
             );
     }
 
+    public Task<BankConnection?> ConnectionByProviderReference(string provider, string externalId, CancellationToken ct)
+    {
+        lock (gate)
+            return Task.FromResult(connections.FirstOrDefault(c => c.Provider == provider && c.ExternalConnectionId == externalId));
+    }
+
     public Task<IReadOnlyList<BankConnection>> ExpiringConnections(
         DateTimeOffset from,
         DateTimeOffset until,

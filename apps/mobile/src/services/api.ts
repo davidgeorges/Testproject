@@ -107,6 +107,14 @@ export const api = {
   notifications: () => request<Notification[]>('/notifications'),
   readNotification: (id: string) =>
     request(`/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
+  pushDevices: () => request<Array<{ id: string; platform: string }>>('/push/devices'),
+  registerPushDevice: (platform: 'ios' | 'android', token: string) =>
+    request<{ id: string; platform: string }>('/push/devices', {
+      method: 'POST',
+      body: JSON.stringify({ platform, token }),
+    }),
+  removePushDevice: (id: string) =>
+    request(`/push/devices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   premiumStatus: () => request<PremiumStatus>('/premium/status'),
   verifyRevenueCat: (productId: string, transactionId: string, key: string) =>
     request<PremiumStatus>('/premium/verify-purchase', {

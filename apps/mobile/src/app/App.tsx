@@ -20,9 +20,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSession, useLiveToken } from '../store/session';
+import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import { api } from '../services/api';
 import { watchFirebaseToken } from '../services/firebase';
+import { registerForPushNotifications } from '../services/notifications';
 import { useColors, Label, IconButton } from '../design/ui';
 import {
   DashboardScreen,
@@ -187,7 +188,10 @@ function Navigator({ onChange }: { onChange: () => void }) {
   return (
     <NavigationContainer
       ref={navigation}
-      linking={{ prefixes: ['http://localhost:8081'], config: { screens: { BankCallback: 'banking/callback' } } }}
+      linking={{
+        prefixes: ['http://localhost:8081'],
+        config: { screens: { BankCallback: 'banking/callback' } },
+      }}
       onReady={() => {
         onChange();
         redirectRestoredSession();
@@ -206,7 +210,7 @@ function Navigator({ onChange }: { onChange: () => void }) {
       }}
     >
       <Stack.Navigator
-        initialRouteName="Main"
+        initialRouteName={token || PREVIEW_ENABLED ? 'Main' : 'Welcome'}
         screenOptions={({ route, navigation: nav }) => ({
           contentStyle: { backgroundColor: c.background },
           animation: 'fade',
@@ -244,7 +248,11 @@ function Navigator({ onChange }: { onChange: () => void }) {
         />
         <Stack.Screen name="Onboarding" component={Onboarding} options={{ headerShown: false }} />
         <Stack.Screen name="Bank" component={BankScreen} />
-        <Stack.Screen name="BankCallback" component={TinkCallbackScreen} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="BankCallback"
+          component={TinkCallbackScreen}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen name="Sync" component={SyncScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Subscription" component={SubscriptionDetail} />
         <Stack.Screen
@@ -364,7 +372,7 @@ function Experience() {
       style={{ flex: 1 }}
     >
       <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
-      {!desktop && Platform.OS === 'web' && (
+      {PREVIEW_ENABLED && !desktop && Platform.OS === 'web' && (
         <View
           style={{
             height: 30,
@@ -414,7 +422,7 @@ function Experience() {
           padding: desktop ? 20 : 0,
         }}
       >
-        {desktop && (
+        {PREVIEW_ENABLED && desktop && (
           <View style={{ width: 240, height: '100%', maxHeight: 844, gap: 12 }}>
             <View style={{ paddingVertical: 10, gap: 8 }}>
               <Text
@@ -436,7 +444,7 @@ function Experience() {
               style={{ paddingVertical: 8, gap: 6, borderTopWidth: 1, borderTopColor: '#283C50' }}
             >
               <Text style={{ fontSize: 10, color: '#A8B8CB' }}>
-                ● {token ? 'Compte Google connecté' : 'Aperçu interactif · données d’exemple'}
+                ● {token ? 'Compte Firebase connecté' : 'Connexion requise'}
               </Text>
               <Text style={{ fontSize: 10, lineHeight: 15, color: '#607992' }}>
                 Les tarifs et fonctionnalités illustrés{'\n'}ne constituent pas des offres actives.
@@ -519,6 +527,7 @@ export default function App() {
     () =>
       watchFirebaseToken((firebase) => {
         useSession.getState().setToken(firebase?.token ?? null);
+        useSession.getState().setIdentity(firebase);
         useSession.getState().setAuthInitialized(true);
         if (firebase) {
           useSession.getState().setPreview(false);
@@ -529,11 +538,12 @@ export default function App() {
           void api
             .profile()
             .then((profile) =>
-              ['Alex', 'Utilisateur'].includes(profile.firstName)
+              profile.firstName === 'Utilisateur'
                 ? api.saveProfile({ ...profile, firstName })
                 : profile,
             )
             .catch(() => undefined);
+          void registerForPushNotifications().catch(() => undefined);
         }
       }),
     [],

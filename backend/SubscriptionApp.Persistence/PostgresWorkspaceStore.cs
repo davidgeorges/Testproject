@@ -40,6 +40,9 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         CancellationToken ct
     ) => await db.Connections.Where(c => c.UserId == userId).ToListAsync(ct);
 
+    public async Task<BankConnection?> ConnectionByProviderReference(string provider, string externalId, CancellationToken ct) =>
+        await db.Connections.SingleOrDefaultAsync(c => c.Provider == provider && c.ExternalConnectionId == externalId, ct);
+
     public async Task<IReadOnlyList<BankConnection>> ExpiringConnections(
         DateTimeOffset from,
         DateTimeOffset until,

@@ -24,7 +24,7 @@ import {
   useColors,
 } from './ui';
 import { useOverview, usePayments, useRecommendations, useProfile } from './reference';
-import { useSession, useLiveToken } from '../store/session';
+import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import { api, idempotencyKey } from '../services/api';
 import { money, cadence, date } from '../utils/format';
 import type { RootStackParams, TabsParams } from '../app/navigation';
@@ -92,7 +92,7 @@ export function ScreenWithTabs({
     </View>
   );
 }
-export function SavingsHero({ amount = 420, green = false }: { amount?: number; green?: boolean }) {
+export function SavingsHero({ amount = 0, green = false }: { amount?: number; green?: boolean }) {
   return (
     <LinearGradient
       colors={green ? ['#00C794', '#159BD4'] : ['#00C0D4', '#2465FF', '#9138FF']}
@@ -155,7 +155,7 @@ export function DashboardScreen() {
       >
         <View style={{ gap: 4 }}>
           <Label style={{ fontSize: 22, lineHeight: 27, fontWeight: '700' }}>
-            Bonjour {profile.data?.firstName ?? 'Thomas'} 👋
+            Bonjour {profile.data?.firstName ?? 'Utilisateur'} 👋
           </Label>
           <Label muted style={{ fontSize: 13 }}>
             Voici votre résumé aujourd’hui.
@@ -309,7 +309,7 @@ export function SubscriptionDetail() {
   const route = useRoute<RouteProp<RootStackParams, 'Subscription'>>();
   const q = usePayments();
   const p = q.data?.items.find((p) => p.id === route.params.id);
-  const preview = !useLiveToken();
+  const preview = PREVIEW_ENABLED && !useLiveToken();
   const c = useColors();
   const [message, setMessage] = useState('');
   const [dialog, setDialog] = useState<'category' | 'ignore' | null>(null);
@@ -570,7 +570,7 @@ export function SavingsScreen() {
     <Page style={{ gap: 12 }}>
       <Label style={{ fontSize: 23, lineHeight: 29, fontWeight: '700' }}>Vos économies</Label>
       <Chips items={['Toutes', 'Disponibles', 'Réalisées']} value={filter} onChange={setFilter} />
-      <SavingsHero green amount={token ? d.data?.annualPotentialSaving : 496} />
+      <SavingsHero green amount={d.data?.annualPotentialSaving ?? 0} />
       {q.isPending || q.error ? (
         <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
       ) : filter === 'Réalisées' ? (
@@ -611,10 +611,9 @@ export function RecommendationDetail() {
         : { tracked: false, isDemo: true, url: null },
     onSuccess: () =>
       setMessage(
-        'Offre de démonstration : aucun contrat souscrit. ' +
-          (token
-            ? 'La consultation a été enregistrée.'
-            : 'Les tarifs ne sont pas des offres commerciales vérifiées.'),
+        token
+          ? 'La consultation a été enregistrée. Vérifiez les conditions du partenaire avant toute souscription.'
+          : 'Connectez-vous pour ouvrir une offre.',
       ),
   });
   return (
@@ -642,7 +641,7 @@ export function RecommendationDetail() {
           <Card>
             {[
               ['Prix mensuel', money(r.currentCost)],
-              ...(!token && r.id === 'mobile'
+              ...(PREVIEW_ENABLED && !token && r.id === 'mobile'
                 ? [
                     ['› Forfait', '200 Go'],
                     ['Consommation moyenne', '21 Go/mois'],
@@ -672,12 +671,14 @@ export function RecommendationDetail() {
                 style={{ padding: 8, borderRadius: 6 }}
               >
                 <Label style={{ color: 'white', fontSize: 23, fontWeight: '800' }}>
-                  {!token && r.id === 'mobile' ? 'Sosh' : 'Offre'}
+                  {PREVIEW_ENABLED && !token && r.id === 'mobile' ? 'Sosh' : 'Offre'}
                 </Label>
               </LinearGradient>
               <View style={{ flex: 1 }}>
                 <Label style={{ fontSize: 15, fontWeight: '600' }}>
-                  {!token && r.id === 'mobile' ? 'Série 80 Go' : r.offer.providerName}
+                  {PREVIEW_ENABLED && !token && r.id === 'mobile'
+                    ? 'Série 80 Go'
+                    : r.offer.providerName}
                 </Label>
                 <Label style={{ fontSize: 16, fontWeight: '600' }}>
                   {money(r.suggestedCost)}/mois
@@ -728,7 +729,7 @@ export function RecommendationDetail() {
               label="Partager la recommandation"
               onPress={() => {
                 void Share.share({
-                  message: `Exemple de recommandation : ${r.title}. Économie estimée : ${money(r.annualSaving)}/an. Données de démonstration.`,
+                  message: `${r.title} : économie estimée à ${money(r.annualSaving)}/an. Vérifiez les conditions de l’offre avant toute souscription.`,
                 }).catch(() => setMessage('Le partage n’est pas disponible sur cet appareil.'));
               }}
             />

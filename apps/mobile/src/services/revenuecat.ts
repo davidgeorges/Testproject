@@ -9,6 +9,7 @@ const apiKey =
       : process.env.EXPO_PUBLIC_REVENUECAT_WEB_API_KEY);
 
 let configuredFor: string | null = null;
+const entitlementId = process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID ?? 'premium';
 
 async function sdk() {
   if (Platform.OS === 'web') {
@@ -33,17 +34,32 @@ export async function purchasePremium(userId: string, plan: 'monthly' | 'annual'
   const packages = offerings.current?.availablePackages ?? [];
   const wanted = plan === 'annual' ? PACKAGE_TYPE.ANNUAL : PACKAGE_TYPE.MONTHLY;
   const selected = packages.find((item) => item.packageType === wanted);
-  if (!selected) throw new Error(`L’offre Premium ${plan === 'annual' ? 'annuelle' : 'mensuelle'} est absente de RevenueCat.`);
+  if (!selected)
+    throw new Error(
+      `L’offre Premium ${plan === 'annual' ? 'annuelle' : 'mensuelle'} est absente de RevenueCat.`,
+    );
   await Purchases.purchasePackage(selected);
-  return { productId: selected.product.identifier, transactionId: `${userId}:${selected.product.identifier}` };
+  return {
+    productId: selected.product.identifier,
+    transactionId: `${userId}:${selected.product.identifier}`,
+  };
 }
 
 export async function restorePremium(userId: string) {
   await configure(userId);
   const { default: Purchases } = await sdk();
   const customer = await Purchases.restorePurchases();
-  const entitlement = customer.entitlements.active.premium
-    ?? Object.values(customer.entitlements.active)[0];
+  const entitlement = customer.entitlements.active[entitlementId];
   if (!entitlement) throw new Error('Aucun abonnement Premium actif n’a été trouvé.');
-  return { productId: entitlement.productIdentifier, transactionId: `${userId}:${entitlement.productIdentifier}` };
+  return {
+    productId: entitlement.productIdentifier,
+    transactionId: `${userId}:${entitlement.productIdentifier}`,
+  };
+}
+
+export async function logOutRevenueCat(): Promise<void> {
+  if (!configuredFor || Platform.OS === 'web') return;
+  const { default: Purchases } = await sdk();
+  await Purchases.logOut();
+  configuredFor = null;
 }
