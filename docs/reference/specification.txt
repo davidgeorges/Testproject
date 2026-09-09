@@ -1,0 +1,316 @@
+SMARTSAVECahier des chargesV1 - Comparateur intelligent de dépensesDocument fonctionnel + technique destiné à l’ingénieur / équipe de développement
+
+Périmètre V1  Connecter la banque, détecter les dépenses récurrentes, estimer les économies et proposer des alternatives pertinentes. Les fonctionnalités budget, administration française et gestion patrimoniale sont explicitement hors périmètre.
+
+Décision technique  Pour un nouveau démarrage en septembre 2026, la cible backend recommandée est .NET 10 LTS plutôt que .NET 9. Microsoft indique .NET 10 supporté jusqu’en novembre 2028, alors que .NET 9 arrive en fin de support en novembre 2026. (référence : Microsoft Lifecycle)
+
+0. Synthèse exécutive
+Produit : Application mobile de comparaison intelligente de dépenses personnelles.
+Promesse : Révéler automatiquement les dépenses récurrentes et les économies possibles, puis proposer une action simple et contextualisée.
+Cible V1 : Particuliers en France disposant d’au moins un compte bancaire compatible Open Banking.
+Canaux : iOS et Android via React Native + Expo.
+Monétisation : Premium + affiliation (assurance, télécom, Internet, énergie, banque, mutuelle selon partenaires disponibles).
+Principe IA : Le moteur métier calcule les détections et économies ; l’IA génère les explications et reformule les recommandations. L’IA ne doit pas être l’unique source de vérité pour les calculs.
+Sommaire
+1. Cahier des charges fonctionnel
+2. Maquettes UX/UI
+3. Design System
+4. Architecture de la base de données
+5. Documentation API
+6. Architecture .NET
+7. Roadmap détaillée
+8. Développement React Native
+9. Développement Backend
+10. Tests et déploiement
+11. Critères de recette V1
+1. Cahier des charges fonctionnel
+1.1 Objectif utilisateur
+À la première connexion, l’utilisateur doit pouvoir passer de “je ne sais pas où part mon argent” à “voici mes dépenses récurrentes et voici les actions qui peuvent me faire économiser”. Le parcours doit privilégier une valeur visible dès la première synchronisation.
+1.2 Fonctionnalités incluses
+Création de compte, connexion, réinitialisation du mot de passe et suppression du compte.
+Connexion d’une ou plusieurs banques via un prestataire Open Banking ; l’application ne stocke pas les identifiants bancaires.
+Import/synchronisation des transactions et des métadonnées utiles à l’analyse.
+Détection des abonnements et paiements récurrents (mensuels, trimestriels, annuels ou autres cycles réguliers).
+Catégorisation : streaming, logiciel, télécom, assurance, énergie, sport, presse, cloud, etc.
+Dashboard avec coût mensuel estimé, nombre d’abonnements, dernières synchronisations et économies potentielles.
+Détection d’opportunités d’économies sur un périmètre limité de V1 : téléphonie, Internet, assurance auto et, si données partenaires disponibles, énergie/mutuelle.
+Fiche de recommandation expliquant la situation actuelle, la recommandation, le gain estimé, les hypothèses et un bouton d’action/affiliation.
+Notifications push pour nouvelles opportunités et synchronisation réussie/échouée.
+Espace Premium et gestion d’abonnement via le store (à intégrer avec un fournisseur de paiement mobile ou RevenueCat si retenu).
+Back-office minimal pour gérer les offres, partenaires, recommandations et indicateurs techniques.
+1.3 Fonctionnalités hors périmètre
+Budget automatique et prévision de trésorerie.
+Assistant administratif français (CAF, impôts, France Travail, URSSAF, etc.).
+Investissement, patrimoine, crédit et conseil financier personnalisé.
+Publicité comportementale et revente de données.
+Annulation automatique de contrats sans validation explicite de l’utilisateur.
+1.4 Règles métier essentielles
+Règle | Spécification
+Détection récurrente | Une dépense peut être classée récurrente si elle présente plusieurs occurrences, un fournisseur stable et un intervalle suffisamment régulier. Le seuil exact doit être configurable côté backend.
+Abonnement | Un abonnement correspond à une dépense récurrente dont la nature et le fournisseur permettent d’identifier un service continu.
+Économie | Toujours présenter une économie comme une estimation basée sur des données connues et des hypothèses explicites.
+Confiance | Chaque recommandation possède un score de confiance : élevé, moyen ou faible, calculé par le moteur métier.
+IA | Le texte généré par IA doit recevoir en entrée uniquement les faits calculés et validés par le moteur métier.
+Affiliation | Une offre affiliée doit être clairement identifiée comme partenaire. Le clic doit être tracé pour mesurer la conversion.
+Données bancaires | Minimisation : stocker seulement les champs nécessaires à la détection, aux statistiques et à l’historique utilisateur.
+1.5 Parcours utilisateur principal
+1.Installer l’application et créer un compte.
+2.Accepter les informations légales/consentements nécessaires.
+3.Sélectionner sa banque et autoriser l’accès via le parcours sécurisé du prestataire Open Banking.
+4.Attendre la synchronisation initiale et voir la progression.
+5.Consulter le dashboard : abonnements, dépenses récurrentes, économies estimées.
+6.Ouvrir une recommandation, comprendre pourquoi elle est proposée et consulter l’offre partenaire.
+7.Activer Premium pour recevoir une analyse plus complète et des alertes.
+1.6 États et erreurs à prévoir
+Banque non compatible / indisponible.
+Consentement bancaire expiré.
+Synchronisation partielle.
+Aucune transaction détectée.
+Aucun abonnement trouvé.
+Aucune économie fiable.
+Offre partenaire momentanément indisponible.
+Erreur serveur / réseau.
+Compte supprimé / réauthentification requise.
+
+2. Maquettes UX/UI
+Référence validée  La maquette dark mode ci-dessous est la référence visuelle V1. Les écrans et composants doivent être reproduits en priorité, sans multiplier les variantes avant la stabilisation du produit.
+
+
+Figure 1 - Maquette V1 dark mode validée et de référence (23 écrans).
+Correction de référence : le dark mode ci-dessus est la maquette officielle V1. Le light mode ci-dessous est conservé comme thème alternatif. Le dark mode est activé par défaut au premier lancement.
+
+Figure 2 - Maquette V1 light mode alternative (23 écrans).
+2.1 Écrans à implémenter
+# | Zone | Attendu
+1 | Splash | Logo, promesse produit, chargement court.
+2-3 | Authentification | Connexion et création de compte.
+4-7 | Onboarding | 4 slides : valeur, économies, recommandations, sécurité bancaire.
+8-9 | Connexion bancaire / synchronisation | Choix de banque, autorisation, progression et état de synchronisation.
+10 | Accueil | Montant économisable, abonnements, dépenses récurrentes, recommandations prioritaires.
+11-12 | Abonnements | Liste + détail d’un abonnement.
+13-14 | Économies / recommandation | Liste des opportunités + fiche de détail.
+15 | Premium | Avantages, prix, CTA.
+16-18 | Profil / paramètres / notifications | Compte, sécurité, apparence, notifications, confidentialité, support.
+19-21 | États système | Erreur, aucune économie, économie réalisée.
+22-23 | Menu / dark mode | Navigation secondaire et variante dark ; la dark est la référence par défaut.
+3. Design System
+3.1 Principes
+Dark mode par défaut ; light mode disponible comme thème alternatif.
+Priorité à la lisibilité et à la confiance.
+Une hiérarchie visuelle claire : montant > gain > explication > action.
+Le code React Native doit centraliser le thème dans des design tokens et permettre le basculement dark/light sans dupliquer les écrans.
+Animations courtes et utiles, jamais décoratives sur les écrans financiers.
+3.2 Tokens UI V1
+Token | Valeur | Usage
+Background principal | #07111F | Fond global
+Surface | #0E1A2B | Cards / sections
+Surface élevée | #13243A | Inputs / éléments actifs
+Primary | #2563EB | CTA principal
+Primary glow | #4F46E5 | Accent gradient
+Success | #10B981 | Économies / succès
+Warning | #F59E0B | Attention
+Danger | #EF4444 | Erreur / suppression
+Text primary | #F8FAFC | Texte principal
+Text secondary | #94A3B8 | Texte secondaire
+Border | #22334A | Contours discrets
+3.3 Composants
+Button / Primary / Secondary / Destructive
+Input / Search / Password
+Card / KPI / Recommendation / Subscription
+Badge / Status / Confidence
+Bottom navigation / Top bar
+List row avec icône, montant, fréquence et chevron
+Empty state / Error state / Success state
+Chart simple de dépenses récurrentes
+3.4 Responsive / accessibilité
+Support iPhone et Android avec hauteurs d’écran différentes.
+Texte dynamique sans débordement ; ne jamais positionner le contenu critique en coordonnées fixes.
+Zones tactiles d’au moins ~44 pt côté iOS.
+Contraste suffisant et libellés accessibles pour les icônes/actions.
+4. Architecture de la base de données
+Principe  PostgreSQL reste la source de vérité applicative. Les données bancaires brutes doivent être minimisées et, lorsque possible, séparées des données de profil et de facturation.
+
+4.1 Tables cœur V1
+Table | Champs clés | Rôle
+users | id, email, status, created_at | Compte applicatif
+user_profiles | user_id, first_name, locale, timezone | Préférences et profil
+bank_connections | id, user_id, provider, external_connection_id, status, consent_expires_at | Connexion Open Banking
+bank_accounts | id, connection_id, external_account_id, account_type, masked_name | Compte bancaire
+transactions | id, account_id, external_id, booked_at, amount, currency, merchant_name, raw_category | Transactions normalisées
+recurring_payments | id, user_id, merchant_key, cadence, avg_amount, confidence | Paiements récurrents détectés
+subscriptions | id, user_id, recurring_payment_id, category, status, first_seen_at, last_seen_at | Abonnements identifiés
+offers | id, category, provider_name, price, benefits_json, eligibility_json, affiliate_url, active | Offres comparables
+recommendations | id, user_id, type, current_cost, suggested_cost, annual_saving, confidence, rationale_json, status | Opportunités calculées
+recommendation_events | id, recommendation_id, event_type, occurred_at, metadata_json | Vues / clics / conversions
+premium_subscriptions | id, user_id, provider, external_subscription_id, plan, status, renews_at | Abonnement Premium
+notifications | id, user_id, type, title, body, read_at, created_at | Notifications push / in-app
+consents | id, user_id, consent_type, version, granted_at, revoked_at | Consentements
+audit_logs | id, user_id, actor, action, resource_type, resource_id, created_at | Traçabilité technique
+4.2 Relations principales
+users 1-N bank_connections ; bank_connections 1-N bank_accounts ; bank_accounts 1-N transactions.
+users 1-N recurring_payments ; recurring_payments 0-1 subscription.
+users 1-N recommendations ; recommendation -> plusieurs offers candidates possibles.
+users 1-N notifications ; users 1-N consents ; users 1-1 profil.
+Toutes les tables métier exposées côté API doivent disposer d’un user_id ou d’un lien vérifiable vers celui-ci.
+4.3 Index / contraintes minimales
+Unique sur external_id + provider pour transactions et comptes.
+Index (user_id, booked_at) sur transactions.
+Index (user_id, status) sur subscriptions et recommendations.
+Index (user_id, created_at) sur notifications.
+Toutes les dates en UTC en base ; conversion selon timezone au niveau API/mobile.
+5. Documentation API
+5.1 Conventions
+REST JSON sur HTTPS.
+Authentification par JWT issu de Firebase Auth, vérifié côté API.
+Versionnement /api/v1.
+Pagination cursor ou page/limit pour les listes.
+Idempotency-Key sur les opérations sensibles ou répétables.
+Erreurs standardisées : code, message utilisateur, correlationId, détails techniques non exposés en production.
+Méthode | Endpoint | Fonction
+POST | /api/v1/bank/connections | Lancer une connexion bancaire
+GET | /api/v1/bank/connections | Lister les connexions
+DELETE | /api/v1/bank/connections/{id} | Révoquer une connexion
+POST | /api/v1/bank/connections/{id}/sync | Forcer une synchronisation
+GET | /api/v1/dashboard | KPIs du dashboard
+GET | /api/v1/subscriptions | Lister les abonnements
+GET | /api/v1/subscriptions/{id} | Détail abonnement
+PATCH | /api/v1/subscriptions/{id} | Modifier catégorie / statut utilisateur
+GET | /api/v1/recommendations | Lister les économies
+GET | /api/v1/recommendations/{id} | Détail recommandation
+GET | /api/v1/offers?category=... | Lister les offres candidates
+POST | /api/v1/recommendations/{id}/click | Tracer clic affiliation
+GET | /api/v1/notifications | Lister notifications
+POST | /api/v1/notifications/{id}/read | Marquer comme lue
+GET | /api/v1/profile | Profil utilisateur
+PATCH | /api/v1/profile | Modifier préférences
+GET | /api/v1/consents | Lister consentements
+DELETE | /api/v1/account | Demander suppression du compte
+GET | /api/v1/premium/status | Statut Premium
+POST | /api/v1/premium/verify-purchase | Vérifier achat store
+5.2 Exemple - dashboard
+GET /api/v1/dashboard200 OK{  "subscriptionCount": 12,  "monthlyRecurringCost": 284.00,  "annualPotentialSaving": 420.00,  "lastSyncAt": "2026-09-08T08:41:00Z",  "topRecommendations": [    {"id":"rec_123", "type":"MOBILE", "annualSaving":180,"confidence":"HIGH"}  ]}
+5.3 Webhooks / événements
+bank.sync.completed
+bank.sync.failed
+bank.consent.expiring
+premium.purchase.updated
+affiliate.conversion.received (si partenaire compatible)
+6. Architecture .NET
+Version cible  ASP.NET Core sur .NET 10 LTS est recommandé pour un nouveau démarrage en 2026. .NET 9 reste techniquement exploitable à court terme mais n’est pas le meilleur choix pour une base long terme, sa fin de support intervenant en novembre 2026. (Microsoft Lifecycle)
+
+6.1 Clean Architecture
+SmartSave.sln├── SmartSave.Api├── SmartSave.Application│   ├── Features│   │   ├── Dashboard│   │   ├── Subscriptions│   │   ├── Recommendations│   │   └── Premium├── SmartSave.Domain├── SmartSave.Infrastructure│   ├── Banking│   ├── OpenAI│   ├── Affiliates│   └── Notifications├── SmartSave.Persistence└── SmartSave.Tests
+6.2 Responsabilités
+Projet | Responsabilité
+API | Controllers/minimal APIs, auth, validation, mapping, HTTP concerns.
+Application | Cas d’usage, orchestration, DTO, règles d’accès, interfaces.
+Domain | Entités, value objects, règles métier pures, enums.
+Infrastructure | Open Banking, OpenAI, affiliation, push notifications, Redis.
+Persistence | EF Core, migrations, repositories/queries, PostgreSQL.
+Tests | Unitaires, intégration, contrats API, tests end-to-end sélectionnés.
+6.3 Services techniques
+Entity Framework Core + PostgreSQL.
+Redis pour cache court terme / verrous / réduction d’appels partenaires.
+Background workers pour synchronisation, détection des récurrences et recalcul des recommandations.
+OpenAI via un service applicatif dédié ; prompts versionnés et observables.
+Sentry + Azure Application Insights pour erreurs et performance.
+OpenAPI/Swagger généré automatiquement à partir du contrat API.
+7. Roadmap détaillée
+Étape | Durée cible | Livrable
+Sprint 0 | 2-3 jours | Repo, environnements, conventions, CI/CD, choix Open Banking, design tokens.
+Sprint 1 | 1 semaine | Auth, comptes, navigation mobile, base PostgreSQL, CI backend.
+Sprint 2 | 1 semaine | Intégration Open Banking : connexion, consentement, comptes, premières transactions.
+Sprint 3 | 1 semaine | Normalisation transactions + moteur de détection récurrence.
+Sprint 4 | 1 semaine | Abonnements, catégories, dashboard V1.
+Sprint 5 | 1 semaine | Moteur économies + catalogue offres + recommandations.
+Sprint 6 | 1 semaine | IA explicative + notifications + affiliation tracking.
+Sprint 7 | 1 semaine | Premium, analytics, paramètres, suppression compte.
+Sprint 8 | 1 semaine | Tests E2E, hardening sécurité, store build, observabilité.
+Buffer | 1-2 semaines | Corrections, certification stores, ajustements partenaire bancaire et conformité.
+Planning  Objectif réaliste : environ 8 à 10 semaines de développement effectif pour une V1 maîtrisée, hors délais externes liés aux partenaires bancaires, stores et conformité.
+
+8. Développement React Native
+8.1 Stack
+React Native + Expo + TypeScript.
+Expo SDK 55+ recommandé ; la New Architecture est activée par défaut à partir d’Expo SDK 55. (Documentation Expo, 2026)
+React Navigation pour navigation.
+TanStack Query pour appels et cache serveur.
+Zustand ou Redux Toolkit uniquement pour l’état local/global réellement nécessaire.
+React Hook Form + Zod pour formulaires/validation.
+EAS Build / EAS Submit pour CI mobile et distribution.
+8.2 Structure proposée
+src/├── app/              # routing, providers├── features/         # dashboard, subscriptions, recommendations...├── components/       # design system réutilisable├── services/         # api, auth, analytics, notifications├── hooks/├── store/├── theme/            # tokens dark mode├── types/└── utils/
+8.3 Règles de développement
+Pas de logique métier critique dans les composants UI.
+Les montants monétaires ne doivent jamais être manipulés en float côté logique critique : préférer decimal côté backend et représentation sûre côté mobile.
+Les écrans doivent gérer loading, success, empty et error.
+Les clés de traduction doivent être prêtes pour i18n même si V1 est uniquement en français.
+Toutes les requêtes réseau passent par un client API centralisé.
+9. Développement Backend
+9.1 Pipelines principaux
+Synchronisation : Provider Open Banking -> normalisation -> PostgreSQL -> calcul des récurrences -> recommandations.
+Recommandation : moteur métier -> candidats offres -> scoring -> génération d’explication IA -> persist résultat.
+Notification : événement métier -> règle notification -> push + historique in-app.
+Affiliation : affichage offre -> click tracking -> conversion si webhook disponible.
+9.2 Moteur de détection des récurrences
+1.Normaliser le nom du marchand et la catégorie.
+2.Regrouper les transactions par clé marchand/utilisateur.
+3.Calculer fréquence moyenne, variance d’intervalle et montant moyen.
+4.Attribuer un score de confiance.
+5.Créer ou mettre à jour recurring_payments.
+6.Classer en abonnement uniquement au-dessus d’un seuil de confiance métier configurable.
+9.3 Moteur d’économies
+Entrées : coût actuel, caractéristiques détectées, usage disponible, catégorie, offres actives.
+Sortie : économie mensuelle/annuelle estimée, hypothèses, score de confiance, offres candidates.
+Ne jamais inventer une caractéristique utilisateur absente des données.
+9.4 IA
+Prompt système versionné.
+Entrée structurée en JSON depuis le moteur métier.
+Sortie structurée avec schéma validé.
+Filtre post-génération : supprimer assertions non présentes dans les données sources.
+Journaliser version du prompt et modèle utilisé, sans journaliser inutilement des données bancaires sensibles.
+10. Tests et déploiement
+10.1 Stratégie de tests
+Niveau | Périmètre
+Unit | Moteur de récurrence, scoring, calcul économie, règles Premium.
+Integration | EF Core + PostgreSQL, Open Banking mock, Redis, auth.
+Contract | Schémas API, erreurs, pagination, idempotence.
+E2E | Onboarding, connexion bancaire simulée, dashboard, recommandation, Premium.
+Mobile | iOS/Android, dark mode, petits/grands écrans, reprise réseau.
+Security | Secrets, auth, contrôle d’accès, rate limit, logs et dépendances.
+10.2 Environnements
+dev : local + données synthétiques.
+staging : intégrations partenaires et tests QA.
+production : secrets séparés, observabilité, sauvegardes, alerting.
+10.3 CI/CD
+Pull request -> lint/typecheck -> tests -> build -> analyse de sécurité -> déploiement staging.
+Release tag -> build mobile EAS -> build backend -> migrations DB contrôlées -> smoke tests.
+Rollback documenté pour API, configuration et app mobile dans les limites imposées par les stores.
+10.4 Sécurité / conformité
+TLS partout ; secrets dans Azure Key Vault ou équivalent.
+Principe du moindre privilège.
+Logs sans données bancaires complètes.
+Chiffrement au repos des données sensibles.
+Processus RGPD : export, suppression, gestion des consentements et politique de rétention.
+Validation juridique/compliance avant mise en production concernant l’Open Banking, les mentions d’affiliation et les comparaisons tarifaires.
+11. Critères de recette V1
+1.Un nouvel utilisateur peut créer son compte et terminer l’onboarding.
+2.Une connexion bancaire de test peut être autorisée et synchronisée sans exposer d’identifiants bancaires à l’application.
+3.Au moins plusieurs paiements récurrents de test sont correctement regroupés par marchand et cadence.
+4.Les abonnements détectés apparaissent dans la liste avec montant, fréquence et catégorie.
+5.Le dashboard affiche un coût récurrent mensuel et une estimation annuelle cohérente.
+6.Une recommandation présente une économie estimée, une explication, un niveau de confiance et une offre/action.
+7.Le clic vers une offre partenaire est tracé.
+8.Les états loading/empty/error sont présents pour chaque écran critique.
+9.Le compte peut être supprimé et les données associées sont traitées selon la politique de rétention.
+10.Les tests critiques passent en CI et une build iOS/Android de release est reproductible.
+12. Références techniques et décisions
+Les versions de framework doivent être figées au démarrage du sprint 0 et mises à jour régulièrement. Pour le backend, Microsoft liste .NET 10 comme LTS jusqu’en novembre 2028 et .NET 9 comme STS jusqu’en novembre 2026 ; pour un nouveau projet en septembre 2026, .NET 10 LTS est donc la cible recommandée. Pour le mobile, la documentation Expo indique qu’Expo SDK 55 fonctionne entièrement avec la New Architecture de React Native. (Sources : Microsoft Learn ; Expo Documentation, consultées en septembre 2026.)
+Definition of Done V1  Fonctionnalité = code + tests + gestion des erreurs + analytics minimal + documentation de l’API + revue sécurité + validation visuelle par rapport aux maquettes.
+
+Annexe - Notes pour l’équipe
+Ne pas sur-architecturer la V1 : privilégier un modular monolith .NET avant d’envisager des microservices.
+Les intégrations externes doivent être derrière des interfaces afin de pouvoir changer de fournisseur Open Banking ou d’affiliation.
+Le moteur de recommandations doit être testable sans IA ni réseau externe.
+Le catalogue d’offres doit être administrable sans nouvelle release mobile.
+Toutes les métriques produit importantes doivent être instrumentées dès la V1 : connexion banque réussie, première synchro, abonnement détecté, recommandation vue, clic partenaire, Premium activé.

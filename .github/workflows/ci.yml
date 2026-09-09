@@ -1,0 +1,60 @@
+name: Validate
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_DB: subscriptions_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U test -d subscriptions_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7.4.5-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_POSTGRES: Host=localhost;Database=subscriptions_test;Username=test;Password=ci-only-password
+      TEST_REDIS: localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore SubscriptionApp.sln --locked-mode
+      - run: dotnet tool restore
+      - run: dotnet build SubscriptionApp.sln --no-restore --configuration Release
+      - run: dotnet test SubscriptionApp.sln --no-build --configuration Release --logger trx
+      - run: dotnet ef migrations script --idempotent --no-build --configuration Release --project backend/SubscriptionApp.Persistence --startup-project backend/SubscriptionApp.Persistence --output deployment/postgres-migrations.sql
+      - run: git diff --exit-code -- deployment/postgres-migrations.sql
+      - run: docker build -f backend/SubscriptionApp.Api/Dockerfile -t subscription-api:ci .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-tests
+          path: '**/TestResults/*.trx'
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run format:check
+      - run: npm run build:web
+      - run: npx expo export --platform android --platform ios
+        working-directory: apps/mobile

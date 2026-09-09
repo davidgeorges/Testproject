@@ -1,0 +1,24 @@
+
+> web
+> npm run web --workspace apps/mobile
+
+
+> subscription-mobile@0.1.0 web
+> expo start --web --port 8081
+
+Starting project at C:\Users\DavidGEORGES\Documents\ChatGPT\projet-abonnement\apps\mobile
+Using src/app as the root directory for Expo Router.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+ ERROR  An unexpected error occured while installing the latest version of React Native DevTools. Using a fallback version instead. Details:
+
+dotslash error: 'fetch' command failed
+caused by: failed to create directory `C:\Users\DavidGEORGES\AppData\Local\dotslash\e5`
+caused by: Impossible de créer un fichier déjà existant. (os error 183)
+
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Web apps\mobile\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 624ms apps\mobile\index.ts (692 modules)
+ LOG  [web] Logs will appear in the browser console

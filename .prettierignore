@@ -1,0 +1,8 @@
+node_modules
+.local
+docs/reference
+**/bin
+**/obj
+**/dist
+package-lock.json
+SubscriptionApp.sln

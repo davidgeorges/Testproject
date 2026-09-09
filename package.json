@@ -1,0 +1,19 @@
+{
+  "name": "subscription-project",
+  "private": true,
+  "workspaces": [
+    "apps/mobile"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace apps/mobile",
+    "web": "npm run web --workspace apps/mobile",
+    "typecheck": "npm run typecheck --workspace apps/mobile",
+    "build:web": "npm run build:web --workspace apps/mobile",
+    "test:backend": "dotnet test SubscriptionApp.sln",
+    "api": "dotnet run --project backend/SubscriptionApp.Api --launch-profile http",
+    "format:check": "prettier --check \"apps/mobile/src/**/*.{ts,tsx}\""
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}

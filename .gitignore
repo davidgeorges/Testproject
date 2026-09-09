@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+bin/
+obj/
+.env
+.env.*
+!.env.example
+.local/
+*.user
+TestResults/
+artifacts/
