@@ -105,12 +105,16 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
     private static decimal Amount(JsonElement row)
     {
         if (!row.TryGetProperty("amount", out var amount)) return 0m;
-        if (amount.TryGetDecimal(out var legacy)) return legacy;
+        if (amount.ValueKind == JsonValueKind.Number && amount.TryGetDecimal(out var legacy)) return legacy;
         if (!amount.TryGetProperty("value", out var value)) return 0m;
-        var unscaledText = Text(value, "unscaledValue");
-        var scaleText = Text(value, "scale");
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var direct)) return direct;
+        if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("unscaledValue", out var unscaledValue)) return 0m;
+        var unscaledText = unscaledValue.ValueKind == JsonValueKind.String ? unscaledValue.GetString() : unscaledValue.GetRawText();
+        var scaleText = value.TryGetProperty("scale", out var scaleValue)
+            ? scaleValue.ValueKind == JsonValueKind.String ? scaleValue.GetString() : scaleValue.GetRawText()
+            : null;
         if (!decimal.TryParse(unscaledText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var unscaled)) return 0m;
-        if (!int.TryParse(scaleText, out var scale)) scale = 0;
+        if (!int.TryParse(scaleText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var scale)) scale = 0;
         return unscaled / (decimal)Math.Pow(10, scale);
     }
 }

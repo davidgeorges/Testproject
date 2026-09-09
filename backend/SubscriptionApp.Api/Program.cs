@@ -75,7 +75,23 @@ builder.Services.AddAuthorization();
 builder.Services.AddMemoryCache();
 var redisConnection = builder.Configuration.GetConnectionString("Redis");
 if (string.IsNullOrWhiteSpace(redisConnection)) builder.Services.AddDistributedMemoryCache();
-else builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConnection);
+else builder.Services.AddStackExchangeRedisCache(options =>
+{
+    if (Uri.TryCreate(redisConnection, UriKind.Absolute, out var redisUri)
+        && redisUri.Scheme is "redis" or "rediss")
+    {
+        var credentials = redisUri.UserInfo.Split(':', 2);
+        options.ConfigurationOptions = new StackExchange.Redis.ConfigurationOptions
+        {
+            User = credentials.Length > 0 ? Uri.UnescapeDataString(credentials[0]) : null,
+            Password = credentials.Length > 1 ? Uri.UnescapeDataString(credentials[1]) : null,
+            Ssl = redisUri.Scheme == "rediss" || redisUri.Host.EndsWith(".upstash.io", StringComparison.OrdinalIgnoreCase),
+            AbortOnConnectFail = false,
+        };
+        options.ConfigurationOptions.EndPoints.Add(redisUri.Host, redisUri.Port > 0 ? redisUri.Port : 6379);
+    }
+    else options.Configuration = redisConnection;
+});
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<BearerDocumentTransformer>();
