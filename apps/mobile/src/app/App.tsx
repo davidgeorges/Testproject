@@ -174,11 +174,24 @@ function MainTabs() {
 function Navigator({ onChange }: { onChange: () => void }) {
   const c = useColors();
   const dark = useSession((s) => s.theme) === 'dark';
+  const token = useLiveToken();
+  const authInitialized = useSession((s) => s.authInitialized);
   const base = dark ? DarkTheme : DefaultTheme;
+  const redirectRestoredSession = () => {
+    if (!authInitialized || !token || !navigation.isReady()) return;
+    const route = navigation.getCurrentRoute();
+    if (route && ['Welcome', 'Login', 'Register', 'ResetPassword'].includes(route.name))
+      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+  };
+  useEffect(redirectRestoredSession, [authInitialized, token]);
   return (
     <NavigationContainer
       ref={navigation}
       linking={{ prefixes: ['http://localhost:8081'], config: { screens: { BankCallback: 'banking/callback' } } }}
+      onReady={() => {
+        onChange();
+        redirectRestoredSession();
+      }}
       onStateChange={onChange}
       theme={{
         ...base,
@@ -506,6 +519,7 @@ export default function App() {
     () =>
       watchFirebaseToken((firebase) => {
         useSession.getState().setToken(firebase?.token ?? null);
+        useSession.getState().setAuthInitialized(true);
         if (firebase) {
           useSession.getState().setPreview(false);
           const firstName =

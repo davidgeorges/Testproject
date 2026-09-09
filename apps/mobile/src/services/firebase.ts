@@ -44,17 +44,28 @@ export async function signInWithGoogle(): Promise<FirebaseSession> {
 }
 
 export function watchFirebaseToken(callback: (session: FirebaseSession | null) => void): Unsubscribe {
-  if (!auth) return () => undefined;
-  return onIdTokenChanged(auth, async (user) =>
-    callback(
-      user
-        ? {
-            token: await user.getIdToken(),
-            displayName: user.displayName,
-            email: user.email,
-          }
-        : null,
-    ),
+  if (!auth) {
+    callback(null);
+    return () => undefined;
+  }
+  return onIdTokenChanged(
+    auth,
+    async (user) => {
+      if (!user) {
+        callback(null);
+        return;
+      }
+      try {
+        callback({
+          token: await user.getIdToken(),
+          displayName: user.displayName,
+          email: user.email,
+        });
+      } catch {
+        callback(null);
+      }
+    },
+    () => callback(null),
   );
 }
 
