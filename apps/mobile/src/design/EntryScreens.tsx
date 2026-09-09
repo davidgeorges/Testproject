@@ -395,8 +395,7 @@ export function BankScreen() {
   const connect = useMutation({
     mutationFn: async () => {
       if (!useSession.getState().token) {
-        const session = await api.session();
-        useSession.getState().setToken(session.token);
+        throw new Error('Connectez-vous avec Google avant de relier votre banque.');
       }
       const { url } = await api.tinkLink();
       await Linking.openURL(url);
@@ -561,6 +560,13 @@ export function TinkCallbackScreen() {
       .then((bank) => { cache.invalidateQueries(); nav.replace('Sync', { connectionId: bank.id }); })
       .catch((reason) => setError(reason instanceof Error ? reason : new Error('Connexion Tink impossible.')));
   }, [token]);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!useSession.getState().token)
+        setError(new Error('Votre session Google n’est plus active. Reconnectez-vous avant de relier votre banque.'));
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, []);
   return <Page fill style={{ justifyContent: 'center', gap: 18 }}>
     {error ? <><State error={error} /><Button title="Retour aux banques" onPress={() => nav.replace('Bank')} /></> :
       <><ActivityIndicator color="#168CFF" size="large" /><Label style={{ textAlign: 'center' }}>Connexion bancaire en cours…</Label></>}
