@@ -6,8 +6,10 @@ RUN dotnet restore SubscriptionApp.sln --locked-mode \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 WORKDIR /app
+RUN apk add --no-cache icu-libs
 ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     DOTNET_EnableDiagnostics=0
 COPY --from=build /app .
 USER app
