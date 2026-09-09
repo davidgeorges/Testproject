@@ -456,9 +456,25 @@ api.MapPost(
             return Unavailable(c, "TINK_NOT_CONFIGURED", "Tink doit être configuré.");
         if (string.IsNullOrWhiteSpace(request.Code))
             return Results.BadRequest(new { code = "TINK_CODE_MISSING", message = "Le code Tink est absent.", correlationId = c.TraceIdentifier });
-        var bank = await tink.CompleteConnection(User(c), request.Code, request.CredentialsId, ct);
+        BankConnection bank;
+        try
+        {
+            bank = await tink.CompleteConnection(User(c), request.Code, request.CredentialsId, ct);
+        }
+        catch (TinkBankingException exception)
+        {
+            app.Logger.LogWarning("Tink callback failed with {Code}, correlation {CorrelationId}", exception.Code, c.TraceIdentifier);
+            return Results.Json(new { code = exception.Code, message = exception.UserMessage, correlationId = c.TraceIdentifier }, statusCode: 502);
+        }
         await store.AddConnection(bank, ct);
-        await sync.Synchronize(bank, ct);
+        try
+        {
+            await sync.Synchronize(bank, ct);
+        }
+        catch (Exception exception)
+        {
+            app.Logger.LogWarning(exception, "Initial Tink synchronization failed, correlation {CorrelationId}", c.TraceIdentifier);
+        }
         return Results.Created($"/api/v1/bank/connections/{bank.Id}", SafeBank(bank));
     }
 ).AddEndpointFilter<IdempotencyFilter>();

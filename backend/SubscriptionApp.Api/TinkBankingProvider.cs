@@ -28,9 +28,11 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
             ["grant_type"] = "authorization_code",
         }), ct);
         var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode) throw new InvalidOperationException("TINK_TOKEN_EXCHANGE_FAILED");
+        if (!response.IsSuccessStatusCode)
+            throw new TinkBankingException("TINK_TOKEN_EXCHANGE_FAILED", "Tink a refusé le code. Vérifiez le Client Secret dans Render puis recommencez la connexion.");
         using var json = JsonDocument.Parse(body);
-        var token = json.RootElement.GetProperty("access_token").GetString() ?? throw new InvalidOperationException("TINK_TOKEN_MISSING");
+        var token = json.RootElement.GetProperty("access_token").GetString()
+            ?? throw new TinkBankingException("TINK_TOKEN_MISSING", "Tink n’a retourné aucun jeton d’accès.");
         return new BankConnection
         {
             UserId = userId,
@@ -86,4 +88,10 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
     private static string? Text(JsonElement value, string property) => value.TryGetProperty(property, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
     private static string? Text(JsonElement value, string parent, string property) => value.TryGetProperty(parent, out var p) ? Text(p, property) : null;
     private static decimal Number(JsonElement value, string property) => value.TryGetProperty(property, out var p) && p.TryGetDecimal(out var number) ? number : 0m;
+}
+
+public sealed class TinkBankingException(string code, string userMessage) : Exception(code)
+{
+    public string Code { get; } = code;
+    public string UserMessage { get; } = userMessage;
 }
