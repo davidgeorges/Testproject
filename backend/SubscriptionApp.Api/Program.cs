@@ -582,6 +582,7 @@ api.MapPost(
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                app.Logger.LogWarning(exception, "Bank synchronization failed, correlation {CorrelationId}", c.TraceIdentifier);
                 await s.AddNotification(new()
                 {
                     UserId = User(c),
@@ -590,7 +591,9 @@ api.MapPost(
                     Body = "Nous n’avons pas pu actualiser vos transactions. Réessayez plus tard.",
                     SourceKey = $"sync-failed:{bank.Id}:{DateTimeOffset.UtcNow:yyyyMMddHH}",
                 }, ct);
-                return Results.Json(new { code = "BANK_SYNC_FAILED", message = "La synchronisation bancaire a échoué.", correlationId = c.TraceIdentifier }, statusCode: 503);
+                var code = exception is TinkBankingException tink ? tink.Code : "BANK_SYNC_FAILED";
+                var message = exception is TinkBankingException tinkError ? tinkError.UserMessage : "La synchronisation bancaire a échoué.";
+                return Results.Json(new { code, message, correlationId = c.TraceIdentifier }, statusCode: 503);
             }
             await s.Synchronize(bank, rows, ct);
             var userId = User(c);

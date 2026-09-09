@@ -52,7 +52,18 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
         using var request = new HttpRequestMessage(HttpMethod.Get, "/data/v2/transactions?pageSize=100");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Unprotect(connection.ExternalConnectionId!));
         using var response = await http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var code = $"TINK_TRANSACTIONS_{(int)response.StatusCode}";
+            var message = response.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Unauthorized => "Le jeton Tink a expiré. Reconnectez la banque.",
+                System.Net.HttpStatusCode.Forbidden => "Tink n’a pas accordé le droit transactions:read à cette connexion.",
+                System.Net.HttpStatusCode.NotFound => "L’API Transactions Tink n’est pas activée pour cette application.",
+                _ => $"Tink a refusé la lecture des transactions (HTTP {(int)response.StatusCode}).",
+            };
+            throw new TinkBankingException(code, message);
+        }
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         var items = json.RootElement.TryGetProperty("transactions", out var rows) ? rows : json.RootElement;
         var result = new List<BankTransaction>();
