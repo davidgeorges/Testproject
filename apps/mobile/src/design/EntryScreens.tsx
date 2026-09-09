@@ -548,16 +548,19 @@ export function BankScreen() {
 export function TinkCallbackScreen() {
   const nav = useNav();
   const cache = useQueryClient();
+  const token = useLiveToken();
   const [error, setError] = useState<Error | null>(null);
+  const submitted = useRef(false);
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web' || !token || submitted.current) return;
+    submitted.current = true;
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (!code) { setError(new Error(params.get('message') ?? 'Tink n’a retourné aucun code.')); return; }
     api.completeTink(code, params.get('credentials_id'), idempotencyKey())
       .then((bank) => { cache.invalidateQueries(); nav.replace('Sync', { connectionId: bank.id }); })
       .catch((reason) => setError(reason instanceof Error ? reason : new Error('Connexion Tink impossible.')));
-  }, []);
+  }, [token]);
   return <Page fill style={{ justifyContent: 'center', gap: 18 }}>
     {error ? <><State error={error} /><Button title="Retour aux banques" onPress={() => nav.replace('Bank')} /></> :
       <><ActivityIndicator color="#168CFF" size="large" /><Label style={{ textAlign: 'center' }}>Connexion bancaire en cours…</Label></>}
