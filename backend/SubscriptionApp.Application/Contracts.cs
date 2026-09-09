@@ -176,6 +176,7 @@ public sealed record Dashboard(
     decimal AnnualPotentialSaving,
     DateTimeOffset? LastSyncAt,
     IReadOnlyList<Recommendation> TopRecommendations,
+    bool HasConnectedBank,
     bool IsDemo
 );
 
@@ -267,6 +268,7 @@ public sealed class AnalysisService(
             recommendations.Sum(r => r.AnnualSaving),
             connections.Select(c => c.LastSyncAt).DefaultIfEmpty().Max(),
             recommendations.Take(3).ToArray(),
+            connections.Any(c => c.Status == "connected"),
             demo
         );
     }

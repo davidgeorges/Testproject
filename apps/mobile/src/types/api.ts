@@ -50,6 +50,7 @@ export interface Dashboard {
   annualPotentialSaving: number;
   lastSyncAt: string | null;
   topRecommendations: Recommendation[];
+  hasConnectedBank: boolean;
   isDemo: boolean;
 }
 export interface Connection {

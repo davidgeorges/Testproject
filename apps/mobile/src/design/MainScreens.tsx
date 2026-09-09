@@ -169,11 +169,17 @@ export function DashboardScreen() {
       </View>
       {!d ? (
         <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
-      ) : d.subscriptionCount === 0 ? (
+      ) : !d.hasConnectedBank ? (
         <State
           title="Connectez votre première banque"
           description="Retrouvez vos abonnements et vos économies possibles."
           action={<Button title="Connecter une banque" onPress={() => nav.navigate('Bank')} />}
+        />
+      ) : d.subscriptionCount === 0 ? (
+        <State
+          title="Aucun abonnement détecté"
+          description="Votre banque est bien connectée et vos transactions ont été analysées."
+          action={<Button title="Voir mes banques" onPress={() => nav.navigate('Bank')} />}
         />
       ) : (
         <>

@@ -136,6 +136,7 @@ export const referenceDashboard: Dashboard = {
   topRecommendations: referenceRecommendations
     .slice(0, 3)
     .map((r, i) => ({ ...r, annualSaving: [180, 240, 96][i]! })),
+  hasConnectedBank: true,
   isDemo: true,
 };
 export function useOverview() {
