@@ -516,6 +516,33 @@ api.MapGet(
             })
         )
 );
+api.MapGet(
+    "/bank/transactions",
+    async (Guid? connectionId, Guid? accountId, int? limit, HttpContext c, IWorkspaceStore s, CancellationToken ct) =>
+    {
+        var take = Math.Clamp(limit ?? 30, 1, 100);
+        var transactions = (await s.Transactions(User(c), ct))
+            .Where(t => connectionId is null || t.ConnectionId == connectionId)
+            .Where(t => accountId is null || t.AccountId == accountId)
+            .OrderByDescending(t => t.BookedAt)
+            .ToArray();
+        return Results.Ok(new
+        {
+            Items = transactions.Take(take).Select(t => new
+            {
+                t.Id,
+                t.ConnectionId,
+                t.AccountId,
+                t.BookedAt,
+                t.Amount,
+                t.Currency,
+                t.MerchantName,
+                t.Category,
+            }),
+            Total = transactions.Length,
+        });
+    }
+);
 api.MapPost(
         "/bank/connections",
         async (

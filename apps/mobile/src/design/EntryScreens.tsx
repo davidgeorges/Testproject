@@ -18,10 +18,11 @@ import {
   type IconName,
 } from './ui';
 import { useNav } from './MainScreens';
-import { api, idempotencyKey } from '../services/api';
+import { api, ApiError, idempotencyKey } from '../services/api';
 import { signInWithGoogle } from '../services/firebase';
 import { useSession, useLiveToken } from '../store/session';
 import type { RootStackParams } from '../app/navigation';
+import { date, money } from '../utils/format';
 export function Welcome() {
   const nav = useNav();
   return (
@@ -392,6 +393,16 @@ export function BankScreen() {
     queryFn: api.connections,
     enabled: !!token,
   });
+  const accounts = useQuery({
+    queryKey: ['bank-accounts', token],
+    queryFn: api.accounts,
+    enabled: !!token,
+  });
+  const transactions = useQuery({
+    queryKey: ['bank-transactions', token],
+    queryFn: () => api.bankTransactions(undefined, 30),
+    enabled: !!token,
+  });
   const connect = useMutation({
     mutationFn: async () => {
       if (!useSession.getState().token) {
@@ -410,10 +421,92 @@ export function BankScreen() {
     mutationFn: api.disconnect,
     onSuccess: () => cache.invalidateQueries(),
   });
+  const openConsent = (name: string) => {
+    setSelected(name);
+    setConsent(false);
+    key.current = idempotencyKey();
+    connect.reset();
+  };
+  const queryError = connections.error ?? accounts.error ?? transactions.error;
   return (
     <Page style={{ gap: 15, paddingTop: 6 }}>
+      {!!connections.data?.length && (
+        <>
+          <Label style={{ fontSize: 23, lineHeight: 30, fontWeight: '700' }}>Mes banques</Label>
+          {connections.data.map((bank) => {
+            const bankAccounts = accounts.data?.filter((account) => account.connectionId === bank.id) ?? [];
+            const expired = new Date(bank.consentExpiresAt).getTime() <= Date.now();
+            const connected = bank.status === 'connected' && !expired;
+            return (
+              <Card key={bank.id} style={{ gap: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: '#087BFF22', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="business" color="#168CFF" size={23} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Label style={{ fontSize: 17, fontWeight: '700' }}>{bank.bankName}</Label>
+                    <Label muted style={{ fontSize: 12 }}>
+                      {bank.lastSyncAt ? `Synchronisée le ${date(bank.lastSyncAt)}` : 'Jamais synchronisée'}
+                    </Label>
+                  </View>
+                  <View style={{ backgroundColor: connected ? '#005439' : '#4A3315', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
+                    <Label style={{ color: connected ? '#3DFFB0' : '#FBBF24', fontSize: 10, fontWeight: '700' }}>
+                      {connected ? 'Connectée' : 'À reconnecter'}
+                    </Label>
+                  </View>
+                </View>
+                {bankAccounts.length > 0 ? bankAccounts.map((account) => (
+                  <View key={account.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderRadius: 10, backgroundColor: c.elevated }}>
+                    <Ionicons name="card-outline" color={c.muted} size={20} />
+                    <View style={{ flex: 1 }}>
+                      <Label style={{ fontWeight: '600' }}>{account.maskedName || 'Compte bancaire'}</Label>
+                      <Label muted style={{ fontSize: 11 }}>{account.accountType || 'Compte'}</Label>
+                    </View>
+                  </View>
+                )) : (
+                  <Label muted style={{ fontSize: 12 }}>Aucun compte détaillé transmis par la banque.</Label>
+                )}
+                {connected ? (
+                  <Button title="Synchroniser maintenant" secondary onPress={() => nav.navigate('Sync', { connectionId: bank.id })} />
+                ) : (
+                  <Button title="Reconnecter avec Tink" onPress={() => openConsent(bank.bankName)} />
+                )}
+                <Button title="Retirer la connexion" secondary loading={remove.isPending} onPress={() => remove.mutate(bank.id)} />
+              </Card>
+            );
+          })}
+          <Label style={{ fontSize: 19, fontWeight: '700', marginTop: 4 }}>Dernières transactions</Label>
+          <Card style={{ paddingVertical: 4 }}>
+            {transactions.isLoading ? (
+              <ActivityIndicator color="#168CFF" style={{ margin: 20 }} />
+            ) : transactions.data?.items.length ? transactions.data.items.map((transaction, index) => (
+              <View key={transaction.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 11, borderBottomWidth: index === transactions.data!.items.length - 1 ? 0 : 0.5, borderColor: c.border }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: c.elevated, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={transaction.amount >= 0 ? 'arrow-down' : 'arrow-up'} color={transaction.amount >= 0 ? '#3DFFB0' : '#FF7485'} size={18} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Label numberOfLines={1} style={{ fontWeight: '600' }}>{transaction.merchantName || 'Transaction bancaire'}</Label>
+                  <Label muted style={{ fontSize: 11 }}>{date(transaction.bookedAt)} · {transaction.category || 'Autre'}</Label>
+                </View>
+                <Label style={{ fontWeight: '700', color: transaction.amount >= 0 ? '#3DFFB0' : c.text }}>
+                  {transaction.amount > 0 ? '+' : ''}{money(transaction.amount)}
+                </Label>
+              </View>
+            )) : (
+              <View style={{ padding: 18, alignItems: 'center', gap: 6 }}>
+                <Ionicons name="receipt-outline" color={c.muted} size={26} />
+                <Label muted style={{ textAlign: 'center' }}>Aucune transaction importée pour le moment.</Label>
+              </View>
+            )}
+          </Card>
+          <Label muted style={{ fontSize: 11, textAlign: 'center' }}>
+            {transactions.data ? `${transactions.data.total} transaction${transactions.data.total > 1 ? 's' : ''} importée${transactions.data.total > 1 ? 's' : ''}` : ''}
+          </Label>
+          <Label style={{ fontSize: 19, fontWeight: '700', marginTop: 8 }}>Ajouter une banque</Label>
+        </>
+      )}
       <Label style={{ fontSize: 23, lineHeight: 30, fontWeight: '700' }}>
-        Connecter une banque
+        {connections.data?.length ? 'Choisir une banque' : 'Connecter une banque'}
       </Label>
       <Search value={search} onChangeText={setSearch} placeholder="Rechercher votre banque" />
       <View>
@@ -424,10 +517,7 @@ export function BankScreen() {
               key={name}
               accessibilityRole="button"
               onPress={() => {
-                setSelected(name);
-                setConsent(false);
-                key.current = idempotencyKey();
-                connect.reset();
+                openConsent(name);
               }}
               style={{
                 minHeight: 61,
@@ -478,24 +568,7 @@ export function BankScreen() {
             </Pressable>
           ))}
       </View>
-      {connections.data?.map((bank) => (
-        <Card key={bank.id}>
-          <Label>
-            {bank.bankName} · {bank.status === 'connected' ? 'connectée' : 'en attente'}
-          </Label>
-          <Button
-            title="Synchroniser"
-            secondary
-            onPress={() => nav.navigate('Sync', { connectionId: bank.id })}
-          />
-          <Button
-            title="Retirer la connexion"
-            secondary
-            loading={remove.isPending}
-            onPress={() => remove.mutate(bank.id)}
-          />
-        </Card>
-      ))}
+      {queryError && <State error={queryError} retry={() => cache.invalidateQueries()} />}
       {remove.error && <State error={remove.error} />}
       <Modal
         visible={!!selected}
@@ -592,6 +665,13 @@ export function SyncScreen() {
   }, [connectionId]);
   const preview = !connectionId;
   const percent = preview ? 75 : mutation.isSuccess ? 100 : 0;
+  const reconnectRequired =
+    mutation.error instanceof ApiError &&
+    ['CONSENT_EXPIRED', 'TINK_TRANSACTIONS_401', 'TINK_TRANSACTIONS_403'].includes(mutation.error.code);
+  const retry = () => {
+    key.current = idempotencyKey();
+    mutation.mutate(connectionId!);
+  };
   return (
     <Page
       fill
@@ -655,7 +735,10 @@ export function SyncScreen() {
         Cette opération peut prendre{'\n'}quelques secondes.
       </Label>
       {mutation.error && (
-        <State error={mutation.error} retry={() => mutation.mutate(connectionId!)} />
+        <View style={{ width: '100%', gap: 10 }}>
+          <State error={mutation.error} retry={reconnectRequired ? undefined : retry} />
+          {reconnectRequired && <Button title="Reconnecter la banque" onPress={() => nav.replace('Bank')} />}
+        </View>
       )}
       {(preview || mutation.isSuccess) && (
         <View style={{ width: '100%' }}>

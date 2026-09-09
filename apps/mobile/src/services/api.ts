@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import { useSession } from '../store/session';
 import type {
+  BankAccount,
+  BankTransaction,
   Connection,
   Dashboard,
   Notification,
@@ -69,6 +71,11 @@ export const api = {
   recommendation: (id: string) =>
     request<Recommendation>(`/recommendations/${encodeURIComponent(id)}`),
   connections: () => request<Connection[]>('/bank/connections'),
+  accounts: () => request<BankAccount[]>('/bank/accounts'),
+  bankTransactions: (connectionId?: string, limit = 30) =>
+    request<{ items: BankTransaction[]; total: number }>(
+      `/bank/transactions?limit=${limit}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ''}`,
+    ),
   tinkLink: () => request<{ url: string }>('/bank/tink/link'),
   completeTink: (code: string, credentialsId: string | null, key: string) =>
     request<Connection>('/bank/tink/callback', {

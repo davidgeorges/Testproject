@@ -120,6 +120,28 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task BankWorkspaceReturnsOnlyTheCurrentUsersAccountsAndTransactions()
+    {
+        using var owner = await Session();
+        using var other = await Session();
+        var bank = await Connect(owner);
+        (await Post(owner, $"/api/v1/bank/connections/{bank.Id}/sync")).EnsureSuccessStatusCode();
+
+        var accounts = (await owner.GetFromJsonAsync<JsonElement[]>("/api/v1/bank/accounts"))!;
+        Assert.NotEmpty(accounts);
+        var transactions = (await owner.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/bank/transactions?connectionId={bank.Id}&limit=5"));
+        Assert.Equal(5, transactions.GetProperty("items").GetArrayLength());
+        Assert.True(transactions.GetProperty("total").GetInt32() >= 5);
+        Assert.False(transactions.GetProperty("items")[0].TryGetProperty("userId", out _));
+        Assert.False(transactions.GetProperty("items")[0].TryGetProperty("externalId", out _));
+
+        var otherTransactions = (await other.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/bank/transactions?connectionId={bank.Id}"));
+        Assert.Equal(0, otherTransactions.GetProperty("total").GetInt32());
+    }
+
+    [Fact]
     public async Task UserCannotReadOrSyncAnotherUsersBank()
     {
         using var a = await Session();

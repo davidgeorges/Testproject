@@ -60,6 +60,22 @@ export interface Connection {
   lastSyncAt: string | null;
   consentExpiresAt: string;
 }
+export interface BankAccount {
+  id: string;
+  connectionId: string;
+  accountType: string;
+  maskedName: string;
+}
+export interface BankTransaction {
+  id: string;
+  connectionId: string;
+  accountId: string | null;
+  bookedAt: string;
+  amount: number;
+  currency: string;
+  merchantName: string;
+  category: string;
+}
 export interface Profile {
   id: string;
   firstName: string;
