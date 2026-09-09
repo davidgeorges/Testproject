@@ -20,29 +20,31 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
 
     public async Task<BankConnection> CompleteConnection(string userId, string code, string? credentialsId, CancellationToken ct)
     {
-        using var response = await http.PostAsync("/api/v1/oauth/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        try
         {
-            ["client_id"] = clientId,
-            ["client_secret"] = clientSecret,
-            ["code"] = code,
-            ["grant_type"] = "authorization_code",
-        }), ct);
-        var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode)
-            throw new TinkBankingException("TINK_TOKEN_EXCHANGE_FAILED", "Tink a refusé le code. Vérifiez le Client Secret dans Render puis recommencez la connexion.");
-        using var json = JsonDocument.Parse(body);
-        var token = json.RootElement.GetProperty("access_token").GetString()
-            ?? throw new TinkBankingException("TINK_TOKEN_MISSING", "Tink n’a retourné aucun jeton d’accès.");
-        return new BankConnection
+            using var response = await http.PostAsync("/api/v1/oauth/token", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["client_id"] = clientId, ["client_secret"] = clientSecret, ["code"] = code,
+                ["grant_type"] = "authorization_code",
+            }), ct);
+            var body = await response.Content.ReadAsStringAsync(ct);
+            if (!response.IsSuccessStatusCode)
+                throw new TinkBankingException("TINK_TOKEN_EXCHANGE_FAILED", "Tink a refusé le code. Vérifiez le Client Secret dans Render puis recommencez la connexion.");
+            using var json = JsonDocument.Parse(body);
+            if (!json.RootElement.TryGetProperty("access_token", out var accessToken) || string.IsNullOrWhiteSpace(accessToken.GetString()))
+                throw new TinkBankingException("TINK_TOKEN_MISSING", "Tink n’a retourné aucun jeton d’accès.");
+            return new BankConnection
+            {
+                UserId = userId, BankName = "Banque connectée via Tink", Provider = "tink",
+                ExternalConnectionId = Protect(accessToken.GetString()!), Status = "connected",
+                ConsentExpiresAt = DateTimeOffset.UtcNow.AddDays(90), AuthorizationUrl = null,
+            };
+        }
+        catch (TinkBankingException) { throw; }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or CryptographicException)
         {
-            UserId = userId,
-            BankName = "Banque connectée via Tink",
-            Provider = "tink",
-            ExternalConnectionId = Protect(token),
-            Status = "connected",
-            ConsentExpiresAt = DateTimeOffset.UtcNow.AddDays(90),
-            AuthorizationUrl = null,
-        };
+            throw new TinkBankingException("TINK_TOKEN_RESPONSE_INVALID", "La réponse d’authentification Tink est invalide. Recommencez la connexion.");
+        }
     }
 
     public async Task<IReadOnlyList<BankTransaction>> FetchTransactions(BankConnection connection, CancellationToken ct)

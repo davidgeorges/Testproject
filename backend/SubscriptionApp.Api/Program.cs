@@ -238,6 +238,7 @@ app.Use(
         catch (Exception ex)
         {
             app.Logger.LogError(
+                ex,
                 "Request failed {ErrorType}, correlation {CorrelationId}",
                 ex.GetType().Name,
                 ctx.TraceIdentifier
@@ -466,7 +467,15 @@ api.MapPost(
             app.Logger.LogWarning("Tink callback failed with {Code}, correlation {CorrelationId}", exception.Code, c.TraceIdentifier);
             return Results.Json(new { code = exception.Code, message = exception.UserMessage, correlationId = c.TraceIdentifier }, statusCode: 502);
         }
-        await store.AddConnection(bank, ct);
+        try
+        {
+            await store.AddConnection(bank, ct);
+        }
+        catch (Exception exception)
+        {
+            app.Logger.LogError(exception, "Tink connection persistence failed, correlation {CorrelationId}", c.TraceIdentifier);
+            return Results.Json(new { code = "TINK_CONNECTION_SAVE_FAILED", message = "La connexion Tink a réussi mais son enregistrement a échoué.", correlationId = c.TraceIdentifier }, statusCode: 503);
+        }
         try
         {
             await sync.Synchronize(bank, ct);
