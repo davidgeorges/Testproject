@@ -1,11 +1,12 @@
 import { Platform } from 'react-native';
 
 const apiKey =
-  Platform.OS === 'ios'
+  process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY ??
+  (Platform.OS === 'ios'
     ? process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY
     : Platform.OS === 'android'
       ? process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY
-      : process.env.EXPO_PUBLIC_REVENUECAT_WEB_API_KEY;
+      : process.env.EXPO_PUBLIC_REVENUECAT_WEB_API_KEY);
 
 let configuredFor: string | null = null;
 

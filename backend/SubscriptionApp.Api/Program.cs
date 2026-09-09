@@ -193,41 +193,32 @@ if (!string.IsNullOrWhiteSpace(tinkClientId) && !string.IsNullOrWhiteSpace(tinkC
 }
 else if (demo) builder.Services.AddSingleton<IBankingProvider, SandboxBankingProvider>();
 else builder.Services.AddSingleton<IBankingProvider, UnavailableBankingProvider>();
-if (demo)
+var premiumVerificationSecret = builder.Configuration["Premium:VerificationSecret"];
+if (demo && (string.IsNullOrWhiteSpace(premiumVerificationSecret) || premiumVerificationSecret.Length < 32))
+    throw new InvalidOperationException("Premium:VerificationSecret must contain at least 32 characters.");
+var revenueCatSecret = builder.Configuration["RevenueCat:SecretApiKey"];
+if (!string.IsNullOrWhiteSpace(revenueCatSecret))
 {
-    var premiumVerificationSecret = builder.Configuration["Premium:VerificationSecret"];
-    if (string.IsNullOrWhiteSpace(premiumVerificationSecret) || premiumVerificationSecret.Length < 32)
-        throw new InvalidOperationException("Premium:VerificationSecret must contain at least 32 characters.");
-    builder.Services.AddSingleton<IPremiumPurchaseVerifier>(sp =>
-        new SandboxPremiumPurchaseVerifier(
-            premiumVerificationSecret,
-            sp.GetRequiredService<TimeProvider>()
-        )
-    );
-    builder.Services.AddSingleton<IPremiumEventVerifier>(
-        new SandboxPremiumEventVerifier(premiumVerificationSecret)
-    );
-}
-else
-{
-    var revenueCatSecret = builder.Configuration["RevenueCat:SecretApiKey"];
     var revenueCatEntitlement = builder.Configuration["RevenueCat:EntitlementId"] ?? "premium";
-    if (!string.IsNullOrWhiteSpace(revenueCatSecret))
+    builder.Services.AddHttpClient("RevenueCat", client =>
     {
-        builder.Services.AddHttpClient("RevenueCat", client =>
-        {
-            client.BaseAddress = new Uri("https://api.revenuecat.com");
-            client.Timeout = TimeSpan.FromSeconds(15);
-        });
-        builder.Services.AddSingleton<IPremiumPurchaseVerifier>(sp => new RevenueCatPurchaseVerifier(
-            sp.GetRequiredService<IHttpClientFactory>().CreateClient("RevenueCat"),
-            revenueCatSecret,
-            revenueCatEntitlement
-        ));
-    }
-    else builder.Services.AddSingleton<IPremiumPurchaseVerifier, UnavailablePremiumPurchaseVerifier>();
-    builder.Services.AddSingleton<IPremiumEventVerifier, UnavailablePremiumEventVerifier>();
+        client.BaseAddress = new Uri("https://api.revenuecat.com");
+        client.Timeout = TimeSpan.FromSeconds(15);
+    });
+    builder.Services.AddSingleton<IPremiumPurchaseVerifier>(sp => new RevenueCatPurchaseVerifier(
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient("RevenueCat"),
+        revenueCatSecret,
+        revenueCatEntitlement
+    ));
 }
+else if (demo)
+    builder.Services.AddSingleton<IPremiumPurchaseVerifier>(sp =>
+        new SandboxPremiumPurchaseVerifier(premiumVerificationSecret!, sp.GetRequiredService<TimeProvider>())
+    );
+else builder.Services.AddSingleton<IPremiumPurchaseVerifier, UnavailablePremiumPurchaseVerifier>();
+if (demo)
+    builder.Services.AddSingleton<IPremiumEventVerifier>(new SandboxPremiumEventVerifier(premiumVerificationSecret!));
+else builder.Services.AddSingleton<IPremiumEventVerifier, UnavailablePremiumEventVerifier>();
 builder.Services.AddScoped<AnalysisService>();
 builder.Services.AddScoped<ConsentExpiryProcessor>();
 builder.Services.AddScoped<BankSyncProcessor>();
