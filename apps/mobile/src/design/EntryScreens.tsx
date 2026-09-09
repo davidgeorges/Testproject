@@ -97,6 +97,7 @@ export function Welcome() {
 }
 export function AuthScreen({ register = false }: { register?: boolean }) {
   const nav = useNav();
+  const queryClient = useQueryClient();
   const c = useColors();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -129,9 +130,19 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
     setAuthBusy(true);
     setMessage('');
     try {
-      const token = await signInWithGoogle();
-      useSession.getState().setToken(token);
+      const firebase = await signInWithGoogle();
+      useSession.getState().setToken(firebase.token);
       useSession.getState().setPreview(false);
+      const firstName =
+        firebase.displayName?.trim().split(/\s+/)[0] ??
+        firebase.email?.split('@')[0] ??
+        'Utilisateur';
+      const profile = await api.saveProfile({
+        firstName,
+        theme: 'dark',
+        notificationsEnabled: true,
+      });
+      queryClient.setQueryData(['profile', firebase.token], profile);
       nav.navigate('Main');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Connexion Google impossible.');

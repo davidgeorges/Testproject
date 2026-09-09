@@ -419,7 +419,7 @@ function Experience() {
               style={{ paddingVertical: 8, gap: 6, borderTopWidth: 1, borderTopColor: '#283C50' }}
             >
               <Text style={{ fontSize: 10, color: '#A8B8CB' }}>
-                ● {token ? 'API locale · banque fictive' : 'Aperçu interactif · données d’exemple'}
+                ● {token ? 'Compte Google connecté · banque à relier' : 'Aperçu interactif · données d’exemple'}
               </Text>
               <Text style={{ fontSize: 10, lineHeight: 15, color: '#607992' }}>
                 Les tarifs et fonctionnalités illustrés{'\n'}ne constituent pas des offres actives.

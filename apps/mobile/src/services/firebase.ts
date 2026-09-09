@@ -24,13 +24,23 @@ const configured = Object.values(config).every(Boolean);
 const app = configured ? (getApps()[0] ?? initializeApp(config)) : null;
 const auth = app ? getAuth(app) : null;
 
-export async function signInWithGoogle(): Promise<string> {
+export type FirebaseSession = {
+  token: string;
+  displayName: string | null;
+  email: string | null;
+};
+
+export async function signInWithGoogle(): Promise<FirebaseSession> {
   if (Platform.OS !== 'web')
     throw new Error('La connexion Google native sera activée avec le build iOS/Android.');
   if (!auth) throw new Error('Firebase n’est pas configuré.');
   await setPersistence(auth, browserLocalPersistence);
   const result = await signInWithPopup(auth, new GoogleAuthProvider());
-  return result.user.getIdToken();
+  return {
+    token: await result.user.getIdToken(),
+    displayName: result.user.displayName,
+    email: result.user.email,
+  };
 }
 
 export function watchFirebaseToken(callback: (token: string | null) => void): Unsubscribe {

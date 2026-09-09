@@ -15,7 +15,7 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         var p = await db.Profiles.FindAsync([userId], ct);
         if (p is not null)
             return p;
-        p = new() { Id = userId, FirstName = "Alex" };
+        p = new() { Id = userId, FirstName = "Utilisateur" };
         db.Profiles.Add(p);
         try
         {

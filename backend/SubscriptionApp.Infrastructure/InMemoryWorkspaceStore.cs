@@ -29,7 +29,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
         lock (gate)
         {
             if (!profiles.TryGetValue(userId, out var p))
-                profiles[userId] = p = new() { Id = userId, FirstName = "Alex" };
+                profiles[userId] = p = new() { Id = userId, FirstName = "Utilisateur" };
             return Task.FromResult(p);
         }
     }
@@ -356,7 +356,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
         lock (gate)
         {
             if (!profiles.TryGetValue(userId, out var profile))
-                profiles[userId] = profile = new() { Id = userId, FirstName = "Alex" };
+                profiles[userId] = profile = new() { Id = userId, FirstName = "Utilisateur" };
             return Task.FromResult(
                 new UserDataExport(
                     DateTimeOffset.UtcNow,
