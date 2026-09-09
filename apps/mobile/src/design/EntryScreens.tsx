@@ -19,6 +19,7 @@ import {
 } from './ui';
 import { useNav } from './MainScreens';
 import { api, idempotencyKey } from '../services/api';
+import { signInWithGoogle } from '../services/firebase';
 import { useSession, useLiveToken } from '../store/session';
 import type { RootStackParams } from '../app/navigation';
 export function Welcome() {
@@ -102,6 +103,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
   const [password, setPassword] = useState('');
   const [accept, setAccept] = useState(false);
   const [message, setMessage] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
   const rules = [
     ['Au moins 8 caractères', password.length >= 8],
     ['Une majuscule', /[A-Z]/.test(password)],
@@ -122,6 +124,20 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
     setPassword('');
     setMessage('');
     nav.navigate(register ? 'Onboarding' : 'Main');
+  }
+  async function googleLogin() {
+    setAuthBusy(true);
+    setMessage('');
+    try {
+      const token = await signInWithGoogle();
+      useSession.getState().setToken(token);
+      useSession.getState().setPreview(false);
+      nav.navigate('Main');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Connexion Google impossible.');
+    } finally {
+      setAuthBusy(false);
+    }
   }
   return (
     <Page fill style={{ gap: 19, paddingTop: 10 }}>
@@ -197,10 +213,11 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                   ['Connexion Apple', 'Connexion Google', 'Connexion biométrique'][i]
                 }
                 accessibilityRole="button"
+                disabled={authBusy}
                 onPress={() =>
-                  setMessage(
-                    'Cette méthode de connexion sera disponible après l’intégration de l’authentification.',
-                  )
+                  i === 1
+                    ? void googleLogin()
+                    : setMessage('Cette méthode de connexion sera disponible dans une prochaine étape.')
                 }
                 style={{
                   flex: 1,
@@ -212,11 +229,15 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                   justifyContent: 'center',
                 }}
               >
-                <Ionicons
-                  name={icon}
-                  size={25}
-                  color={i === 2 ? '#8B61FF' : i === 1 ? '#4285F4' : c.text}
-                />
+                {authBusy && i === 1 ? (
+                  <ActivityIndicator color="#4285F4" />
+                ) : (
+                  <Ionicons
+                    name={icon}
+                    size={25}
+                    color={i === 2 ? '#8B61FF' : i === 1 ? '#4285F4' : c.text}
+                  />
+                )}
               </Pressable>
             ))}
           </View>

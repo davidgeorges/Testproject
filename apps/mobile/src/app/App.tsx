@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSession, useLiveToken } from '../store/session';
+import { watchFirebaseToken } from '../services/firebase';
 import { useColors, Label, IconButton } from '../design/ui';
 import {
   DashboardScreen,
@@ -497,6 +498,14 @@ function Experience() {
   );
 }
 export default function App() {
+  useEffect(
+    () =>
+      watchFirebaseToken((token) => {
+        useSession.getState().setToken(token);
+        if (token) useSession.getState().setPreview(false);
+      }),
+    [],
+  );
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={client}>

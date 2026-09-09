@@ -19,6 +19,7 @@ import { useNav } from './MainScreens';
 import { useProfile } from './reference';
 import { useSession, useLiveToken } from '../store/session';
 import { api } from '../services/api';
+import { signOutFirebase } from '../services/firebase';
 import type { RootStackParams } from '../app/navigation';
 function Row({
   icon,
@@ -166,6 +167,7 @@ export function ProfileScreen() {
         onPress={() => {
           cache.clear();
           useSession.getState().setToken(null);
+          void signOutFirebase();
           nav.navigate('Login');
         }}
       />
@@ -205,6 +207,7 @@ export function SettingsScreen() {
     onSuccess: () => {
       cache.clear();
       useSession.getState().setToken(null);
+      void signOutFirebase();
       nav.navigate('Welcome');
     },
   });
@@ -680,7 +683,7 @@ export function InfoScreen() {
       <Card>
         <Label muted>
           {kind === 'security'
-            ? 'Cette version utilise des sessions de démonstration. Firebase Auth et Face ID seront intégrés dans une prochaine étape. Aucun identifiant bancaire n’est demandé.'
+            ? 'La connexion Google utilise Firebase sur le Web. Apple et la biométrie seront activés avec les builds mobiles. Aucun identifiant bancaire n’est demandé.'
             : kind === 'privacy'
               ? 'Les données de cette version sont fictives. Vous pouvez supprimer une connexion bancaire depuis Mes banques ou supprimer les données de votre session depuis les paramètres.'
               : 'Pour tester le parcours, ouvrez Mes banques, sélectionnez une banque et autorisez la connexion fictive. Aucune souscription ni aucun paiement ne sont effectués.'}

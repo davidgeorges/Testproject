@@ -20,6 +20,7 @@ builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 var demo = builder.Configuration.GetValue<bool>("Demo:Enabled");
+var firebaseProjectId = builder.Configuration["Firebase:ProjectId"];
 if (demo && !builder.Environment.IsDevelopment())
     throw new InvalidOperationException("Demo mode is restricted to Development.");
 builder.Services.AddSingleton<DemoSessions>();
@@ -29,13 +30,36 @@ if (demo)
     builder.Services.Configure<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>(
         o => o.XmlRepository = new EphemeralKeyRepository()
     );
-    builder
-        .Services.AddAuthentication("Demo")
-        .AddScheme<AuthenticationSchemeOptions, DemoAuthentication>("Demo", _ => { });
+    if (!string.IsNullOrWhiteSpace(firebaseProjectId))
+    {
+        builder.Services.AddHttpClient("firebase-keys");
+        builder.Services.AddSingleton<IFirebaseSigningKeys, FirebaseSigningKeys>();
+        builder.Services
+            .AddAuthentication("App")
+            .AddPolicyScheme("App", "Demo or Firebase", options =>
+                options.ForwardDefaultSelector = context =>
+                {
+                    var value = context.Request.Headers.Authorization.ToString();
+                    var token = value.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                        ? value[7..]
+                        : "";
+                    return token.Count(c => c == '.') == 2 ? "Firebase" : "Demo";
+                })
+            .AddScheme<AuthenticationSchemeOptions, DemoAuthentication>("Demo", _ => { })
+            .AddScheme<FirebaseAuthenticationOptions, FirebaseAuthentication>(
+                "Firebase",
+                options => options.ProjectId = firebaseProjectId
+            );
+    }
+    else
+    {
+        builder.Services
+            .AddAuthentication("Demo")
+            .AddScheme<AuthenticationSchemeOptions, DemoAuthentication>("Demo", _ => { });
+    }
 }
 else
 {
-    var firebaseProjectId = builder.Configuration["Firebase:ProjectId"];
     if (string.IsNullOrWhiteSpace(firebaseProjectId))
         throw new InvalidOperationException("Firebase:ProjectId is required outside demo mode.");
     builder.Services.AddHttpClient("firebase-keys");
