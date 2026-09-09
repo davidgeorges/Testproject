@@ -43,9 +43,19 @@ export async function signInWithGoogle(): Promise<FirebaseSession> {
   };
 }
 
-export function watchFirebaseToken(callback: (token: string | null) => void): Unsubscribe {
+export function watchFirebaseToken(callback: (session: FirebaseSession | null) => void): Unsubscribe {
   if (!auth) return () => undefined;
-  return onIdTokenChanged(auth, async (user) => callback(user ? await user.getIdToken() : null));
+  return onIdTokenChanged(auth, async (user) =>
+    callback(
+      user
+        ? {
+            token: await user.getIdToken(),
+            displayName: user.displayName,
+            email: user.email,
+          }
+        : null,
+    ),
+  );
 }
 
 export async function signOutFirebase(): Promise<void> {

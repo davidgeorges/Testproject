@@ -21,6 +21,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSession, useLiveToken } from '../store/session';
+import { api } from '../services/api';
 import { watchFirebaseToken } from '../services/firebase';
 import { useColors, Label, IconButton } from '../design/ui';
 import {
@@ -359,7 +360,7 @@ function Experience() {
           }}
         >
           <Text style={{ color: '#B4C5DA', fontSize: 10 }}>
-            MAQUETTE · DONNÉES {token ? 'BANCAIRES FICTIVES' : 'D’EXEMPLE'}
+            {token ? 'COMPTE GOOGLE CONNECTÉ · BANQUE À RELIER' : 'MAQUETTE · DONNÉES D’EXEMPLE'}
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -500,9 +501,23 @@ function Experience() {
 export default function App() {
   useEffect(
     () =>
-      watchFirebaseToken((token) => {
-        useSession.getState().setToken(token);
-        if (token) useSession.getState().setPreview(false);
+      watchFirebaseToken((firebase) => {
+        useSession.getState().setToken(firebase?.token ?? null);
+        if (firebase) {
+          useSession.getState().setPreview(false);
+          const firstName =
+            firebase.displayName?.trim().split(/\s+/)[0] ||
+            firebase.email?.split('@')[0] ||
+            'Utilisateur';
+          void api
+            .profile()
+            .then((profile) =>
+              ['Alex', 'Utilisateur'].includes(profile.firstName)
+                ? api.saveProfile({ ...profile, firstName })
+                : profile,
+            )
+            .catch(() => undefined);
+        }
       }),
     [],
   );
