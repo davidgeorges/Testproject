@@ -5,7 +5,23 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "ios": { "supportsTablet": true },
-    "web": { "bundler": "metro", "output": "single" }
+    "scheme": "subscriptionapp",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.davidgeorges.subscriptionapp",
+      "versionCode": 1
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b55cc19c-4ea7-410d-891c-7fe38657a84f"
+      }
+    },
+    "owner": "azetoxvii"
   }
 }

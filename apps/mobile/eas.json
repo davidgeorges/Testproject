@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://testproject-s3qv.onrender.com",
+        "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY": "test_AdTSMmBnAQSUvAvcXtLqBdxIjIm"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://testproject-s3qv.onrender.com",
+        "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY": "test_AdTSMmBnAQSUvAvcXtLqBdxIjIm"
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  }
+}
