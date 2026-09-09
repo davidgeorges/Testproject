@@ -626,6 +626,8 @@ api.MapPost(
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 app.Logger.LogWarning(exception, "Bank synchronization failed, correlation {CorrelationId}", c.TraceIdentifier);
+                if (exception is TinkBankingException { Code: "TINK_TRANSACTIONS_401" or "TINK_TRANSACTIONS_403" })
+                    await s.SetConnectionStatus(bank, "reconnect_required", ct);
                 await s.AddNotification(new()
                 {
                     UserId = User(c),

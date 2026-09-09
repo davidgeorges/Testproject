@@ -77,6 +77,12 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
         return Task.CompletedTask;
     }
 
+    public Task SetConnectionStatus(BankConnection connection, string status, CancellationToken ct)
+    {
+        lock (gate) connection.Status = status;
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<BankAccount>> Accounts(string userId, CancellationToken ct)
     {
         lock (gate)

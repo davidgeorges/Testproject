@@ -13,6 +13,7 @@ public interface IWorkspaceStore
         CancellationToken ct
     );
     Task AddConnection(BankConnection connection, CancellationToken ct);
+    Task SetConnectionStatus(BankConnection connection, string status, CancellationToken ct);
     Task<IReadOnlyList<BankAccount>> Accounts(string userId, CancellationToken ct);
     Task<IReadOnlyList<BankTransaction>> Transactions(string userId, CancellationToken ct);
     Task Synchronize(

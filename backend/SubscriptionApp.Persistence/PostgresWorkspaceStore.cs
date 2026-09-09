@@ -61,6 +61,12 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task SetConnectionStatus(BankConnection connection, string status, CancellationToken ct)
+    {
+        connection.Status = status;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task<IReadOnlyList<BankAccount>> Accounts(string userId, CancellationToken ct) =>
         await db.Accounts.AsNoTracking().Where(a => a.UserId == userId).ToListAsync(ct);
 
