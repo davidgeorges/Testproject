@@ -49,37 +49,46 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
 
     public async Task<IReadOnlyList<BankTransaction>> FetchTransactions(BankConnection connection, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/data/v2/transactions?pageSize=100");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Unprotect(connection.ExternalConnectionId!));
-        using var response = await http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            var code = $"TINK_TRANSACTIONS_{(int)response.StatusCode}";
-            var message = response.StatusCode switch
-            {
-                System.Net.HttpStatusCode.Unauthorized => "Le jeton Tink a expiré. Reconnectez la banque.",
-                System.Net.HttpStatusCode.Forbidden => "Tink n’a pas accordé le droit transactions:read à cette connexion.",
-                System.Net.HttpStatusCode.NotFound => "L’API Transactions Tink n’est pas activée pour cette application.",
-                _ => $"Tink a refusé la lecture des transactions (HTTP {(int)response.StatusCode}).",
-            };
-            throw new TinkBankingException(code, message);
-        }
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-        var items = json.RootElement.TryGetProperty("transactions", out var rows) ? rows : json.RootElement;
+        var accessToken = Unprotect(connection.ExternalConnectionId!);
         var result = new List<BankTransaction>();
-        foreach (var row in items.EnumerateArray())
+        string? pageToken = null;
+        for (var page = 0; page < 5; page++)
         {
-            var id = Text(row, "id") ?? Guid.NewGuid().ToString("N");
-            var dateText = Text(row, "bookedDateTime") ?? Text(row, "dates", "booked") ?? Text(row, "date") ?? DateTimeOffset.UtcNow.ToString("O");
-            _ = DateOnly.TryParse(dateText.Length >= 10 ? dateText[..10] : dateText, out var date);
-            result.Add(new BankTransaction
+            var path = "/data/v2/transactions?pageSize=100"
+                + (string.IsNullOrWhiteSpace(pageToken) ? "" : $"&pageToken={Uri.EscapeDataString(pageToken)}");
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
             {
-                UserId = connection.UserId, ConnectionId = connection.Id, Provider = "tink", ExternalId = id,
-                AccountKey = Text(row, "accountId") ?? "tink", BookedAt = date == default ? DateOnly.FromDateTime(DateTime.UtcNow) : date,
-                Amount = Amount(row), Currency = Text(row, "amount", "currencyCode") ?? Text(row, "currencyDenominatedAmount", "currencyCode") ?? Text(row, "currencyCode") ?? "EUR",
-                MerchantName = Text(row, "merchantInformation", "merchantName") ?? Text(row, "descriptions", "display") ?? Text(row, "descriptions", "original") ?? Text(row, "description") ?? "Transaction",
-                Category = Text(row, "enrichedData", "categories", "pfm", "id") ?? Text(row, "categoryId") ?? "other",
-            });
+                var code = $"TINK_TRANSACTIONS_{(int)response.StatusCode}";
+                var message = response.StatusCode switch
+                {
+                    System.Net.HttpStatusCode.Unauthorized => "Le jeton Tink a expiré. Reconnectez la banque.",
+                    System.Net.HttpStatusCode.Forbidden => "Tink n’a pas accordé le droit transactions:read à cette connexion.",
+                    System.Net.HttpStatusCode.NotFound => "L’API Transactions Tink n’est pas activée pour cette application.",
+                    _ => $"Tink a refusé la lecture des transactions (HTTP {(int)response.StatusCode}).",
+                };
+                throw new TinkBankingException(code, message);
+            }
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            var items = json.RootElement.TryGetProperty("transactions", out var rows) ? rows : json.RootElement;
+            foreach (var row in items.EnumerateArray())
+            {
+                var id = Text(row, "id") ?? Guid.NewGuid().ToString("N");
+                var dateText = Text(row, "bookedDateTime") ?? Text(row, "dates", "booked") ?? Text(row, "date") ?? DateTimeOffset.UtcNow.ToString("O");
+                _ = DateOnly.TryParse(dateText.Length >= 10 ? dateText[..10] : dateText, out var date);
+                result.Add(new BankTransaction
+                {
+                    UserId = connection.UserId, ConnectionId = connection.Id, Provider = "tink", ExternalId = id,
+                    AccountKey = Text(row, "accountId") ?? "tink", BookedAt = date == default ? DateOnly.FromDateTime(DateTime.UtcNow) : date,
+                    Amount = Amount(row), Currency = Text(row, "amount", "currencyCode") ?? Text(row, "currencyDenominatedAmount", "currencyCode") ?? Text(row, "currencyCode") ?? "EUR",
+                    MerchantName = Text(row, "merchantInformation", "merchantName") ?? Text(row, "descriptions", "display") ?? Text(row, "descriptions", "original") ?? Text(row, "description") ?? "Transaction",
+                    Category = Text(row, "enrichedData", "categories", "pfm", "id") ?? Text(row, "categoryId") ?? "other",
+                });
+            }
+            pageToken = Text(json.RootElement, "nextPageToken");
+            if (string.IsNullOrWhiteSpace(pageToken)) break;
         }
         return result;
     }

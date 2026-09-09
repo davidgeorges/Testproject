@@ -23,4 +23,17 @@ public sealed class TransactionNormalizerTests
         new TransactionNormalizer().Normalize([transaction]);
         Assert.Equal("insurance", transaction.Category);
     }
+
+    [Theory]
+    [InlineData("ORANGE", "other", "mobile")]
+    [InlineData("EDF", "other", "energy")]
+    [InlineData("AXA FRANCE", "other", "insurance")]
+    [InlineData("Fournisseur", "EXPENSES_HOUSEHOLD_ENERGY", "energy")]
+    [InlineData("Fournisseur", "expenses:entertainment:streaming", "streaming")]
+    public void NormalizerMapsRealMerchantAndTinkCategories(string merchant, string supplied, string expected)
+    {
+        var transaction = new BankTransaction { MerchantName = merchant, Category = supplied, Currency = "EUR" };
+        new TransactionNormalizer().Normalize([transaction]);
+        Assert.Equal(expected, transaction.Category);
+    }
 }

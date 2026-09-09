@@ -123,11 +123,24 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
                 row.AccountId = account.Id;
             }
             var existing = transactions
-                .Select(t => (t.UserId, t.Provider, t.ExternalId))
-                .ToHashSet();
-            transactions.AddRange(
-                rows.Where(t => existing.Add((t.UserId, t.Provider, t.ExternalId)))
-            );
+                .Where(t => t.UserId == connection.UserId && t.ConnectionId == connection.Id)
+                .ToDictionary(t => t.ExternalId);
+            foreach (var row in rows)
+            {
+                if (!existing.TryGetValue(row.ExternalId, out var stored))
+                {
+                    transactions.Add(row);
+                    existing.Add(row.ExternalId, row);
+                    continue;
+                }
+                stored.AccountId = row.AccountId;
+                stored.AccountKey = row.AccountKey;
+                stored.BookedAt = row.BookedAt;
+                stored.Amount = row.Amount;
+                stored.Currency = row.Currency;
+                stored.MerchantName = row.MerchantName;
+                stored.Category = row.Category;
+            }
             connection.LastSyncAt = DateTimeOffset.UtcNow;
             connection.Status = "connected";
         }

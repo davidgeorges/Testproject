@@ -81,14 +81,9 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             $"SELECT pg_advisory_xact_lock(hashtext({connection.Id.ToString()}))",
             ct
         );
-        var existing = (
-            await db
-                .Transactions.Where(t =>
-                    t.UserId == connection.UserId && t.ConnectionId == connection.Id
-                )
-                .Select(t => t.ExternalId)
-                .ToListAsync(ct)
-        ).ToHashSet();
+        var existing = await db.Transactions
+            .Where(t => t.UserId == connection.UserId && t.ConnectionId == connection.Id)
+            .ToDictionaryAsync(t => t.ExternalId, ct);
         var knownAccounts = await db.Accounts
             .Where(a => a.UserId == connection.UserId && a.ConnectionId == connection.Id)
             .ToDictionaryAsync(a => a.ExternalAccountId, ct);
@@ -109,7 +104,22 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             }
             row.AccountId = account.Id;
         }
-        db.Transactions.AddRange(rows.Where(t => existing.Add(t.ExternalId)));
+        foreach (var row in rows)
+        {
+            if (!existing.TryGetValue(row.ExternalId, out var stored))
+            {
+                db.Transactions.Add(row);
+                existing.Add(row.ExternalId, row);
+                continue;
+            }
+            stored.AccountId = row.AccountId;
+            stored.AccountKey = row.AccountKey;
+            stored.BookedAt = row.BookedAt;
+            stored.Amount = row.Amount;
+            stored.Currency = row.Currency;
+            stored.MerchantName = row.MerchantName;
+            stored.Category = row.Category;
+        }
         connection.LastSyncAt = DateTimeOffset.UtcNow;
         connection.Status = "connected";
         await db.SaveChangesAsync(ct);
