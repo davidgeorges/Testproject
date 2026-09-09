@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import Purchases, { PACKAGE_TYPE } from 'react-native-purchases';
 
 const apiKey =
   Platform.OS === 'ios'
@@ -10,9 +9,17 @@ const apiKey =
 
 let configuredFor: string | null = null;
 
+async function sdk() {
+  if (Platform.OS === 'web') {
+    throw new Error('Les achats Premium se testent depuis l’application iOS ou Android.');
+  }
+  return import('react-native-purchases');
+}
+
 async function configure(userId: string) {
   if (!apiKey) throw new Error('RevenueCat doit être configuré pour cette plateforme.');
   if (configuredFor === userId) return;
+  const { default: Purchases } = await sdk();
   if (!configuredFor) Purchases.configure({ apiKey });
   await Purchases.logIn(userId);
   configuredFor = userId;
@@ -20,6 +27,7 @@ async function configure(userId: string) {
 
 export async function purchasePremium(userId: string, plan: 'monthly' | 'annual') {
   await configure(userId);
+  const { default: Purchases, PACKAGE_TYPE } = await sdk();
   const offerings = await Purchases.getOfferings();
   const packages = offerings.current?.availablePackages ?? [];
   const wanted = plan === 'annual' ? PACKAGE_TYPE.ANNUAL : PACKAGE_TYPE.MONTHLY;
@@ -31,6 +39,7 @@ export async function purchasePremium(userId: string, plan: 'monthly' | 'annual'
 
 export async function restorePremium(userId: string) {
   await configure(userId);
+  const { default: Purchases } = await sdk();
   const customer = await Purchases.restorePurchases();
   const entitlement = customer.entitlements.active.premium
     ?? Object.values(customer.entitlements.active)[0];
