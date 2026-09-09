@@ -96,7 +96,7 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
     private string Unprotect(string value)
     {
         var bytes = Convert.FromBase64String(value); var key = SHA256.HashData(Encoding.UTF8.GetBytes(clientSecret)); var plain = new byte[bytes.Length - 28];
-        using var aes = new AesGcm(key, 16); aes.Decrypt(bytes[..12], bytes[12..28], bytes[28..], plain); return Encoding.UTF8.GetString(plain);
+        using var aes = new AesGcm(key, 16); aes.Decrypt(bytes[..12], bytes[28..], bytes[12..28], plain); return Encoding.UTF8.GetString(plain);
     }
     private static string? Text(JsonElement value, string property) => value.TryGetProperty(property, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
     private static string? Text(JsonElement value, string parent, string property) => value.TryGetProperty(parent, out var p) ? Text(p, property) : null;
