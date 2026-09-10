@@ -43,11 +43,20 @@ export function Page({
   style,
   fill = false,
   transparent = false,
-}: PropsWithChildren<{ style?: ViewStyle; fill?: boolean; transparent?: boolean }>) {
+  backgroundColor,
+}: PropsWithChildren<{
+  style?: ViewStyle;
+  fill?: boolean;
+  transparent?: boolean;
+  backgroundColor?: string;
+}>) {
   const c = useColors();
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: transparent ? 'transparent' : c.background }}
+      style={{
+        flex: 1,
+        backgroundColor: transparent ? 'transparent' : (backgroundColor ?? c.background),
+      }}
       contentContainerStyle={[
         { padding: 20, paddingTop: 16, paddingBottom: 24, gap: 16, flexGrow: fill ? 1 : undefined },
         style,

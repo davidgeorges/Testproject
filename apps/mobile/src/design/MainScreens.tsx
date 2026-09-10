@@ -36,6 +36,7 @@ export function useNav() {
 export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
+  const homeTheme = active === 'Home';
   const items: [keyof TabsParams, string, React.ComponentProps<typeof Ionicons>['name']][] = [
     ['Home', 'Accueil', 'home-outline'],
     ['Subscriptions', 'Abonnements', 'reader-outline'],
@@ -47,11 +48,12 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
     <View
       style={{
         flexDirection: 'row',
-        backgroundColor: c.background,
-        borderTopWidth: 0.5,
-        borderColor: c.border,
-        paddingTop: 6,
-        paddingBottom: 7,
+        backgroundColor: homeTheme ? '#05090D' : c.background,
+        borderTopWidth: 1,
+        borderColor: homeTheme ? '#202A33' : c.border,
+        paddingTop: homeTheme ? 9 : 6,
+        paddingBottom: homeTheme ? 10 : 7,
+        paddingHorizontal: homeTheme ? 8 : 0,
       }}
     >
       {items.map(([key, title, icon]) => (
@@ -61,15 +63,43 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           accessibilityState={{ selected: key === active }}
           accessibilityLabel={title}
           onPress={() => nav.navigate('Main', { screen: key })}
-          style={{ flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', gap: 3 }}
+          style={({ pressed }) => ({
+            flex: 1,
+            minHeight: homeTheme ? 54 : 46,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 3,
+            borderRadius: 16,
+            opacity: pressed ? 0.72 : 1,
+            backgroundColor: homeTheme && key === active ? '#151C23' : 'transparent',
+          })}
         >
           <Ionicons
             name={active === key && key === 'Home' ? 'home' : icon}
             size={21}
-            color={key === active ? '#1888FF' : c.muted}
+            color={
+              homeTheme
+                ? key === active
+                  ? '#FFFFFF'
+                  : '#778293'
+                : key === active
+                  ? '#1888FF'
+                  : c.muted
+            }
           />
           <Label
-            style={{ fontSize: 9, lineHeight: 12, color: key === active ? '#1888FF' : c.muted }}
+            style={{
+              fontSize: homeTheme ? 10 : 9,
+              lineHeight: 13,
+              fontWeight: key === active ? '700' : '500',
+              color: homeTheme
+                ? key === active
+                  ? '#FFFFFF'
+                  : '#778293'
+                : key === active
+                  ? '#1888FF'
+                  : c.muted,
+            }}
           >
             {title}
           </Label>
@@ -144,7 +174,10 @@ export function DashboardScreen() {
   const profile = useProfile();
   const d = q.data;
   return (
-    <Page style={{ gap: 14 }}>
+    <Page
+      backgroundColor="#03070B"
+      style={{ gap: 18, paddingHorizontal: 16, paddingTop: 22, paddingBottom: 30 }}
+    >
       <View
         style={{
           flexDirection: 'row',
@@ -154,10 +187,10 @@ export function DashboardScreen() {
         }}
       >
         <View style={{ gap: 4 }}>
-          <Label style={{ fontSize: 22, lineHeight: 27, fontWeight: '700' }}>
+          <Label style={{ fontSize: 30, lineHeight: 37, fontWeight: '800', letterSpacing: -0.8 }}>
             Bonjour {profile.data?.firstName ?? 'Utilisateur'} 👋
           </Label>
-          <Label muted style={{ fontSize: 13 }}>
+          <Label muted style={{ fontSize: 16, lineHeight: 22, color: '#8E98A9' }}>
             Voici votre résumé aujourd’hui.
           </Label>
         </View>
@@ -183,7 +216,118 @@ export function DashboardScreen() {
         />
       ) : (
         <>
-          <SavingsHero amount={d.annualPotentialSaving} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Voir mes abonnements"
+            onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
+            style={({ pressed }) => ({ opacity: pressed ? 0.88 : 1 })}
+          >
+            <LinearGradient
+              colors={['#26313B', '#111820', '#070C11']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                minHeight: 245,
+                borderRadius: 30,
+                borderWidth: 1,
+                borderColor: '#7F8C993D',
+                padding: 24,
+                overflow: 'hidden',
+                shadowColor: '#B9C7D5',
+                shadowOffset: { width: 0, height: 10 },
+                shadowRadius: 26,
+                shadowOpacity: 0.16,
+              }}
+            >
+              <LinearGradient
+                colors={['#FFFFFF42', '#FFFFFF08']}
+                style={{
+                  position: 'absolute',
+                  left: -30,
+                  top: -55,
+                  width: 270,
+                  height: 120,
+                  borderRadius: 80,
+                  transform: [{ rotate: '-7deg' }],
+                }}
+              />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#DDE7F01A',
+                    borderWidth: 1,
+                    borderColor: '#FFFFFF24',
+                  }}
+                >
+                  <Ionicons name="wallet-outline" size={27} color="#F8FAFC" />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Label style={{ fontSize: 17, fontWeight: '700' }}>Votre budget</Label>
+                  <Label muted style={{ fontSize: 14, color: '#9BA6B7' }}>
+                    Dépenses récurrentes
+                  </Label>
+                </View>
+                <Ionicons name="chevron-forward" size={25} color="#8E99A8" />
+              </View>
+              <Label
+                style={{
+                  marginTop: 32,
+                  fontSize: 42,
+                  lineHeight: 50,
+                  fontWeight: '800',
+                  letterSpacing: -1.2,
+                }}
+              >
+                {money(d.monthlyRecurringCost)}
+              </Label>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 22 }}>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#AAB7C550',
+                    borderRadius: 22,
+                    paddingHorizontal: 17,
+                    minHeight: 42,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <Label style={{ fontSize: 13, fontWeight: '700' }}>Voir mes abonnements</Label>
+                  <Ionicons name="arrow-forward" size={18} color="#F8FAFC" />
+                </View>
+                <View
+                  accessible={false}
+                  style={{
+                    flex: 1,
+                    height: 55,
+                    marginLeft: 18,
+                    flexDirection: 'row',
+                    alignItems: 'flex-end',
+                    gap: 5,
+                  }}
+                >
+                  {[12, 18, 24, 33, 28, 38, 31, 45, 52, 68, 82, 57].map((height, index) => (
+                    <View
+                      key={`${height}-${index}`}
+                      style={{
+                        flex: 1,
+                        height,
+                        maxHeight: 52,
+                        borderRadius: 4,
+                        backgroundColor: index > 8 ? '#F3F6F9' : '#46515F',
+                      }}
+                    />
+                  ))}
+                </View>
+              </View>
+            </LinearGradient>
+          </Pressable>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <Pressable
               accessibilityRole="button"
@@ -191,42 +335,91 @@ export function DashboardScreen() {
               onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
               style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}
             >
-              <Card style={{ padding: 16, minHeight: 104 }}>
-                <Label style={{ fontSize: 29, lineHeight: 35, fontWeight: '700' }}>
+              <LinearGradient
+                colors={['#111820', '#080D12']}
+                style={{
+                  padding: 18,
+                  minHeight: 142,
+                  borderRadius: 24,
+                  borderWidth: 1,
+                  borderColor: '#27323C',
+                }}
+              >
+                <View
+                  style={{
+                    width: 43,
+                    height: 43,
+                    borderRadius: 22,
+                    backgroundColor: '#18212B',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 14,
+                  }}
+                >
+                  <Ionicons name="people-outline" size={23} color="#F4F7FA" />
+                </View>
+                <Label style={{ fontSize: 31, lineHeight: 36, fontWeight: '800' }}>
                   {d.subscriptionCount}
                 </Label>
-                <Label muted style={{ fontSize: 13, lineHeight: 17 }}>
+                <Label muted style={{ fontSize: 14, lineHeight: 19, color: '#929DAE' }}>
                   Abonnements{'\n'}détectés
                 </Label>
-              </Card>
+              </LinearGradient>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Voir le détail du total mensuel de ${money(d.monthlyRecurringCost)}`}
-              onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
+              accessibilityLabel={`Voir le détail des économies possibles de ${money(d.annualPotentialSaving)} par an`}
+              onPress={() => nav.navigate('Main', { screen: 'Savings' })}
               style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}
             >
-              <Card style={{ padding: 16, minHeight: 104 }}>
-                <Label style={{ fontSize: 29, lineHeight: 35, fontWeight: '700' }}>
-                  {money(d.monthlyRecurringCost)}
+              <LinearGradient
+                colors={['#111820', '#080D12']}
+                style={{
+                  padding: 18,
+                  minHeight: 142,
+                  borderRadius: 24,
+                  borderWidth: 1,
+                  borderColor: '#27323C',
+                }}
+              >
+                <View
+                  style={{
+                    width: 43,
+                    height: 43,
+                    borderRadius: 22,
+                    backgroundColor: '#18212B',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 14,
+                  }}
+                >
+                  <Ionicons name="trending-up-outline" size={23} color="#F4F7FA" />
+                </View>
+                <Label style={{ fontSize: 27, lineHeight: 36, fontWeight: '800' }}>
+                  {money(d.annualPotentialSaving)}
                 </Label>
-                <Label muted style={{ fontSize: 13 }}>
-                  Total mensuel
+                <Label muted style={{ fontSize: 14, lineHeight: 19, color: '#929DAE' }}>
+                  Économies{'\n'}possibles / an
                 </Label>
-              </Card>
+              </LinearGradient>
             </Pressable>
           </View>
           <Pressable onPress={() => nav.navigate('Bank')} accessibilityRole="button">
-            <Card
+            <LinearGradient
+              colors={['#10171E', '#080D12']}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
-                padding: 12,
-                minHeight: 63,
+                paddingHorizontal: 18,
+                paddingVertical: 16,
+                minHeight: 76,
+                borderRadius: 23,
+                borderWidth: 1,
+                borderColor: '#27323C',
               }}
             >
-              <Ionicons name="timer-outline" size={29} color="#31FFAB" />
+              <Ionicons name="timer-outline" size={31} color="#F4F7FA" />
               <View style={{ flex: 1 }}>
                 <Label muted style={{ fontSize: 11, lineHeight: 16 }}>
                   Dernière synchronisation
@@ -241,23 +434,115 @@ export function DashboardScreen() {
                     : '08:41'}
                 </Label>
               </View>
-              <View>
-                <Badge text="Tout est à jour" />
+              <View
+                style={{
+                  backgroundColor: '#063E2C',
+                  borderRadius: 22,
+                  paddingHorizontal: 13,
+                  paddingVertical: 9,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 7,
+                }}
+              >
+                <View
+                  style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#20F2A0' }}
+                />
+                <Label style={{ color: '#20F2A0', fontSize: 11, fontWeight: '600' }}>
+                  Tout est à jour
+                </Label>
               </View>
-            </Card>
+            </LinearGradient>
           </Pressable>
-          <Section
-            title="Top recommandations"
-            action="Voir tout"
-            onPress={() => nav.navigate('Main', { screen: 'Savings' })}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 42 }}>
+            <Label
+              style={{
+                flex: 1,
+                fontSize: 21,
+                lineHeight: 28,
+                fontWeight: '800',
+                letterSpacing: -0.35,
+              }}
+            >
+              Top recommandations
+            </Label>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => nav.navigate('Main', { screen: 'Savings' })}
+              style={{
+                minHeight: 44,
+                paddingLeft: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Label muted style={{ fontSize: 14, fontWeight: '600', color: '#9AA5B5' }}>
+                Voir tout
+              </Label>
+              <Ionicons name="chevron-forward" size={18} color="#8792A2" />
+            </Pressable>
+          </View>
           <View style={{ gap: 8 }}>
             {d.topRecommendations.map((item) => (
-              <RecommendationRow
+              <Pressable
                 key={item.id}
-                item={item}
                 onPress={() => nav.navigate('Recommendation', { id: item.id })}
-              />
+                accessibilityRole="button"
+                style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}
+              >
+                <LinearGradient
+                  colors={['#111820', '#080D12']}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 13,
+                    padding: 13,
+                    minHeight: 76,
+                    borderRadius: 22,
+                    borderWidth: 1,
+                    borderColor: '#27323C',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 15,
+                      backgroundColor: '#18212A',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons
+                      name={
+                        item.category === 'mobile'
+                          ? 'phone-portrait-outline'
+                          : item.category === 'insurance'
+                            ? 'shield-checkmark-outline'
+                            : 'sparkles-outline'
+                      }
+                      size={24}
+                      color="#E9EEF3"
+                    />
+                  </View>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Label style={{ fontWeight: '700', fontSize: 15 }}>{item.title}</Label>
+                    <Label muted style={{ fontSize: 12 }}>
+                      Économie estimée
+                    </Label>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                    <Label style={{ fontSize: 15, fontWeight: '700' }}>
+                      {money(item.annualSaving)}
+                    </Label>
+                    <Label muted style={{ fontSize: 11 }}>
+                      par an
+                    </Label>
+                  </View>
+                  <Ionicons name="chevron-forward" size={21} color="#8792A2" />
+                </LinearGradient>
+              </Pressable>
             ))}
           </View>
         </>
