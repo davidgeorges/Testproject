@@ -422,6 +422,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
     useSession
       .getState()
       .setAccentColor(normalizeAccentColor(profile.accentColor) ?? DEFAULT_ACCENT_COLOR);
+    useSession.getState().setBackgroundColor(normalizeAccentColor(profile.backgroundColor));
     if (register && accept) await api.acceptLegal('1.0');
     queryClient.setQueryData(['profile', firebase.token], profile);
   }

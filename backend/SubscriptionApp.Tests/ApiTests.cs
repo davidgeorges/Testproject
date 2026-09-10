@@ -92,6 +92,7 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         using var c = await Session();
         var initial = (await c.GetFromJsonAsync<UserProfile>("/api/v1/profile"))!;
         Assert.Equal("#70737A", initial.AccentColor);
+        Assert.Null(initial.BackgroundColor);
 
         using var validRequest = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/profile")
         {
@@ -102,6 +103,7 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
                     theme = "light",
                     notificationsEnabled = true,
                     accentColor = "#aBc123",
+                    backgroundColor = "#123AbC",
                 }
             ),
         };
@@ -109,6 +111,7 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         validResponse.EnsureSuccessStatusCode();
         var updated = (await validResponse.Content.ReadFromJsonAsync<UserProfile>())!;
         Assert.Equal("#ABC123", updated.AccentColor);
+        Assert.Equal("#123ABC", updated.BackgroundColor);
 
         using var invalidRequest = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/profile")
         {
@@ -126,6 +129,27 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(
             "#ABC123",
             (await c.GetFromJsonAsync<UserProfile>("/api/v1/profile"))!.AccentColor
+        );
+
+        using var invalidBackgroundRequest = new HttpRequestMessage(
+            HttpMethod.Patch,
+            "/api/v1/profile"
+        )
+        {
+            Content = JsonContent.Create(
+                new
+                {
+                    firstName = "Camille",
+                    theme = "light",
+                    notificationsEnabled = true,
+                    accentColor = "#ABC123",
+                    backgroundColor = "not-a-color",
+                }
+            ),
+        };
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await c.SendAsync(invalidBackgroundRequest)).StatusCode
         );
     }
 

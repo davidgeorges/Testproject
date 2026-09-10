@@ -155,6 +155,7 @@ export interface Profile {
   firstName: string;
   theme: 'dark' | 'light';
   accentColor: string;
+  backgroundColor: string | null;
   notificationsEnabled: boolean;
 }
 

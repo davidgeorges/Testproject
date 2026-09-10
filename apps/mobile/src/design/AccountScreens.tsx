@@ -24,6 +24,7 @@ import { deleteCurrentFirebaseUser, signOutFirebase } from '../services/firebase
 import { unregisterPushNotifications } from '../services/notifications';
 import type { RootStackParams } from '../app/navigation';
 import { accentTextColor, DEFAULT_ACCENT_COLOR, normalizeAccentColor } from '../theme/accent';
+import { resolveBackgroundColor } from '../theme/background';
 function Row({
   icon,
   title,
@@ -91,6 +92,9 @@ export function ProfileScreen() {
   const cache = useQueryClient();
   const token = useLiveToken();
   const email = useSession((s) => s.email);
+  const theme = useSession((s) => s.theme);
+  const selectedBackground = useSession((s) => s.backgroundColor);
+  const pageBackground = resolveBackgroundColor(selectedBackground, theme);
   const preview = PREVIEW_ENABLED && !token;
   const displayName = preview ? 'Georges' : (profile.data?.firstName ?? 'Utilisateur');
   const displayEmail = token ? (email ?? 'Compte Firebase') : 'georges@email.com';
@@ -159,12 +163,16 @@ export function ProfileScreen() {
     <ImageBackground
       source={require('../../assets/home-fabric.png')}
       resizeMode="cover"
-      imageStyle={{ opacity: 0.96 }}
-      style={{ flex: 1, backgroundColor: '#08111D' }}
+      imageStyle={{ opacity: 0.28 }}
+      style={{ flex: 1, backgroundColor: pageBackground }}
     >
       <LinearGradient
         pointerEvents="none"
-        colors={['#02060CE8', '#0B14205C', '#182432ED']}
+        colors={
+          theme === 'dark'
+            ? ['#00000070', '#00000018', '#00000055']
+            : ['#FFFFFF70', '#FFFFFF18', '#FFFFFF55']
+        }
         locations={[0, 0.46, 1]}
         style={{ position: 'absolute', inset: 0 }}
       />
@@ -390,12 +398,24 @@ const accentChoices = [
   '#C45C7A',
   '#B84C4C',
 ];
+const backgroundChoices = [
+  '#0B0B0F',
+  '#111827',
+  '#15202B',
+  '#1A1630',
+  '#10251F',
+  '#2A1812',
+  '#2B1B24',
+  '#222222',
+];
 
 export function SettingsScreen() {
   const nav = useNav();
   const c = useColors();
   const theme = useSession((s) => s.theme);
   const accentColor = useSession((s) => s.accentColor);
+  const backgroundColor = useSession((s) => s.backgroundColor);
+  const resolvedBackground = resolveBackgroundColor(backgroundColor, theme);
   const token = useLiveToken();
   const q = useProfile();
   const cache = useQueryClient();
@@ -404,6 +424,7 @@ export function SettingsScreen() {
   const [message, setMessage] = useState('');
   const [confirm, setConfirm] = useState(false);
   const [customAccent, setCustomAccent] = useState(accentColor);
+  const [customBackground, setCustomBackground] = useState(resolvedBackground);
   const save = useMutation({
     mutationFn: async () => {
       if (!name.trim()) throw new Error('Indiquez votre prénom.');
@@ -414,6 +435,7 @@ export function SettingsScreen() {
             accentColor:
               normalizeAccentColor(q.data?.accentColor ?? useSession.getState().accentColor) ??
               DEFAULT_ACCENT_COLOR,
+            backgroundColor: q.data?.backgroundColor ?? useSession.getState().backgroundColor,
             notificationsEnabled: q.data?.notificationsEnabled ?? true,
           })
         : { ...q.data, firstName: name.trim() };
@@ -483,6 +505,45 @@ export function SettingsScreen() {
       return;
     }
     saveAccent.mutate(normalized);
+  };
+  const saveBackground = useMutation({
+    mutationFn: async (nextColor: string) => {
+      const normalized = normalizeAccentColor(nextColor);
+      if (!normalized) throw new Error('Utilisez une couleur au format #RRGGBB.');
+      if (!token || !q.data)
+        throw new Error('Votre profil doit être chargé avant la modification.');
+      return api.saveProfile({
+        ...q.data,
+        theme,
+        accentColor: normalizeAccentColor(q.data.accentColor) ?? DEFAULT_ACCENT_COLOR,
+        backgroundColor: normalized,
+      });
+    },
+    onMutate: (nextColor) => {
+      const previous = useSession.getState().backgroundColor;
+      const normalized = normalizeAccentColor(nextColor);
+      if (normalized) useSession.getState().setBackgroundColor(normalized);
+      return { previous };
+    },
+    onSuccess: (profile) => {
+      const normalized = normalizeAccentColor(profile.backgroundColor);
+      useSession.getState().setBackgroundColor(normalized);
+      setCustomBackground(resolveBackgroundColor(normalized, theme));
+      cache.setQueryData(['profile', token], profile);
+      setMessage('Fond enregistré sur votre profil.');
+    },
+    onError: (error, _nextColor, context) => {
+      useSession.getState().setBackgroundColor(context?.previous ?? null);
+      setMessage(error.message);
+    },
+  });
+  const applyCustomBackground = () => {
+    const normalized = normalizeAccentColor(customBackground);
+    if (!normalized) {
+      setMessage('Utilisez une couleur au format #RRGGBB.');
+      return;
+    }
+    saveBackground.mutate(normalized);
   };
   return (
     <Page style={{ gap: 24, paddingTop: 64 }}>
@@ -572,6 +633,79 @@ export function SettingsScreen() {
                 style={{ color: accentTextColor(accentColor), fontSize: 13, fontWeight: '800' }}
               >
                 {saveAccent.isPending ? 'Enregistrement…' : 'Appliquer'}
+              </Label>
+            </Pressable>
+          </View>
+          <View
+            style={{ paddingVertical: 14, borderBottomWidth: 0.5, borderColor: c.border, gap: 12 }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="layers-outline" color={c.muted} size={21} />
+              <Label style={{ flex: 1, marginLeft: 12, fontSize: 13 }}>Fond de l’application</Label>
+              <Label muted style={{ fontSize: 11 }}>
+                {resolvedBackground}
+              </Label>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 11 }}>
+              {backgroundChoices.map((color) => {
+                const selected = color === resolvedBackground;
+                return (
+                  <Pressable
+                    key={color}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Choisir le fond ${color}`}
+                    accessibilityState={{ selected }}
+                    disabled={saveBackground.isPending}
+                    onPress={() => saveBackground.mutate(color)}
+                    style={({ pressed }) => ({
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: color,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: selected ? 3 : 1,
+                      borderColor: selected ? c.text : c.border,
+                      opacity: pressed || saveBackground.isPending ? 0.65 : 1,
+                    })}
+                  >
+                    {selected ? (
+                      <Ionicons name="checkmark" size={18} color={accentTextColor(color)} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Field
+              label="Fond personnalisé"
+              placeholder="#0B0B0F"
+              value={customBackground}
+              onChangeText={(value) => setCustomBackground(value.toUpperCase().slice(0, 7))}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Appliquer le fond personnalisé"
+              disabled={saveBackground.isPending}
+              onPress={applyCustomBackground}
+              style={({ pressed }) => ({
+                minHeight: 42,
+                borderRadius: 15,
+                backgroundColor: resolvedBackground,
+                borderWidth: 1,
+                borderColor: c.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed || saveBackground.isPending ? 0.68 : 1,
+              })}
+            >
+              <Label
+                style={{
+                  color: accentTextColor(resolvedBackground),
+                  fontSize: 13,
+                  fontWeight: '800',
+                }}
+              >
+                {saveBackground.isPending ? 'Enregistrement…' : 'Appliquer le fond'}
               </Label>
             </Pressable>
           </View>

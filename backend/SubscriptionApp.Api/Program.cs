@@ -752,6 +752,12 @@ api.MapPatch(
                     || request.AccentColor[0] != '#'
                     || !request.AccentColor.AsSpan(1).ToString().All(Uri.IsHexDigit)
                 )
+            || request.BackgroundColor is not null
+                && (
+                    request.BackgroundColor.Length != 7
+                    || request.BackgroundColor[0] != '#'
+                    || !request.BackgroundColor.AsSpan(1).ToString().All(Uri.IsHexDigit)
+                )
         )
             return Results.BadRequest(
                 new
@@ -766,6 +772,8 @@ api.MapPatch(
         p.Theme = request.Theme;
         if (request.AccentColor is not null)
             p.AccentColor = request.AccentColor.ToUpperInvariant();
+        if (request.BackgroundColor is not null)
+            p.BackgroundColor = request.BackgroundColor.ToUpperInvariant();
         p.NotificationsEnabled = request.NotificationsEnabled;
         await s.SaveProfile(p, ct);
         await Audit(s, c, "profile.updated", "profile", p.Id, ct);
@@ -1727,7 +1735,8 @@ public sealed record ProfileRequest(
     string FirstName,
     string Theme,
     bool NotificationsEnabled,
-    string? AccentColor = null
+    string? AccentColor = null,
+    string? BackgroundColor = null
 );
 
 public sealed record SubscriptionPreferenceRequest(string? Category, string Status);

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSession } from '../store/session';
 import { themes } from '../theme/tokens';
+import { resolveBackgroundColor } from '../theme/background';
 import { money, cadence } from '../utils/format';
 import { fr } from '../i18n/fr';
 import type { Category, Payment, Recommendation } from '../types/api';
@@ -56,7 +57,9 @@ export function Page({
   onScroll?: ScrollViewProps['onScroll'];
   scrollEventThrottle?: number;
 }>) {
-  const c = useColors();
+  const theme = useSession((s) => s.theme);
+  const selectedBackground = useSession((s) => s.backgroundColor);
+  const pageBackground = resolveBackgroundColor(selectedBackground, theme);
   const content = (
     <ScrollView
       style={{
@@ -80,12 +83,16 @@ export function Page({
     <ImageBackground
       source={require('../../assets/home-fabric.png')}
       resizeMode="cover"
-      imageStyle={{ opacity: 0.96 }}
-      style={{ flex: 1, backgroundColor: backgroundColor ?? c.background }}
+      imageStyle={{ opacity: 0.28 }}
+      style={{ flex: 1, backgroundColor: backgroundColor ?? pageBackground }}
     >
       <LinearGradient
         pointerEvents="none"
-        colors={['#02060CE8', '#0B14205C', '#182432ED']}
+        colors={
+          theme === 'dark'
+            ? ['#00000070', '#00000018', '#00000055']
+            : ['#FFFFFF70', '#FFFFFF18', '#FFFFFF55']
+        }
         locations={[0, 0.46, 1]}
         style={{ position: 'absolute', inset: 0 }}
       />
