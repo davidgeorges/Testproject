@@ -64,7 +64,11 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
   const normalizedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR;
   const accentForeground = accentTextColor(normalizedAccent);
   if (active === 'Profile') return null;
-  const homeLight = active === 'Home' || active === 'Subscriptions' || active === 'Finances';
+  const homeLight =
+    active === 'Home' ||
+    active === 'Subscriptions' ||
+    active === 'Finances' ||
+    active === 'Savings';
   const glassTheme =
     active === 'Home' ||
     active === 'Subscriptions' ||
@@ -192,18 +196,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         borderColor: homeLight ? '#E7E7EA' : glassTheme ? '#EEF3F526' : c.border,
         paddingVertical: homeLight ? 9 : glassTheme ? 2 : 6,
         paddingHorizontal: homeLight ? 14 : glassTheme ? 5 : 0,
-        marginHorizontal:
-          active === 'Savings'
-            ? dashboardScrollY.interpolate({
-                inputRange: [0, 95],
-                outputRange: [15, 91],
-                extrapolate: 'clamp',
-              })
-            : glassTheme
-              ? homeLight
-                ? 0
-                : 15
-              : 0,
+        marginHorizontal: glassTheme ? 15 : 0,
         marginBottom: 0,
         borderRadius: homeLight ? 0 : glassTheme ? 27 : 0,
         shadowColor: glassTheme ? '#000000' : 'transparent',
@@ -251,24 +244,8 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           <Animated.View
             style={{
               overflow: 'hidden',
-              opacity: homeLight
-                ? 0
-                : active === 'Savings'
-                  ? dashboardScrollY.interpolate({
-                      inputRange: [0, 55, 95],
-                      outputRange: [1, 0.35, 0],
-                      extrapolate: 'clamp',
-                    })
-                  : 1,
-              maxHeight: homeLight
-                ? 0
-                : active === 'Savings'
-                  ? dashboardScrollY.interpolate({
-                      inputRange: [0, 95],
-                      outputRange: [13, 0],
-                      extrapolate: 'clamp',
-                    })
-                  : 13,
+              opacity: homeLight ? 0 : 1,
+              maxHeight: homeLight ? 0 : 13,
             }}
           >
             <Label
@@ -1705,42 +1682,97 @@ export function SubscriptionDetail() {
 }
 export function SavingsScreen() {
   const nav = useNav();
-  const q = useRecommendations();
-  const d = useOverview();
-  const [filter, setFilter] = useState('Toutes');
-  const token = useLiveToken();
-  const items = q.data?.filter((item) =>
-    filter === 'Réalisées' ? item.realized : filter === 'Disponibles' ? !item.realized : true,
+  const recommendations = useRecommendations();
+  const profile = useProfile();
+  const isDark = useSession((state) => state.theme) === 'dark';
+  const accentColor = useSession((state) => state.accentColor);
+  const normalizedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR;
+  const accentForeground = accentTextColor(normalizedAccent);
+  const heroText =
+    isDark && normalizedAccent === ORIGINAL_THEME_ACCENT
+      ? '#FFFFFF'
+      : accentTextColor(normalizedAccent);
+  const pageColors = isDark
+    ? {
+        background: '#0B0B0F',
+        surface: '#18181D',
+        elevated: '#222228',
+        text: '#F8F7FA',
+        body: '#ECEBF0',
+        secondary: '#AAA8B1',
+        muted: '#777780',
+        separator: '#2A292F',
+        avatar: '#493B34',
+        avatarText: '#FFF7F0',
+        shadow: '#000000',
+      }
+    : {
+        background: '#F4F3F7',
+        surface: '#FFFFFF',
+        elevated: '#FFFFFF',
+        text: '#171719',
+        body: '#242328',
+        secondary: '#858489',
+        muted: '#A4A3A9',
+        separator: '#F0EFF2',
+        avatar: '#E8D6C8',
+        avatarText: '#2B2420',
+        shadow: '#34313D',
+      };
+  const [filter, setFilter] = useState<'Toutes' | 'Disponibles' | 'Réalisées'>('Toutes');
+  const [search, setSearch] = useState('');
+  const sourceItems = recommendations.data ?? [];
+  const normalizedSearch = search.trim().toLocaleLowerCase('fr');
+  const items = sourceItems.filter((item) => {
+    const matchesStatus =
+      filter === 'Réalisées' ? item.realized : filter === 'Disponibles' ? !item.realized : true;
+    const matchesSearch =
+      !normalizedSearch ||
+      item.title.toLocaleLowerCase('fr').includes(normalizedSearch) ||
+      item.explanation.toLocaleLowerCase('fr').includes(normalizedSearch) ||
+      item.category.toLocaleLowerCase('fr').includes(normalizedSearch);
+    return matchesStatus && matchesSearch;
+  });
+  const availableTotal = sourceItems
+    .filter((item) => !item.realized)
+    .reduce((sum, item) => sum + item.annualSaving, 0);
+  const realizedTotal = sourceItems
+    .filter((item) => item.realized)
+    .reduce((sum, item) => sum + (item.realizedAnnualSaving ?? item.annualSaving), 0);
+  const displayedTotal = filter === 'Réalisées' ? realizedTotal : availableTotal;
+  const displayedLabel = filter === 'Réalisées' ? 'Économies réalisées' : 'Économies potentielles';
+  const heroGradient = [
+    mixAccentColor(normalizedAccent, '#FFFFFF', isDark ? 0.1 : 0.2),
+    mixAccentColor(normalizedAccent, '#000000', isDark ? 0.16 : 0.06),
+  ] as const;
+  const heroMuted = mixAccentColor(
+    normalizedAccent,
+    heroText === '#FFFFFF' ? '#FFFFFF' : '#000000',
+    0.72,
   );
-  const realizedTotal =
-    q.data
-      ?.filter((item) => item.realized)
-      .reduce((sum, item) => sum + (item.realizedAnnualSaving ?? 0), 0) ?? 0;
-  const showReference = PREVIEW_ENABLED && !token;
-  const displayedTotal =
-    filter === 'Réalisées'
-      ? realizedTotal
-      : showReference
-        ? 496
-        : (d.data?.annualPotentialSaving ?? 0);
+  const initial = (profile.data?.firstName?.trim() || 'Vous').charAt(0).toLocaleUpperCase('fr');
+
   React.useEffect(() => {
     dashboardScrollY.setValue(0);
     return () => dashboardScrollY.setValue(0);
   }, []);
 
+  const recommendationIcon = (category: Category) =>
+    category === 'mobile'
+      ? 'phone-portrait-outline'
+      : category === 'insurance'
+        ? 'shield-checkmark-outline'
+        : category === 'internet'
+          ? 'wifi-outline'
+          : category === 'energy'
+            ? 'flash-outline'
+            : category === 'sport'
+              ? 'fitness-outline'
+              : 'sparkles-outline';
+
   return (
-    <ImageBackground
-      source={require('../../assets/home-fabric.png')}
-      resizeMode="cover"
-      imageStyle={{ opacity: 0.96 }}
-      style={{ flex: 1, backgroundColor: '#08111D' }}
-    >
-      <LinearGradient
-        pointerEvents="none"
-        colors={['#02060CE8', '#0B14205C', '#182432ED']}
-        locations={[0, 0.46, 1]}
-        style={{ position: 'absolute', inset: 0 }}
-      />
+    <View style={{ flex: 1, backgroundColor: pageColors.background }}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <Page
         fill
         transparent
@@ -1748,63 +1780,161 @@ export function SavingsScreen() {
           useNativeDriver: false,
         })}
         scrollEventThrottle={16}
-        style={{ gap: 0, paddingHorizontal: 17, paddingTop: 10, paddingBottom: 150 }}
+        style={{ gap: 0, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 112 }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Voir mon profil"
             onPress={() => nav.navigate('Main', { screen: 'Profile' })}
             style={({ pressed }) => ({
-              width: 32,
-              height: 32,
-              borderRadius: 20,
+              width: 43,
+              height: 43,
+              borderRadius: 22,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: '#8FAC9CDA',
-              borderWidth: 2,
-              borderColor: '#D9E7DF9C',
-              opacity: pressed ? 0.75 : 1,
+              backgroundColor: pageColors.avatar,
+              opacity: pressed ? 0.72 : 1,
             })}
           >
-            <Ionicons name="person-outline" size={20} color="#FFFFFF" />
+            <Label style={{ color: pageColors.avatarText, fontSize: 17, fontWeight: '900' }}>
+              {initial}
+            </Label>
+            <View
+              style={{
+                position: 'absolute',
+                right: -1,
+                bottom: -1,
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: pageColors.surface,
+              }}
+            >
+              <Ionicons name="settings-outline" size={11} color={pageColors.secondary} />
+            </View>
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Rechercher un abonnement"
-            onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
-            style={({ pressed }) => ({
+          <View
+            style={{
               flex: 1,
-              minHeight: 32,
-              borderRadius: 20,
-              paddingHorizontal: 14,
+              height: 43,
+              borderRadius: 23,
+              paddingHorizontal: 15,
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 10,
-              backgroundColor: '#5B6068D9',
-              opacity: pressed ? 0.78 : 1,
+              gap: 9,
+              backgroundColor: pageColors.surface,
+            }}
+          >
+            <Ionicons name="search-outline" size={20} color={pageColors.muted} />
+            <TextInput
+              accessibilityLabel="Rechercher une économie"
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Rechercher"
+              placeholderTextColor={pageColors.muted}
+              style={
+                { flex: 1, color: pageColors.text, fontSize: 15, outlineStyle: 'none' } as never
+              }
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            onPress={() => nav.navigate('Notifications')}
+            style={({ pressed }) => ({
+              width: 43,
+              height: 43,
+              borderRadius: 22,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: pageColors.surface,
+              opacity: pressed ? 0.72 : 1,
             })}
           >
-            <Ionicons name="search" size={20} color="#FFFFFF" />
-            <Label style={{ fontSize: 14, color: '#FFFFFF', fontWeight: '500' }}>Rechercher</Label>
+            <Ionicons name="notifications-outline" size={22} color={pageColors.text} />
           </Pressable>
         </View>
 
-        <Label
+        <View style={{ marginTop: 23, flexDirection: 'row', alignItems: 'baseline' }}>
+          <Label style={{ flex: 1, color: pageColors.text, fontSize: 20, fontWeight: '900' }}>
+            Économies
+          </Label>
+          <Label style={{ color: pageColors.secondary, fontSize: 12 }}>
+            {sourceItems.filter((item) => !item.realized).length} disponible
+            {sourceItems.filter((item) => !item.realized).length > 1 ? 's' : ''}
+          </Label>
+        </View>
+
+        <LinearGradient
+          colors={heroGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={{
-            marginTop: 31,
-            color: '#FFFFFF',
-            fontSize: 27,
-            lineHeight: 33,
-            fontWeight: '700',
-            letterSpacing: -0.65,
+            minHeight: 178,
+            marginTop: 12,
+            borderRadius: 25,
+            padding: 18,
+            overflow: 'hidden',
+            shadowColor: pageColors.shadow,
+            shadowOpacity: isDark ? 0.34 : 0.14,
+            shadowRadius: 15,
+            shadowOffset: { width: 0, height: 8 },
           }}
         >
-          Vos économies
-        </Label>
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              width: 132,
+              height: 132,
+              borderRadius: 66,
+              right: -24,
+              top: -38,
+              backgroundColor: accentWithAlpha(heroText, 0.12),
+            }}
+          />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 11,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: accentWithAlpha(heroText, 0.14),
+              }}
+            >
+              <Ionicons name="trending-up" size={19} color={heroText} />
+            </View>
+            <Label style={{ marginLeft: 10, color: heroText, fontSize: 16, fontWeight: '800' }}>
+              {displayedLabel}
+            </Label>
+          </View>
+          <Label
+            style={{
+              marginTop: 14,
+              color: heroText,
+              fontSize: 39,
+              lineHeight: 45,
+              fontWeight: '900',
+              letterSpacing: -1,
+            }}
+          >
+            {money(displayedTotal)}
+            <Label style={{ color: heroText, fontSize: 17, fontWeight: '800' }}> / an</Label>
+          </Label>
+          <Label style={{ marginTop: 5, color: heroMuted, fontSize: 11 }}>
+            {filter === 'Réalisées'
+              ? 'Montants confirmés après vos changements'
+              : 'Montants calculés à partir de vos recommandations disponibles'}
+          </Label>
+        </LinearGradient>
 
-        <View style={{ flexDirection: 'row', gap: 7, marginTop: 12 }}>
-          {['Toutes', 'Disponibles', 'Réalisées'].map((item) => {
+        <View style={{ flexDirection: 'row', gap: 7, marginTop: 15 }}>
+          {(['Toutes', 'Disponibles', 'Réalisées'] as const).map((item) => {
             const selected = filter === item;
             return (
               <Pressable
@@ -1812,202 +1942,170 @@ export function SavingsScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
                 onPress={() => setFilter(item)}
-                style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.72 : 1 })}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  height: 36,
+                  borderRadius: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: selected ? normalizedAccent : pageColors.separator,
+                  backgroundColor: selected ? normalizedAccent : pageColors.surface,
+                  opacity: pressed ? 0.72 : 1,
+                })}
               >
-                <View
+                <Label
                   style={{
-                    height: 32,
-                    borderRadius: 18,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 1,
-                    borderColor: selected ? '#EAF1F259' : '#DDE6EC26',
-                    backgroundColor: selected ? '#7E8995C7' : '#394653A8',
+                    color: selected ? accentForeground : pageColors.secondary,
+                    fontSize: 11,
+                    fontWeight: selected ? '800' : '600',
                   }}
                 >
-                  <Label
-                    style={{
-                      color: selected ? '#FFFFFF' : '#D5DCE2',
-                      fontSize: 10,
-                      fontWeight: selected ? '700' : '500',
-                    }}
-                  >
-                    {item}
-                  </Label>
-                </View>
+                  {item}
+                </Label>
               </Pressable>
             );
           })}
         </View>
 
-        <LinearGradient
-          colors={['#5A6672E8', '#3C4A57E8', '#263541E8']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            minHeight: 132,
-            marginTop: 17,
-            borderRadius: 23,
-            borderWidth: 1,
-            borderColor: '#E8F1EF3B',
-            padding: 17,
-            overflow: 'hidden',
-            shadowColor: '#000000',
-            shadowOpacity: 0.2,
-            shadowRadius: 15,
-          }}
-        >
-          <LinearGradient
-            pointerEvents="none"
-            colors={['#FFFFFF20', '#C9D5DF0D', '#00000000']}
-            style={{ position: 'absolute', left: -35, right: 70, top: -50, height: 110 }}
-          />
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ flex: 1 }}>
-              <Label style={{ color: '#D3DDD9', fontSize: 12 }}>Économies potentielles</Label>
-              <Label
-                style={{
-                  marginTop: 1,
-                  color: '#FFFFFF',
-                  fontSize: 38,
-                  lineHeight: 46,
-                  fontWeight: '700',
-                  letterSpacing: -0.9,
-                }}
-              >
-                {money(displayedTotal)}
-                <Label style={{ color: '#38F5AE', fontSize: 17 }}> /an</Label>
-              </Label>
-            </View>
-            <View
-              style={{
-                width: 46,
-                height: 46,
-                borderRadius: 23,
-                backgroundColor: '#34434FC7',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Ionicons name="trending-up" size={24} color="#38F5AE" />
-            </View>
-          </View>
+        <View style={{ marginTop: 23, flexDirection: 'row', alignItems: 'center' }}>
+          <Label style={{ flex: 1, color: pageColors.text, fontSize: 18, fontWeight: '900' }}>
+            Recommandations
+          </Label>
+          <Label style={{ color: pageColors.secondary, fontSize: 11 }}>{items.length}</Label>
+        </View>
+
+        {recommendations.isPending || recommendations.error ? (
           <View
             style={{
               marginTop: 10,
-              height: 4,
-              borderRadius: 3,
-              backgroundColor: '#FFFFFF1A',
+              borderRadius: 22,
+              backgroundColor: pageColors.surface,
               overflow: 'hidden',
             }}
           >
-            <LinearGradient
-              colors={['#F2F6F8', '#9FB9CC']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ width: '72%', height: 4, borderRadius: 3 }}
+            <State
+              loading={recommendations.isPending}
+              error={recommendations.error}
+              retry={() => recommendations.refetch()}
             />
           </View>
-          <Label style={{ marginTop: 7, color: '#D0D9D8', fontSize: 10 }}>
-            Des économies accessibles dès maintenant
-          </Label>
-        </LinearGradient>
-
-        {q.isPending || q.error ? (
-          <View style={{ marginTop: 70 }}>
-            <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
-          </View>
-        ) : items?.length === 0 ? (
-          <View style={{ marginTop: 70 }}>
+        ) : items.length === 0 ? (
+          <View
+            style={{
+              marginTop: 10,
+              borderRadius: 22,
+              backgroundColor: pageColors.surface,
+              paddingVertical: 18,
+            }}
+          >
             <State
               title={
-                filter === 'Réalisées'
-                  ? 'Pas encore d’économie réalisée'
-                  : 'Aucune économie disponible'
+                normalizedSearch
+                  ? 'Aucun résultat'
+                  : filter === 'Réalisées'
+                    ? 'Pas encore d’économie réalisée'
+                    : 'Aucune économie disponible'
               }
               description={
-                filter === 'Réalisées'
-                  ? 'Confirmez une recommandation après avoir changé d’offre.'
-                  : 'De nouvelles offres apparaîtront après la prochaine analyse.'
+                normalizedSearch
+                  ? 'Essayez un autre nom ou effacez votre recherche.'
+                  : filter === 'Réalisées'
+                    ? 'Confirmez une recommandation après avoir changé d’offre.'
+                    : 'De nouvelles recommandations apparaîtront après la prochaine analyse.'
               }
             />
           </View>
         ) : (
           <View
             style={{
-              marginTop: 12,
-              borderRadius: 23,
-              overflow: 'hidden',
-              paddingHorizontal: 16,
-              backgroundColor: '#4B5966D4',
-              borderWidth: 1,
-              borderColor: '#E9EFF238',
+              marginTop: 10,
+              borderRadius: 22,
+              paddingHorizontal: 14,
+              backgroundColor: pageColors.surface,
+              shadowColor: pageColors.shadow,
+              shadowOpacity: isDark ? 0.25 : 0.07,
+              shadowRadius: 13,
+              shadowOffset: { width: 0, height: 5 },
             }}
           >
-            {items?.map((item, index) => (
+            {items.map((item, index) => (
               <Pressable
                 key={item.id}
                 onPress={() => nav.navigate('Recommendation', { id: item.id })}
                 accessibilityRole="button"
+                accessibilityLabel={item.title}
                 style={({ pressed }) => ({
-                  minHeight: 64,
+                  minHeight: 82,
+                  paddingVertical: 12,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: 12,
+                  gap: 11,
                   borderBottomWidth: index === items.length - 1 ? 0 : 1,
-                  borderBottomColor: '#DDE5EA24',
-                  opacity: pressed ? 0.72 : 1,
+                  borderBottomColor: pageColors.separator,
+                  opacity: pressed ? 0.68 : 1,
                 })}
               >
                 <View
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: 43,
+                    height: 43,
                     borderRadius: 14,
-                    backgroundColor: '#34424FCE',
+                    backgroundColor: accentWithAlpha(normalizedAccent, isDark ? 0.26 : 0.13),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
                   <Ionicons
-                    name={
-                      item.category === 'mobile'
-                        ? 'phone-portrait-outline'
-                        : item.category === 'insurance'
-                          ? 'shield-checkmark-outline'
-                          : item.category === 'internet'
-                            ? 'wifi-outline'
-                            : 'heart-outline'
-                    }
-                    size={20}
-                    color="#FFFFFF"
+                    name={recommendationIcon(item.category)}
+                    size={21}
+                    color={normalizedAccent}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Label style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>
+                  <Label
+                    numberOfLines={1}
+                    style={{ color: pageColors.body, fontSize: 14, fontWeight: '800' }}
+                  >
                     {item.title}
                   </Label>
-                  <Label style={{ color: '#CFD7DE', fontSize: 11 }}>Économie possible</Label>
-                </View>
-                <View
-                  style={{
-                    paddingHorizontal: 9,
-                    paddingVertical: 6,
-                    borderRadius: 15,
-                    backgroundColor: '#0A513AC7',
-                  }}
-                >
-                  <Label style={{ color: '#38F5AE', fontSize: 10, fontWeight: '700' }}>
-                    {money(item.annualSaving)} /an
+                  <Label
+                    numberOfLines={2}
+                    style={{
+                      color: pageColors.secondary,
+                      fontSize: 10,
+                      lineHeight: 14,
+                      marginTop: 2,
+                    }}
+                  >
+                    {item.explanation}
                   </Label>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#D3DBE2" />
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <Label
+                    style={{
+                      color: item.realized ? pageColors.secondary : normalizedAccent,
+                      fontSize: 11,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {money(
+                      item.realized
+                        ? (item.realizedAnnualSaving ?? item.annualSaving)
+                        : item.annualSaving,
+                    )}
+                  </Label>
+                  <Label style={{ color: pageColors.muted, fontSize: 9 }}>
+                    {item.realized ? 'réalisés / an' : 'possibles / an'}
+                  </Label>
+                </View>
+                <Ionicons name="chevron-forward" size={17} color={pageColors.muted} />
               </Pressable>
             ))}
           </View>
         )}
       </Page>
-    </ImageBackground>
+    </View>
   );
 }
 export function RecommendationDetail() {
