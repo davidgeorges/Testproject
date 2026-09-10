@@ -234,7 +234,6 @@ export function DashboardScreen() {
   const nav = useNav();
   const q = useOverview();
   const payments = usePayments();
-  const profile = useProfile();
   const d = q.data;
   const showReference = PREVIEW_ENABLED && !useSession.getState().token;
   const featuredPayments = (
@@ -257,29 +256,6 @@ export function DashboardScreen() {
       : showReference
         ? '10:28'
         : '08:41';
-  const quickActions: {
-    icon: React.ComponentProps<typeof Ionicons>['name'];
-    label: string;
-    onPress: () => void;
-  }[] = [
-    {
-      icon: 'reader-outline',
-      label: 'Mes\nabonnements',
-      onPress: () => nav.navigate('Main', { screen: 'Subscriptions' }),
-    },
-    { icon: 'sync-outline', label: 'Synchroniser', onPress: () => nav.navigate('Bank') },
-    {
-      icon: 'sparkles-outline',
-      label: 'Mes\néconomies',
-      onPress: () => nav.navigate('Main', { screen: 'Savings' }),
-    },
-    {
-      icon: 'ellipsis-horizontal',
-      label: 'Plus',
-      onPress: () => nav.navigate('Main', { screen: 'Profile' }),
-    },
-  ];
-
   return (
     <ImageBackground
       source={require('../../assets/home-fabric.png')}
@@ -301,8 +277,8 @@ export function DashboardScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            onPress={() => nav.navigate('Notifications')}
+            accessibilityLabel="Voir mon profil"
+            onPress={() => nav.navigate('Main', { screen: 'Profile' })}
             style={({ pressed }) => ({
               width: 49,
               height: 49,
@@ -315,18 +291,7 @@ export function DashboardScreen() {
               opacity: pressed ? 0.75 : 1,
             })}
           >
-            <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
-            <View
-              style={{
-                position: 'absolute',
-                width: 7,
-                height: 7,
-                borderRadius: 4,
-                backgroundColor: '#FF4E55',
-                right: 2,
-                top: 1,
-              }}
-            />
+            <Ionicons name="person-outline" size={25} color="#FFFFFF" />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -346,38 +311,6 @@ export function DashboardScreen() {
           >
             <Ionicons name="search" size={25} color="#FFFFFF" />
             <Label style={{ fontSize: 17, color: '#FFFFFF', fontWeight: '500' }}>Rechercher</Label>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Voir mes économies"
-            onPress={() => nav.navigate('Main', { screen: 'Savings' })}
-            style={({ pressed }) => ({
-              width: 49,
-              height: 49,
-              borderRadius: 25,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#4C5159E6',
-              opacity: pressed ? 0.75 : 1,
-            })}
-          >
-            <Ionicons name="stats-chart" size={23} color="#FFFFFF" />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Voir mon profil"
-            onPress={() => nav.navigate('Main', { screen: 'Profile' })}
-            style={({ pressed }) => ({
-              width: 49,
-              height: 49,
-              borderRadius: 25,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#4C5159E6',
-              opacity: pressed ? 0.75 : 1,
-            })}
-          >
-            <Ionicons name="person-outline" size={24} color="#FFFFFF" />
           </Pressable>
         </View>
 
@@ -462,54 +395,11 @@ export function DashboardScreen() {
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 15 }}>
-              {quickActions.map((action) => (
-                <Pressable
-                  key={action.label}
-                  accessibilityRole="button"
-                  accessibilityLabel={action.label.replace('\n', ' ')}
-                  onPress={action.onPress}
-                  style={({ pressed }) => ({
-                    width: '24%',
-                    alignItems: 'center',
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <View
-                    style={{
-                      width: 57,
-                      height: 57,
-                      borderRadius: 29,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: '#B7C2CC42',
-                      borderWidth: 1,
-                      borderColor: '#ECF2F53D',
-                    }}
-                  >
-                    <Ionicons name={action.icon} size={27} color="#FFFFFF" />
-                  </View>
-                  <Label
-                    style={{
-                      marginTop: 9,
-                      minHeight: 34,
-                      color: '#F7F8FA',
-                      fontSize: 12,
-                      lineHeight: 16,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {action.label}
-                  </Label>
-                </Pressable>
-              ))}
-            </View>
-
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Voir les recommandations"
               onPress={() => nav.navigate('Main', { screen: 'Savings' })}
-              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1, marginTop: 17 })}
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1, marginTop: 22 })}
             >
               <LinearGradient
                 colors={['#8493A1B8', '#566574C7']}
