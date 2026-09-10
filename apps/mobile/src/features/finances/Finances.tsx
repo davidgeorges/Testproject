@@ -272,6 +272,7 @@ export function FinancesScreen() {
   const [newBudgetName, setNewBudgetName] = useState('');
   const [newBudgetValue, setNewBudgetValue] = useState('');
   const [newBudgetType, setNewBudgetType] = useState<FinanceCategoryType>('variable');
+  const [deletingBudget, setDeletingBudget] = useState<string | null>(null);
 
   const orderedMonths = fromMonth <= toMonth ? [fromMonth, toMonth] : [toMonth, fromMonth];
   const filters = useMemo<FinanceFilters>(
@@ -348,7 +349,11 @@ export function FinancesScreen() {
   });
   const removeBudget = useMutation({
     mutationFn: api.deleteFinanceBudget,
-    onSuccess: refreshFinance,
+    onSuccess: async () => {
+      setDeletingBudget(null);
+      setEditingBudget(null);
+      await refreshFinance();
+    },
     onError: (error: Error) => Alert.alert('Budget', error.message),
   });
   const saveCategory = useMutation({
@@ -1338,29 +1343,32 @@ export function FinancesScreen() {
                           onPress={() => {
                             setNewBudgetCategory(item.id);
                             setNewBudgetType(item.type);
+                            if (item.id !== 'other') setNewBudgetName('');
                           }}
                         />
                       ))}
                     </View>
                   </View>
-                  <TextInput
-                    accessibilityLabel="Intitulé personnalisé du budget"
-                    value={newBudgetName}
-                    maxLength={60}
-                    onChangeText={setNewBudgetName}
-                    placeholder="Intitulé personnalisé (facultatif)"
-                    placeholderTextColor={pageColors.muted}
-                    style={{
-                      minHeight: 44,
-                      borderRadius: 13,
-                      borderWidth: 1,
-                      borderColor: pageColors.separator,
-                      backgroundColor: pageColors.elevated,
-                      color: pageColors.text,
-                      paddingHorizontal: 12,
-                      fontWeight: '700',
-                    }}
-                  />
+                  {newBudgetCategory === 'other' ? (
+                    <TextInput
+                      accessibilityLabel="Intitulé personnalisé du budget"
+                      value={newBudgetName}
+                      maxLength={60}
+                      onChangeText={setNewBudgetName}
+                      placeholder="Intitulé personnalisé (facultatif)"
+                      placeholderTextColor={pageColors.muted}
+                      style={{
+                        minHeight: 44,
+                        borderRadius: 13,
+                        borderWidth: 1,
+                        borderColor: pageColors.separator,
+                        backgroundColor: pageColors.elevated,
+                        color: pageColors.text,
+                        paddingHorizontal: 12,
+                        fontWeight: '700',
+                      }}
+                    />
+                  ) : null}
                   <TextInput
                     accessibilityLabel="Montant mensuel du budget"
                     value={newBudgetValue}
@@ -1405,7 +1413,8 @@ export function FinancesScreen() {
                           categoryId: newBudgetCategory,
                           amount,
                           type: newBudgetType,
-                          displayName: newBudgetName.trim() || null,
+                          displayName:
+                            newBudgetCategory === 'other' ? newBudgetName.trim() || null : null,
                         });
                     }}
                     style={({ pressed }) => ({
@@ -1468,19 +1477,39 @@ export function FinancesScreen() {
                           {type === 'fixed' ? 'Fixe' : 'Variable'} · {money(spent)} dépensés
                         </Label>
                       </View>
-                      <Pressable
-                        onPress={() =>
-                          setEditingBudget({
-                            category: definition.id,
-                            value: String(budget.monthlyLimit),
-                            displayName: budget.displayName ?? '',
-                          })
-                        }
-                      >
-                        <Label style={{ color: normalizedAccent, fontSize: 11, fontWeight: '800' }}>
-                          {money(budget.monthlyLimit)}
-                        </Label>
-                      </Pressable>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <Pressable
+                          accessibilityLabel={`Modifier le budget ${displayName}`}
+                          onPress={() =>
+                            setEditingBudget({
+                              category: definition.id,
+                              value: String(budget.monthlyLimit),
+                              displayName: budget.displayName ?? '',
+                            })
+                          }
+                        >
+                          <Label
+                            style={{ color: normalizedAccent, fontSize: 11, fontWeight: '800' }}
+                          >
+                            {money(budget.monthlyLimit)}
+                          </Label>
+                        </Pressable>
+                        <Pressable
+                          accessibilityLabel={`Supprimer le budget ${displayName}`}
+                          onPress={() => setDeletingBudget(definition.id)}
+                          style={({ pressed }) => ({
+                            width: 30,
+                            height: 30,
+                            borderRadius: 10,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: '#E86D6718',
+                            opacity: pressed ? 0.6 : 1,
+                          })}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#E86D67" />
+                        </Pressable>
+                      </View>
                     </View>
                     <View
                       style={{
@@ -1505,23 +1534,25 @@ export function FinancesScreen() {
                     </View>
                     {editingBudget?.category === definition.id ? (
                       <View style={{ gap: 8 }}>
-                        <TextInput
-                          accessibilityLabel={`Intitulé du budget ${displayName}`}
-                          value={editingBudget.displayName}
-                          maxLength={60}
-                          onChangeText={(value) =>
-                            setEditingBudget({ ...editingBudget, displayName: value })
-                          }
-                          placeholder={`Intitulé (par défaut : ${definition.label})`}
-                          placeholderTextColor={pageColors.muted}
-                          style={{
-                            minHeight: 42,
-                            borderRadius: 12,
-                            backgroundColor: pageColors.elevated,
-                            color: pageColors.text,
-                            paddingHorizontal: 11,
-                          }}
-                        />
+                        {definition.id === 'other' ? (
+                          <TextInput
+                            accessibilityLabel={`Intitulé du budget ${displayName}`}
+                            value={editingBudget.displayName}
+                            maxLength={60}
+                            onChangeText={(value) =>
+                              setEditingBudget({ ...editingBudget, displayName: value })
+                            }
+                            placeholder="Intitulé personnalisé (facultatif)"
+                            placeholderTextColor={pageColors.muted}
+                            style={{
+                              minHeight: 42,
+                              borderRadius: 12,
+                              backgroundColor: pageColors.elevated,
+                              color: pageColors.text,
+                              paddingHorizontal: 11,
+                            }}
+                          />
+                        ) : null}
                         <View style={{ flexDirection: 'row', gap: 7 }}>
                           <TextInput
                             autoFocus
@@ -1549,7 +1580,10 @@ export function FinancesScreen() {
                                   categoryId: definition.id,
                                   amount,
                                   type,
-                                  displayName: editingBudget.displayName.trim() || null,
+                                  displayName:
+                                    definition.id === 'other'
+                                      ? editingBudget.displayName.trim() || null
+                                      : null,
                                 });
                             }}
                             style={{
@@ -1588,13 +1622,46 @@ export function FinancesScreen() {
                               })
                             }
                           />
-                          <Pressable
-                            onPress={() => removeBudget.mutate(definition.id)}
-                            style={{ justifyContent: 'center', paddingHorizontal: 7 }}
-                          >
-                            <Label style={{ color: '#E86D67', fontSize: 11 }}>Supprimer</Label>
-                          </Pressable>
                         </View>
+                      </View>
+                    ) : null}
+                    {deletingBudget === definition.id ? (
+                      <View
+                        style={{
+                          borderTopWidth: 1,
+                          borderTopColor: pageColors.separator,
+                          paddingTop: 9,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <Label muted style={{ flex: 1, fontSize: 11 }}>
+                          Supprimer ce budget ?
+                        </Label>
+                        <Pressable
+                          onPress={() => setDeletingBudget(null)}
+                          style={{ paddingHorizontal: 8, paddingVertical: 7 }}
+                        >
+                          <Label muted style={{ fontSize: 11, fontWeight: '700' }}>
+                            Annuler
+                          </Label>
+                        </Pressable>
+                        <Pressable
+                          disabled={removeBudget.isPending}
+                          onPress={() => removeBudget.mutate(definition.id)}
+                          style={({ pressed }) => ({
+                            borderRadius: 10,
+                            backgroundColor: '#E86D67',
+                            paddingHorizontal: 11,
+                            paddingVertical: 7,
+                            opacity: pressed || removeBudget.isPending ? 0.65 : 1,
+                          })}
+                        >
+                          <Label style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>
+                            Supprimer
+                          </Label>
+                        </Pressable>
                       </View>
                     ) : null}
                   </Card>
