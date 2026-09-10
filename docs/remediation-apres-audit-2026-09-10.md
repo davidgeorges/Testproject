@@ -56,8 +56,8 @@ Les deux tests ignorés couvrent PostgreSQL et Redis et sont exécutés par la C
 
 ## Actions qui nécessitent un accès externe ou une décision
 
-1. **Neon :** valider dans la console la réinitialisation du mot de passe PostgreSQL précédemment communiqué, puis mettre à jour immédiatement `ConnectionStrings__Postgres` sur Render et vérifier la readiness.
-2. **Tink :** se reconnecter à la console pour ajouter `subscriptionapp://banking/callback` aux URI autorisées, puis tester le retour sur Android/iOS physiques. Le webhook Events v2 est déjà créé, signé et testé en production.
+1. **Neon :** rotation terminée le 10 septembre 2026. Le nouveau secret est installé sur Render, le déploiement du commit `39928f0` est actif et `/health/ready` confirme `database: true`. L’ancien mot de passe communiqué n’est plus valide.
+2. **Tink :** `subscriptionapp://banking/callback` est autorisé dans la console. Il reste à tester le retour sur Android/iOS physiques. Le webhook Events v2 est déjà créé, signé et testé en production.
 3. **RevenueCat et stores :** les produits gratuits du Test Store `monthly` et `yearly` sont associés à l’offering. Les produits sandbox Apple/Google exigent les comptes développeur et la création préalable des abonnements dans App Store Connect et Play Console ; cette étape n’a pas été effectuée puisqu’aucun achat en ligne n’est autorisé.
 4. **Catalogue :** trois offres publiques vérifiées (Free Mobile, Sosh et B&You) sont enregistrées comme candidates inactives et non partenaires, avec leurs domaines officiels et leurs conditions connues. Leur activation exige encore une nouvelle vérification et un accord commercial ; voir `catalogue-offres-verifiees-2026-09-10.md`.
 5. **Juridique :** fournir l’identité de l’entreprise, le responsable de traitement, le support et les décisions de conservation afin de publier les CGU, la politique de confidentialité, les mentions légales et les déclarations stores définitives.
@@ -71,6 +71,8 @@ Les deux tests ignorés couvrent PostgreSQL et Redis et sont exécutés par la C
 - Le webhook Tink de production répond `200` à un événement de test signé selon le format Events v2.
 - Firebase Admin est actif pour l’identité et les notifications push.
 - RevenueCat est opérationnel avec son Test Store gratuit ; l’association aux stores Apple et Google reste dépendante des comptes et produits externes.
+- Le mot de passe du rôle PostgreSQL Neon a été renouvelé et la nouvelle chaîne Npgsql a été déployée sur Render ; la readiness de production répond `200` avec `database: true`.
+- Le callback mobile `subscriptionapp://banking/callback` figure dans les URI autorisées de l’application Tink.
 
 ## Risques techniques encore ouverts dans le code
 
