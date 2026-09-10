@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, Share, Modal, Text } from 'react-native';
+import { View, Pressable, Share, Modal, Text, TextInput } from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -14,10 +14,8 @@ import {
   Section,
   IconButton,
   Chips,
-  Search,
   BrandIcon,
   CategoryIcon,
-  PaymentRow,
   RecommendationRow,
   State,
   ReferenceCrop,
@@ -42,7 +40,7 @@ export function useNav() {
 export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
-  const homeTheme = active === 'Home';
+  const glassTheme = active === 'Home' || active === 'Subscriptions';
   const items: [keyof TabsParams, string, React.ComponentProps<typeof Ionicons>['name']][] = [
     ['Home', 'Accueil', 'home-outline'],
     ['Subscriptions', 'Abonnements', 'reader-outline'],
@@ -54,12 +52,12 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
     <View
       style={{
         flexDirection: 'row',
-        backgroundColor: homeTheme ? '#05090D' : c.background,
+        backgroundColor: glassTheme ? '#05090D' : c.background,
         borderTopWidth: 1,
-        borderColor: homeTheme ? '#202A33' : c.border,
-        paddingTop: homeTheme ? 6 : 6,
-        paddingBottom: homeTheme ? 4 : 7,
-        paddingHorizontal: homeTheme ? 8 : 0,
+        borderColor: glassTheme ? '#202A33' : c.border,
+        paddingTop: glassTheme ? 6 : 6,
+        paddingBottom: glassTheme ? 4 : 7,
+        paddingHorizontal: glassTheme ? 8 : 0,
       }}
     >
       {items.map(([key, title, icon]) => (
@@ -77,14 +75,14 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
             gap: 3,
             borderRadius: 16,
             opacity: pressed ? 0.72 : 1,
-            backgroundColor: homeTheme && key === active ? '#151C23' : 'transparent',
+            backgroundColor: glassTheme && key === active ? '#151C23' : 'transparent',
           })}
         >
           <Ionicons
             name={active === key && key === 'Home' ? 'home' : icon}
-            size={homeTheme ? 23 : 21}
+            size={glassTheme ? 23 : 21}
             color={
-              homeTheme
+              glassTheme
                 ? key === active
                   ? '#FFFFFF'
                   : '#778293'
@@ -95,10 +93,10 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           />
           <Label
             style={{
-              fontSize: homeTheme ? 10 : 9,
+              fontSize: glassTheme ? 10 : 9,
               lineHeight: 13,
               fontWeight: key === active ? '700' : '500',
-              color: homeTheme
+              color: glassTheme
                 ? key === active
                   ? '#FFFFFF'
                   : '#778293'
@@ -173,6 +171,49 @@ export function SavingsHero({ amount = 0, green = false }: { amount?: number; gr
     </LinearGradient>
   );
 }
+
+function GlassBrandIcon({ name, size = 38 }: { name: string; size?: number }) {
+  const key = name.toLowerCase();
+  if (key.includes('adobe')) {
+    return (
+      <LinearGradient
+        colors={['#FF3264', '#FF9A26', '#35D264', '#237CFF', '#BA43FF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size * 0.28,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ color: 'white', fontSize: size * 0.66, lineHeight: size * 0.74 }}>∞</Text>
+      </LinearGradient>
+    );
+  }
+  if (key.includes('spotify')) {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: '#1ED760',
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: '#1ED760',
+          shadowOpacity: 0.38,
+          shadowRadius: 7,
+        }}
+      >
+        <FontAwesome5 name="spotify" size={size * 0.79} color="#07120B" />
+      </View>
+    );
+  }
+  return <BrandIcon name={name} size={size} />;
+}
+
 export function DashboardScreen() {
   const nav = useNav();
   const c = useColors();
@@ -609,40 +650,7 @@ export function DashboardScreen() {
                       justifyContent: 'center',
                     }}
                   >
-                    {item.merchant.toLowerCase().includes('adobe') ? (
-                      <LinearGradient
-                        colors={['#FF3264', '#FF9A26', '#35D264', '#237CFF', '#BA43FF']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 11,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Text style={{ color: 'white', fontSize: 25, lineHeight: 28 }}>∞</Text>
-                      </LinearGradient>
-                    ) : item.merchant.toLowerCase().includes('spotify') ? (
-                      <View
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 19,
-                          backgroundColor: '#1ED760',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          shadowColor: '#1ED760',
-                          shadowOpacity: 0.38,
-                          shadowRadius: 7,
-                        }}
-                      >
-                        <FontAwesome5 name="spotify" size={30} color="#07120B" />
-                      </View>
-                    ) : (
-                      <BrandIcon name={item.merchant} size={38} />
-                    )}
+                    <GlassBrandIcon name={item.merchant} />
                   </View>
                   <View style={{ flex: 1, gap: 3 }}>
                     <Label style={{ fontWeight: '700', fontSize: 14 }}>{item.merchant}</Label>
@@ -677,43 +685,152 @@ export function SubscriptionsScreen() {
   const q = usePayments();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Tous');
+  const showReference = PREVIEW_ENABLED && !useSession.getState().token;
   const categories: Record<string, string> = {
     Streaming: 'streaming',
     Télécom: 'mobile',
     Assurance: 'insurance',
   };
-  const items = q.data?.items.filter(
+  const sourceItems = showReference ? referencePayments.slice(0, 6) : (q.data?.items ?? []);
+  const items = sourceItems.filter(
     (p) =>
       p.merchant.toLowerCase().includes(search.toLowerCase()) &&
       (filter === 'Tous' || p.category === categories[filter]),
   );
   return (
-    <Page style={{ gap: 9 }}>
+    <Page
+      backgroundColor="#020609"
+      style={{ gap: 11, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 }}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ gap: 3 }}>
-          <Label style={{ fontSize: 22, lineHeight: 28, fontWeight: '700' }}>Vos abonnements</Label>
-          <Label muted style={{ fontSize: 13 }}>
-            {q.data?.total ?? 0} abonnements détectés
+        <View style={{ gap: 2 }}>
+          <Label style={{ fontSize: 27, lineHeight: 33, fontWeight: '800', letterSpacing: -0.7 }}>
+            Vos abonnements
+          </Label>
+          <Label muted style={{ fontSize: 14, color: '#8E98A9' }}>
+            {showReference ? 6 : (q.data?.total ?? 0)} abonnements détectés
           </Label>
         </View>
-        <Ionicons name="search-outline" size={21} color="#CAD5E5" />
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: '#28333D',
+            backgroundColor: '#111820',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="search-outline" size={20} color="#F1F5F9" />
+        </View>
       </View>
-      <Search value={search} onChangeText={setSearch} placeholder="Rechercher un abonnement…" />
-      <Chips
-        items={['Tous', 'Streaming', 'Télécom', 'Assurance']}
-        value={filter}
-        onChange={setFilter}
-      />
+      <View
+        style={{
+          height: 43,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 9,
+          paddingHorizontal: 14,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: '#26313B',
+          backgroundColor: '#10171E',
+        }}
+      >
+        <Ionicons name="search-outline" size={18} color="#8995A5" />
+        <TextInput
+          accessibilityLabel="Rechercher un abonnement"
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Rechercher un abonnement…"
+          placeholderTextColor="#778393"
+          style={{ flex: 1, height: 41, color: '#F8FAFC', fontSize: 13 }}
+        />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 7 }}>
+        {['Tous', 'Streaming', 'Télécom', 'Assurance'].map((item) => {
+          const selected = filter === item;
+          return (
+            <Pressable
+              key={item}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => setFilter(item)}
+              style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.75 : 1 })}
+            >
+              <View
+                style={{
+                  minHeight: 34,
+                  borderRadius: 17,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: selected ? '#65717E' : '#232D36',
+                  backgroundColor: selected ? '#202A34' : '#0D1319',
+                }}
+              >
+                <Label
+                  style={{
+                    fontSize: 10,
+                    fontWeight: selected ? '700' : '500',
+                    color: selected ? '#FFFFFF' : '#8D98A8',
+                  }}
+                >
+                  {item}
+                </Label>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
       {q.isPending || q.error ? (
         <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
-      ) : items?.length ? (
-        <View>
+      ) : items.length ? (
+        <View style={{ gap: 7 }}>
           {items.map((payment) => (
-            <PaymentRow
+            <Pressable
               key={payment.id}
-              payment={payment}
               onPress={() => nav.navigate('Subscription', { id: payment.id })}
-            />
+              accessibilityRole="button"
+              accessibilityLabel={`${payment.merchant}, ${money(payment.monthlyCost)} par mois`}
+              style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
+            >
+              <LinearGradient
+                colors={['#111820', '#080D12']}
+                style={{
+                  minHeight: 67,
+                  paddingHorizontal: 13,
+                  paddingVertical: 9,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: '#26313B',
+                }}
+              >
+                <GlassBrandIcon name={payment.merchant} size={44} />
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Label style={{ fontSize: 15, fontWeight: '700' }}>{payment.merchant}</Label>
+                  <Label muted style={{ fontSize: 12, color: '#8E99A9' }}>
+                    {payment.merchant.toLowerCase().includes('spotify')
+                      ? 'Musique'
+                      : fr.categories[payment.category]}
+                  </Label>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                  <Label style={{ fontSize: 14, fontWeight: '700' }}>
+                    {money(payment.monthlyCost)}
+                  </Label>
+                  <Label muted style={{ fontSize: 11, color: '#8E99A9' }}>
+                    par mois
+                  </Label>
+                </View>
+                <Ionicons name="chevron-forward" size={21} color="#8792A2" />
+              </LinearGradient>
+            </Pressable>
           ))}
         </View>
       ) : (
