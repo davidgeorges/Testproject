@@ -49,6 +49,7 @@ import {
   mixAccentColor,
   normalizeAccentColor,
   DEFAULT_ACCENT_COLOR,
+  ORIGINAL_THEME_ACCENT,
 } from '../theme/accent';
 export function useNav() {
   return useNavigation<NativeStackNavigationProp<RootStackParams>>();
@@ -432,7 +433,8 @@ export function DashboardScreen() {
     mixAccentColor(normalizedAccent, '#FFFFFF', isDark ? 0.1 : 0.2),
     mixAccentColor(normalizedAccent, '#000000', isDark ? 0.16 : 0.06),
   ] as const;
-  const summaryText = accentTextColor(normalizedAccent);
+  const summaryText =
+    normalizedAccent === ORIGINAL_THEME_ACCENT ? '#FFFFFF' : accentTextColor(normalizedAccent);
   const summaryMuted = mixAccentColor(
     normalizedAccent,
     summaryText === '#FFFFFF' ? '#FFFFFF' : '#000000',

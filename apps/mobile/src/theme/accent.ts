@@ -1,4 +1,5 @@
 export const DEFAULT_ACCENT_COLOR = '#70737A';
+export const ORIGINAL_THEME_ACCENT = '#FFD900';
 
 export const normalizeAccentColor = (value: string | null | undefined) => {
   if (typeof value !== 'string') return null;

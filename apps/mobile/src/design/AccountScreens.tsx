@@ -32,7 +32,12 @@ import { logOutRevenueCat, purchasePremium, restorePremium } from '../services/r
 import { deleteCurrentFirebaseUser, signOutFirebase } from '../services/firebase';
 import { unregisterPushNotifications } from '../services/notifications';
 import type { RootStackParams } from '../app/navigation';
-import { accentTextColor, DEFAULT_ACCENT_COLOR, normalizeAccentColor } from '../theme/accent';
+import {
+  accentTextColor,
+  DEFAULT_ACCENT_COLOR,
+  normalizeAccentColor,
+  ORIGINAL_THEME_ACCENT,
+} from '../theme/accent';
 function Row({
   icon,
   title,
@@ -410,7 +415,6 @@ const paletteColors = [
   '#EC4899',
 ];
 const ORIGINAL_THEME = 'dark' as const;
-const ORIGINAL_THEME_ACCENT = '#FFD900';
 
 function ColorPickerControl({
   value,
