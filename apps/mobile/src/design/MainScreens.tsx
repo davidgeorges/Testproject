@@ -296,14 +296,16 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
 export function ScreenWithTabs({
   children,
   active,
+  standalone = false,
 }: {
   children: React.ReactNode;
   active: keyof TabsParams;
+  standalone?: boolean;
 }) {
   return (
     <View style={{ flex: 1 }}>
       {children}
-      <BottomBar active={active} />
+      {standalone ? <BottomBar active={active} /> : null}
     </View>
   );
 }
@@ -1394,7 +1396,7 @@ export function SubscriptionDetail() {
       setMessage(error instanceof Error ? error.message : 'Modification impossible.'),
   });
   return (
-    <ScreenWithTabs active="Subscriptions">
+    <ScreenWithTabs active="Subscriptions" standalone>
       <Page
         backgroundColor="#020609"
         style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 10 }}
