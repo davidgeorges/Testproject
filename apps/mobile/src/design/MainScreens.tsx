@@ -917,11 +917,16 @@ export function DashboardScreen() {
                           height: 40,
                           borderRadius: 20,
                           backgroundColor:
-                            item.amount >= 0
-                              ? accentWithAlpha(normalizedAccent, isDark ? 0.55 : 0.2)
-                              : isDark
+                            item.isInternalTransfer ||
+                            item.merchantName.trim().toLocaleLowerCase('fr').startsWith('virement')
+                              ? isDark
                                 ? '#2B2B32'
-                                : '#171719',
+                                : '#E9E8ED'
+                              : item.amount >= 0
+                                ? accentWithAlpha(normalizedAccent, isDark ? 0.55 : 0.2)
+                                : isDark
+                                  ? '#2B2B32'
+                                  : '#171719',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -929,11 +934,19 @@ export function DashboardScreen() {
                         <Label
                           style={{
                             color:
-                              item.amount >= 0
+                              item.isInternalTransfer ||
+                              item.merchantName
+                                .trim()
+                                .toLocaleLowerCase('fr')
+                                .startsWith('virement')
                                 ? isDark
-                                  ? '#FFFFFF'
-                                  : mixAccentColor(normalizedAccent, '#000000', 0.38)
-                                : '#FFFFFF',
+                                  ? '#EDECF1'
+                                  : '#56545C'
+                                : item.amount >= 0
+                                  ? isDark
+                                    ? '#FFFFFF'
+                                    : mixAccentColor(normalizedAccent, '#000000', 0.38)
+                                  : '#FFFFFF',
                             fontSize: 13,
                             fontWeight: '900',
                           }}
