@@ -8,6 +8,8 @@ import {
   TextInput,
   ImageBackground,
   Animated,
+  ScrollView,
+  StatusBar,
 } from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,6 +52,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
   if (active === 'Profile') return null;
+  const homeLight = active === 'Home';
   const glassTheme =
     active === 'Home' ||
     active === 'Subscriptions' ||
@@ -70,14 +73,13 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         right: glassTheme ? 0 : undefined,
         bottom: glassTheme ? 7 : undefined,
         zIndex: glassTheme ? 20 : 0,
-        backgroundColor: glassTheme ? '#555D66D9' : c.background,
+        backgroundColor: homeLight ? '#FFFFFFF5' : glassTheme ? '#555D66D9' : c.background,
         borderTopWidth: glassTheme ? 0 : 1,
-        borderWidth: glassTheme ? 1 : 0,
-        borderColor: glassTheme ? '#EEF3F526' : c.border,
-        paddingVertical: glassTheme ? 2 : 6,
-        paddingHorizontal: glassTheme ? 5 : 0,
+        borderWidth: homeLight ? 0 : glassTheme ? 1 : 0,
+        borderColor: homeLight ? '#E7E7EA' : glassTheme ? '#EEF3F526' : c.border,
+        paddingVertical: homeLight ? 9 : glassTheme ? 2 : 6,
+        paddingHorizontal: homeLight ? 14 : glassTheme ? 5 : 0,
         marginHorizontal:
-          active === 'Home' ||
           active === 'Subscriptions' ||
           active === 'Savings'
             ? dashboardScrollY.interpolate({
@@ -86,13 +88,15 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                 extrapolate: 'clamp',
               })
             : glassTheme
-              ? 15
+              ? homeLight
+                ? 0
+                : 15
               : 0,
         marginBottom: 0,
-        borderRadius: glassTheme ? 27 : 0,
+        borderRadius: homeLight ? 0 : glassTheme ? 27 : 0,
         shadowColor: glassTheme ? '#000000' : 'transparent',
-        shadowOpacity: glassTheme ? 0.44 : 0,
-        shadowRadius: glassTheme ? 18 : 0,
+        shadowOpacity: homeLight ? 0.08 : glassTheme ? 0.44 : 0,
+        shadowRadius: homeLight ? 12 : glassTheme ? 18 : 0,
         shadowOffset: { width: 0, height: 8 },
       }}
     >
@@ -105,20 +109,24 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           onPress={() => nav.navigate('Main', { screen: key })}
           style={({ pressed }) => ({
             flex: 1,
-            minHeight: glassTheme ? 47 : 46,
+            minHeight: homeLight ? 50 : glassTheme ? 47 : 46,
             alignItems: 'center',
             justifyContent: 'center',
             gap: 2,
             borderRadius: glassTheme ? 23 : 16,
             opacity: pressed ? 0.72 : 1,
-            backgroundColor: glassTheme && key === active ? '#868D95A3' : 'transparent',
+            backgroundColor: !homeLight && glassTheme && key === active ? '#868D95A3' : 'transparent',
           })}
         >
           <Ionicons
             name={active === key && key === 'Home' ? 'home' : icon}
-            size={glassTheme ? 20 : 21}
+            size={homeLight ? 25 : glassTheme ? 18 : 20}
             color={
-              glassTheme
+              homeLight
+                ? key === active
+                  ? '#050A20'
+                  : '#B8B8BA'
+                : glassTheme
                 ? key === active
                   ? '#FFFFFF'
                   : '#D1D5DA'
@@ -130,9 +138,9 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           <Animated.View
             style={{
               overflow: 'hidden',
-              opacity:
-                active === 'Home' ||
-                active === 'Subscriptions' ||
+              opacity: homeLight
+                ? 0
+                : active === 'Subscriptions' ||
                 active === 'Savings'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 55, 95],
@@ -140,9 +148,9 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                       extrapolate: 'clamp',
                     })
                   : 1,
-              maxHeight:
-                active === 'Home' ||
-                active === 'Subscriptions' ||
+              maxHeight: homeLight
+                ? 0
+                : active === 'Subscriptions' ||
                 active === 'Savings'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 95],
@@ -282,100 +290,105 @@ export function DashboardScreen() {
   const payments = usePayments();
   const d = q.data;
   const showReference = PREVIEW_ENABLED && !useSession.getState().token;
-  const featuredPayments = (
-    PREVIEW_ENABLED
-      ? ['Netflix', 'Spotify', 'Adobe'].map((merchant, index) => ({
-          ...referencePayments.find((item) => item.merchant === merchant)!,
-          monthlyCost: [13.99, 10.99, 52.99][index]!,
+  const allPayments = (
+    showReference
+      ? referencePayments.map((item) => ({
+          ...item,
+          monthlyCost:
+            item.merchant === 'Netflix'
+              ? 13.99
+              : item.merchant === 'Spotify'
+                ? 10.99
+                : item.merchant === 'Adobe'
+                  ? 52.99
+                  : item.monthlyCost,
         }))
-      : (payments.data?.items ?? []).slice(0, 3)
+      : (payments.data?.items ?? [])
   ).filter(Boolean);
+  const upcomingPayments = allPayments.slice(0, 3);
   const annualSaving = showReference ? 420 : (d?.annualPotentialSaving ?? 0);
   const subscriptionCount = showReference ? 6 : (d?.subscriptionCount ?? 0);
   const monthlyCost = showReference ? 145.81 : (d?.monthlyRecurringCost ?? 0);
-  const syncTime =
-    !useSession.getState().preview && d?.lastSyncAt
-      ? new Date(d.lastSyncAt).toLocaleTimeString('fr-FR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : showReference
-        ? '10:28'
-        : '08:41';
-
-  React.useEffect(() => {
-    dashboardScrollY.setValue(0);
-    return () => dashboardScrollY.setValue(0);
-  }, []);
+  const categoryCards = [
+    {
+      title: 'Streaming',
+      tint: '#EEF8FF',
+      border: '#D7EDF8',
+      items: allPayments.filter((item) =>
+        ['Netflix', 'Amazon Prime', 'Canal+'].some((name) => item.merchant.includes(name)),
+      ),
+    },
+    {
+      title: 'Musique',
+      tint: '#FFF2F0',
+      border: '#F8DDD8',
+      items: allPayments.filter((item) => item.merchant.toLowerCase().includes('spotify')),
+    },
+    {
+      title: 'Travail',
+      tint: '#F4F1FF',
+      border: '#E4DCF9',
+      items: allPayments.filter((item) =>
+        ['Adobe', 'Microsoft', 'Notion'].some((name) => item.merchant.includes(name)),
+      ),
+    },
+  ];
 
   return (
-    <ImageBackground
-      source={require('../../assets/home-fabric.png')}
-      resizeMode="cover"
-      imageStyle={{ opacity: 0.96 }}
-      style={{ flex: 1, backgroundColor: '#08111D' }}
-    >
-      <LinearGradient
-        pointerEvents="none"
-        colors={['#02060CCF', '#0B142040', '#182432E8']}
-        locations={[0, 0.48, 1]}
-        style={{ position: 'absolute', inset: 0 }}
-      />
-      <Page
-        fill
-        transparent
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: dashboardScrollY } } }], {
-          useNativeDriver: false,
-        })}
-        scrollEventThrottle={16}
-        style={{ gap: 0, paddingHorizontal: 17, paddingTop: 10, paddingBottom: 210 }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+    <ScreenWithTabs active="Home">
+      <View style={{ flex: 1, backgroundColor: '#F7F7F8' }}>
+        <StatusBar barStyle="dark-content" />
+        <Page
+          fill
+          transparent
+          style={{ gap: 0, paddingHorizontal: 21, paddingTop: 8, paddingBottom: 105 }}
+        >
+        <View
+          style={{
+            minHeight: 54,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Label style={{ color: '#111114', fontSize: 23, fontWeight: '800' }}>
+            Mes abonnements
+          </Label>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Voir mon profil"
-            onPress={() => nav.navigate('Main', { screen: 'Profile' })}
+            accessibilityLabel="Notifications"
+            onPress={() => nav.navigate('Notifications')}
             style={({ pressed }) => ({
-              width: 42,
-              height: 42,
-              borderRadius: 21,
+              position: 'absolute',
+              right: 0,
+              width: 38,
+              height: 38,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: '#8FAC9CDA',
-              borderWidth: 2,
-              borderColor: '#D9E7DF9C',
-              opacity: pressed ? 0.75 : 1,
+              opacity: pressed ? 0.65 : 1,
             })}
           >
-            <Ionicons name="person-outline" size={21} color="#FFFFFF" />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Rechercher un abonnement"
-            onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
-            style={({ pressed }) => ({
-              flex: 1,
-              minHeight: 42,
-              borderRadius: 21,
-              paddingHorizontal: 15,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-              backgroundColor: '#5B6068D9',
-              opacity: pressed ? 0.78 : 1,
-            })}
-          >
-            <Ionicons name="search" size={21} color="#FFFFFF" />
-            <Label style={{ fontSize: 15, color: '#FFFFFF', fontWeight: '500' }}>Rechercher</Label>
+            <Ionicons name="notifications" size={25} color="#050A20" />
+            <View
+              style={{
+                position: 'absolute',
+                right: 5,
+                top: 4,
+                width: 7,
+                height: 7,
+                borderRadius: 4,
+                backgroundColor: '#FF3B30',
+              }}
+            />
           </Pressable>
         </View>
 
         {!d ? (
-          <View style={{ marginTop: 120 }}>
+          <View style={{ marginTop: 100 }}>
             <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
           </View>
         ) : !d.hasConnectedBank && !d.lastSyncAt ? (
-          <View style={{ marginTop: 100 }}>
+          <View style={{ marginTop: 80 }}>
             <State
               title="Connectez votre première banque"
               description="Retrouvez vos abonnements et vos économies possibles."
@@ -383,7 +396,7 @@ export function DashboardScreen() {
             />
           </View>
         ) : d.subscriptionCount === 0 ? (
-          <View style={{ marginTop: 100 }}>
+          <View style={{ marginTop: 80 }}>
             <State
               title="Aucun abonnement détecté"
               description="Votre banque est bien connectée et vos transactions ont été analysées."
@@ -394,250 +407,194 @@ export function DashboardScreen() {
           <>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Voir les ${subscriptionCount} abonnements pour ${money(monthlyCost)} par mois`}
+              accessibilityLabel={`Voir les ${subscriptionCount} abonnements`}
               onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
-              style={({ pressed }) => ({
-                alignItems: 'center',
-                marginTop: 91,
-                opacity: pressed ? 0.78 : 1,
-              })}
+              style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, marginTop: 12 })}
             >
-              <Label style={{ fontSize: 15, color: '#E6EBEF', letterSpacing: 0.2 }}>
-                Vos abonnements détectés
-              </Label>
-              <Label
-                style={{
-                  marginTop: 5,
-                  fontSize: 37,
-                  lineHeight: 44,
-                  fontWeight: '600',
-                  color: '#FFFFFF',
-                  letterSpacing: -1.3,
-                }}
-              >
-                {subscriptionCount} abonnements
-              </Label>
-              <Label
-                style={{
-                  fontSize: 30,
-                  lineHeight: 36,
-                  fontWeight: '500',
-                  color: '#FFFFFF',
-                  letterSpacing: -0.8,
-                }}
-              >
-                {money(monthlyCost)} /mois
-              </Label>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8 }}>
-                <Ionicons name="sparkles-outline" size={16} color="#DDE5EA" />
-                <Label style={{ color: '#E5EBEF', fontSize: 14 }}>
-                  {money(annualSaving)} d’économies potentielles /an
-                </Label>
-              </View>
-            </Pressable>
-
-            <View style={{ alignItems: 'center', marginTop: 70 }}>
               <View
                 style={{
-                  paddingHorizontal: 23,
-                  minHeight: 42,
-                  borderRadius: 22,
+                  minHeight: 181,
+                  borderRadius: 20,
+                  backgroundColor: '#02071D',
+                  paddingHorizontal: 24,
+                  paddingVertical: 24,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#C8D1D94D',
-                  borderWidth: 1,
-                  borderColor: '#EDF3F64D',
+                  shadowColor: '#0B1020',
+                  shadowOpacity: 0.16,
+                  shadowRadius: 12,
+                  shadowOffset: { width: 0, height: 7 },
                 }}
               >
-                <Label style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500' }}>
-                  Votre tableau de bord
+                <Label style={{ color: '#AEB2BE', fontSize: 22, fontWeight: '500' }}>
+                  Dépenses récurrentes
                 </Label>
-              </View>
-            </View>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Voir les recommandations"
-              onPress={() => nav.navigate('Main', { screen: 'Savings' })}
-              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1, marginTop: 22 })}
-            >
-              <LinearGradient
-                colors={['#8493A1B8', '#566574C7']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{
-                  minHeight: 108,
-                  borderRadius: 23,
-                  overflow: 'hidden',
-                  padding: 18,
-                  borderWidth: 1,
-                  borderColor: '#EAF1F44A',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-              >
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Label
-                    style={{ color: '#FFFFFF', fontSize: 20, lineHeight: 25, fontWeight: '600' }}
-                  >
-                    {money(annualSaving)} à économiser
-                  </Label>
-                  <Label style={{ color: '#E5EBF0', fontSize: 13, lineHeight: 18 }}>
-                    Découvrez vos recommandations personnalisées.
-                  </Label>
-                  <View style={{ flexDirection: 'row', gap: 5, marginTop: 8 }}>
-                    {[0, 1, 2, 3, 4].map((dot) => (
-                      <View
-                        key={dot}
-                        style={{
-                          width: 5,
-                          height: 5,
-                          borderRadius: 3,
-                          backgroundColor: dot === 0 ? '#FFFFFF' : '#CBD4DB78',
-                        }}
-                      />
-                    ))}
-                  </View>
-                </View>
+                <Label style={{ color: '#FFFFFF', fontSize: 27, fontWeight: '800', marginTop: 4 }}>
+                  {money(monthlyCost)}
+                  <Label style={{ color: '#AEB2BE', fontSize: 13 }}> / mois</Label>
+                </Label>
                 <View
                   style={{
-                    width: 84,
-                    height: 84,
+                    marginTop: 23,
+                    flexDirection: 'row',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    alignSelf: 'stretch',
                   }}
                 >
-                  {[0, 1, 2].map((layer) => (
-                    <View
-                      key={layer}
-                      style={{
-                        position: 'absolute',
-                        width: 59,
-                        height: 39,
-                        borderRadius: 12,
-                        backgroundColor:
-                          layer === 0 ? '#D9E6F4' : layer === 1 ? '#829BD8' : '#4D6DE2',
-                        borderWidth: 1,
-                        borderColor: '#FFFFFF80',
-                        transform: [{ translateY: layer * 12 - 12 }, { rotate: '-8deg' }],
-                        shadowColor: '#1A3FFF',
-                        shadowOpacity: 0.35,
-                        shadowRadius: 8,
-                      }}
-                    />
-                  ))}
-                  <Ionicons name="sparkles" size={24} color="#FFFFFF" style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="sparkles-outline" size={18} color="#E7E9F0" />
+                      <Label style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+                        Économies
+                      </Label>
+                    </View>
+                    <Label style={{ color: '#D9DCE5', fontSize: 13 }}>{money(annualSaving)} /an</Label>
+                  </View>
+                  <View style={{ height: 40, width: 1, backgroundColor: '#62697A' }} />
+                  <View style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="albums-outline" size={18} color="#E7E9F0" />
+                      <Label style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+                        Abonnements
+                      </Label>
+                    </View>
+                    <Label style={{ color: '#D9DCE5', fontSize: 13 }}>
+                      {subscriptionCount} détectés
+                    </Label>
+                  </View>
                 </View>
-              </LinearGradient>
+              </View>
             </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Synchroniser les données"
-              onPress={() => nav.navigate('Bank')}
-              style={({ pressed }) => ({
-                marginTop: 13,
-                opacity: pressed ? 0.78 : 1,
-                borderRadius: 21,
-                paddingHorizontal: 16,
-                minHeight: 61,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 11,
-                backgroundColor: '#3F4C58CC',
-                borderWidth: 1,
-                borderColor: '#E6EEF13B',
-              })}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 26 }}>
+              <Label style={{ flex: 1, color: '#17171A', fontSize: 19, fontWeight: '800' }}>
+                Catégories
+              </Label>
+              <Pressable onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}>
+                <Label style={{ color: '#26262A', fontSize: 13, textDecorationLine: 'underline' }}>
+                  Voir tout
+                </Label>
+              </Pressable>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 11, paddingVertical: 14 }}
             >
-              <Ionicons name="time-outline" size={25} color="#FFFFFF" />
-              <View style={{ flex: 1 }}>
-                <Label style={{ color: '#D9E0E6', fontSize: 11 }}>Dernière synchronisation</Label>
-                <Label style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
-                  Aujourd’hui à {syncTime}
-                </Label>
-              </View>
-              <View
-                style={{
-                  borderRadius: 18,
-                  paddingHorizontal: 10,
-                  paddingVertical: 7,
-                  backgroundColor: '#0A513AC7',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <View
-                  style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#20F2A0' }}
-                />
-                <Label style={{ color: '#38F5AE', fontSize: 10, fontWeight: '600' }}>À jour</Label>
-              </View>
-            </Pressable>
-
-            <View style={{ marginTop: 18, gap: 9 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Label style={{ flex: 1, color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>
-                  Abonnements récents
-                </Label>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
-                  style={{ paddingVertical: 8, paddingLeft: 14 }}
-                >
-                  <Label style={{ color: '#E2E8ED', fontSize: 12 }}>Voir tout</Label>
-                </Pressable>
-              </View>
-              <View
-                style={{
-                  borderRadius: 23,
-                  overflow: 'hidden',
-                  paddingHorizontal: 16,
-                  backgroundColor: '#4B5966D4',
-                  borderWidth: 1,
-                  borderColor: '#E9EFF238',
-                }}
-              >
-                {featuredPayments.map((item, index) => (
+              {categoryCards.map((category) => {
+                const icons = category.items.slice(0, 3);
+                return (
                   <Pressable
-                    key={item.id}
-                    accessibilityRole="button"
-                    onPress={() => nav.navigate('Subscription', { id: item.id })}
+                    key={category.title}
+                    onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
                     style={({ pressed }) => ({
-                      minHeight: 72,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 12,
-                      borderBottomWidth: index === featuredPayments.length - 1 ? 0 : 1,
-                      borderBottomColor: '#DDE5EA24',
-                      opacity: pressed ? 0.72 : 1,
+                      width: 142,
+                      minHeight: 103,
+                      borderRadius: 14,
+                      padding: 13,
+                      backgroundColor: category.tint,
+                      borderWidth: 1,
+                      borderColor: category.border,
+                      opacity: pressed ? 0.75 : 1,
                     })}
                   >
-                    <GlassBrandIcon name={item.merchant} size={42} />
-                    <View style={{ flex: 1 }}>
-                      <Label style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '600' }}>
-                        {item.merchant}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Label style={{ flex: 1, color: '#17171A', fontSize: 16, fontWeight: '700' }}>
+                        {category.title}
                       </Label>
-                      <Label style={{ color: '#CFD7DE', fontSize: 11 }}>
-                        {item.category === 'streaming'
-                          ? 'Divertissement'
-                          : fr.categories[item.category]}
+                      <Label style={{ color: '#89898F', fontSize: 12 }}>
+                        {category.items.length} app{category.items.length > 1 ? 's' : ''}
                       </Label>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Label style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '600' }}>
-                        {money(item.monthlyCost)}
-                      </Label>
-                      <Label style={{ color: '#D3DAE0', fontSize: 10 }}>par mois</Label>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 18 }}>
+                      {icons.length ? (
+                        icons.map((item) => <GlassBrandIcon key={item.id} name={item.merchant} size={29} />)
+                      ) : (
+                        <View
+                          style={{
+                            width: 29,
+                            height: 29,
+                            borderRadius: 8,
+                            backgroundColor: '#FFFFFF',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Ionicons name="apps-outline" size={17} color="#72727A" />
+                        </View>
+                      )}
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color="#D3DBE2" />
                   </Pressable>
-                ))}
-              </View>
+                );
+              })}
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 7, marginBottom: 12 }}>
+              <Label style={{ flex: 1, color: '#17171A', fontSize: 19, fontWeight: '800' }}>
+                Prochains abonnements
+              </Label>
+              <Pressable onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}>
+                <Label style={{ color: '#26262A', fontSize: 13, textDecorationLine: 'underline' }}>
+                  Voir tout
+                </Label>
+              </Pressable>
+            </View>
+            <View style={{ gap: 12 }}>
+              {upcomingPayments.map((item) => (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="button"
+                  onPress={() => nav.navigate('Subscription', { id: item.id })}
+                  style={({ pressed }) => ({
+                    minHeight: 87,
+                    borderRadius: 17,
+                    backgroundColor: '#FFFFFF',
+                    paddingHorizontal: 15,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 13,
+                    shadowColor: '#121827',
+                    shadowOpacity: 0.06,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 4 },
+                    opacity: pressed ? 0.72 : 1,
+                  })}
+                >
+                  <GlassBrandIcon name={item.merchant} size={48} />
+                  <View style={{ flex: 1 }}>
+                    <Label style={{ color: '#18181B', fontSize: 18, fontWeight: '700' }}>
+                      {item.merchant}
+                    </Label>
+                    <Label style={{ color: '#8B8B92', fontSize: 13, marginTop: 4 }}>
+                      {date(item.nextPaymentAt)}
+                    </Label>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 8 }}>
+                    <Label style={{ color: '#242429', fontSize: 13, fontWeight: '600' }}>
+                      {money(item.monthlyCost)}
+                      <Label style={{ color: '#8B8B92', fontSize: 10 }}> / mois</Label>
+                    </Label>
+                    <View
+                      style={{
+                        minWidth: 54,
+                        minHeight: 29,
+                        borderRadius: 6,
+                        backgroundColor: '#17171B',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Label style={{ color: '#FFFFFF', fontSize: 12 }}>Voir</Label>
+                    </View>
+                  </View>
+                </Pressable>
+              ))}
             </View>
           </>
         )}
-      </Page>
-    </ImageBackground>
+        </Page>
+      </View>
+    </ScreenWithTabs>
   );
 }
 export function SubscriptionsScreen() {

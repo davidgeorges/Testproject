@@ -332,6 +332,7 @@ function Experience() {
   const [picker, setPicker] = useState(false);
   const token = useLiveToken();
   const dark = useSession((s) => s.theme) === 'dark';
+  const homePreview = active === 9;
   const onChange = () => {
     const route = navigation.getCurrentRoute();
     const names: Record<string, number> = {
@@ -517,13 +518,13 @@ function Experience() {
                     borderColor: '#41566E',
                     borderRadius: 31,
                     overflow: 'hidden',
-                    backgroundColor: c.background,
+                    backgroundColor: homePreview ? '#F7F7F8' : c.background,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 20 },
                     shadowRadius: 40,
                     shadowOpacity: 0.5,
                   }
-                : { flex: 1, backgroundColor: c.background }
+                : { flex: 1, backgroundColor: homePreview ? '#F7F7F8' : c.background }
             }
           >
             {Platform.OS === 'web' && (
@@ -535,20 +536,28 @@ function Experience() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  backgroundColor: c.background,
+                  backgroundColor: homePreview ? '#F7F7F8' : c.background,
                 }}
               >
-                <Label style={{ fontSize: 11, fontWeight: '600' }}>9:41</Label>
+                <Label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: homePreview ? '#111114' : c.text,
+                  }}
+                >
+                  9:41
+                </Label>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="cellular" size={12} color={c.text} />
-                  <Ionicons name="wifi" size={12} color={c.text} />
-                  <Ionicons name="battery-full" size={19} color={c.text} />
+                  <Ionicons name="cellular" size={12} color={homePreview ? '#111114' : c.text} />
+                  <Ionicons name="wifi" size={12} color={homePreview ? '#111114' : c.text} />
+                  <Ionicons name="battery-full" size={19} color={homePreview ? '#111114' : c.text} />
                 </View>
               </View>
             )}
             <SafeAreaView
               edges={Platform.OS === 'web' ? [] : ['top', 'bottom']}
-              style={{ flex: 1, backgroundColor: c.background }}
+              style={{ flex: 1, backgroundColor: homePreview ? '#F7F7F8' : c.background }}
             >
               <Navigator onChange={onChange} />
             </SafeAreaView>
@@ -558,10 +567,17 @@ function Experience() {
                   height: 16,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: c.background,
+                  backgroundColor: homePreview ? '#F7F7F8' : c.background,
                 }}
               >
-                <View style={{ height: 4, width: 115, backgroundColor: c.text, borderRadius: 5 }} />
+                <View
+                  style={{
+                    height: 4,
+                    width: 115,
+                    backgroundColor: homePreview ? '#111114' : c.text,
+                    borderRadius: 5,
+                  }}
+                />
               </View>
             )}
           </View>
