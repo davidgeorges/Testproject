@@ -338,40 +338,44 @@ export function DashboardScreen() {
           <>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Voir ${money(annualSaving)} d'économies potentielles par an`}
-              onPress={() => nav.navigate('Main', { screen: 'Savings' })}
+              accessibilityLabel={`Voir les ${subscriptionCount} abonnements pour ${money(monthlyCost)} par mois`}
+              onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
               style={({ pressed }) => ({
                 alignItems: 'center',
                 marginTop: 91,
                 opacity: pressed ? 0.78 : 1,
               })}
             >
-              <Label style={{ fontSize: 15, color: '#F2F5F8', letterSpacing: 0.2 }}>
-                Économies potentielles · Annuel
+              <Label style={{ fontSize: 15, color: '#E6EBEF', letterSpacing: 0.2 }}>
+                Vos abonnements détectés
               </Label>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 5 }}>
-                <Label
-                  style={{
-                    fontSize: 54,
-                    lineHeight: 61,
-                    fontWeight: '500',
-                    color: '#FFFFFF',
-                    letterSpacing: -2,
-                  }}
-                >
-                  {money(annualSaving).replace(' €', '')}
-                </Label>
-                <Label
-                  style={{ fontSize: 27, lineHeight: 35, fontWeight: '500', color: '#FFFFFF' }}
-                >
-                  {' '}
-                  € /an
-                </Label>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }}>
-                <Ionicons name="receipt-outline" size={16} color="#F1F4F7" />
-                <Label style={{ color: '#F1F4F7', fontSize: 14 }}>
-                  {subscriptionCount} abonnements · {money(monthlyCost)}/mois
+              <Label
+                style={{
+                  marginTop: 5,
+                  fontSize: 37,
+                  lineHeight: 44,
+                  fontWeight: '600',
+                  color: '#FFFFFF',
+                  letterSpacing: -1.3,
+                }}
+              >
+                {subscriptionCount} abonnements
+              </Label>
+              <Label
+                style={{
+                  fontSize: 30,
+                  lineHeight: 36,
+                  fontWeight: '500',
+                  color: '#FFFFFF',
+                  letterSpacing: -0.8,
+                }}
+              >
+                {money(monthlyCost)} /mois
+              </Label>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8 }}>
+                <Ionicons name="sparkles-outline" size={16} color="#DDE5EA" />
+                <Label style={{ color: '#E5EBEF', fontSize: 14 }}>
+                  {money(annualSaving)} d’économies potentielles /an
                 </Label>
               </View>
             </Pressable>
