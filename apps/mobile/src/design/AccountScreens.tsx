@@ -737,7 +737,7 @@ export function SettingsScreen() {
             <Button
               title="Réinitialiser le thème d’origine"
               secondary
-              loading={resetAppearance.isPending}
+              disabled={resetAppearance.isPending}
               onPress={() => resetAppearance.mutate()}
             />
           </View>
