@@ -117,10 +117,10 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                   borderRadius: center ? 28 : 15,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: center ? '#FFD900' : 'transparent',
+                  backgroundColor: center ? (isDark ? '#666A72' : '#7A7D84') : 'transparent',
                   borderWidth: center ? 5 : 0,
                   borderColor: center ? (isDark ? '#0B0B0F' : '#F7F6F8') : 'transparent',
-                  shadowColor: center ? '#E6C400' : 'transparent',
+                  shadowColor: center ? (isDark ? '#000000' : '#555860') : 'transparent',
                   shadowOpacity: center ? 0.28 : 0,
                   shadowRadius: 9,
                   shadowOffset: { width: 0, height: 5 },
@@ -129,7 +129,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                 <Ionicons
                   name={selected && key === 'Home' ? 'home' : icon}
                   size={center ? 22 : 22}
-                  color={center ? '#171719' : selected ? (isDark ? '#FFFFFF' : '#171719') : isDark ? '#777780' : '#929295'}
+                  color={center ? '#FFFFFF' : selected ? (isDark ? '#FFFFFF' : '#171719') : isDark ? '#777780' : '#929295'}
                 />
               </View>
               <Label
@@ -402,6 +402,11 @@ export function DashboardScreen() {
         avatarText: '#2B2420',
         shadow: '#34313D',
       };
+  const summaryGradient = isDark ? (['#73767D', '#55585F'] as const) : (['#92959C', '#70737A'] as const);
+  const summaryText = '#FFFFFF';
+  const summaryMuted = isDark ? '#E1E2E5' : '#F1F2F4';
+  const summaryProgress = '#FFFFFF';
+  const summaryTrack = '#FFFFFF42';
   const dashboard = useOverview();
   const profile = useProfile();
   const finance = useQuery({
@@ -572,7 +577,7 @@ export function DashboardScreen() {
                 style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
               >
                 <LinearGradient
-                  colors={['#FFE839', '#FFD900']}
+                  colors={summaryGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{
@@ -580,8 +585,8 @@ export function DashboardScreen() {
                     borderRadius: 24,
                     padding: 19,
                     overflow: 'hidden',
-                    shadowColor: '#B79B00',
-                    shadowOpacity: 0.2,
+                    shadowColor: isDark ? '#000000' : '#454850',
+                    shadowOpacity: isDark ? 0.34 : 0.22,
                     shadowRadius: 14,
                     shadowOffset: { width: 0, height: 9 },
                   }}
@@ -594,7 +599,7 @@ export function DashboardScreen() {
                       borderRadius: 95,
                       right: -68,
                       top: -72,
-                      backgroundColor: '#FFF26A99',
+                      backgroundColor: isDark ? '#92959C66' : '#BFC1C666',
                     }}
                   />
                   <View
@@ -609,41 +614,41 @@ export function DashboardScreen() {
                     }}
                   />
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: '#19191B', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="calendar-outline" size={17} color="#FFE429" />
+                    <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: isDark ? '#41434A' : '#19191B', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="calendar-outline" size={17} color="#FFFFFF" />
                     </View>
-                    <Label style={{ marginLeft: 10, flex: 1, color: '#19191B', fontSize: 19, fontWeight: '900' }}>
+                    <Label style={{ marginLeft: 10, flex: 1, color: summaryText, fontSize: 19, fontWeight: '900' }}>
                       Ce mois
                     </Label>
-                    <Label style={{ color: '#625900', fontSize: 11, fontWeight: '700' }}>{monthLabel}</Label>
+                    <Label style={{ color: summaryMuted, fontSize: 11, fontWeight: '700' }}>{monthLabel}</Label>
                   </View>
                   <View style={{ marginTop: 23 }}>
-                    <Label style={{ color: '#5F5700', fontSize: 10, fontWeight: '700', letterSpacing: 0.7 }}>
+                    <Label style={{ color: summaryMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.7 }}>
                       DÉPENSÉ
                     </Label>
-                    <Label style={{ color: '#171719', fontSize: 31, lineHeight: 38, fontWeight: '900', letterSpacing: -0.9 }}>
+                    <Label style={{ color: summaryText, fontSize: 31, lineHeight: 38, fontWeight: '900', letterSpacing: -0.9 }}>
                       {finance.isPending ? '—' : money(spent)}
                     </Label>
                   </View>
                   <View style={{ marginTop: 15 }}>
-                    <View style={{ height: 7, borderRadius: 4, backgroundColor: '#FFFFFF73', overflow: 'hidden' }}>
+                    <View style={{ height: 7, borderRadius: 4, backgroundColor: summaryTrack, overflow: 'hidden' }}>
                       <View
                         style={{
                           width: `${progressRatio * 100}%`,
                           height: 7,
                           borderRadius: 4,
-                          backgroundColor: hasMonthlyBudget && spent > (financeData?.monthlyBudget ?? 0) ? '#B21D1D' : '#19191B',
+                          backgroundColor: hasMonthlyBudget && spent > (financeData?.monthlyBudget ?? 0) ? '#B21D1D' : summaryProgress,
                         }}
                       />
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 7 }}>
-                      <Label style={{ flex: 1, color: '#625900', fontSize: 10, fontWeight: '700' }}>
+                      <Label style={{ flex: 1, color: summaryMuted, fontSize: 10, fontWeight: '700' }}>
                         {finance.isPending ? 'Calcul en cours…' : progressLabel}
                       </Label>
-                      <Label style={{ color: '#625900', fontSize: 10, fontWeight: '700' }}>
+                      <Label style={{ color: summaryMuted, fontSize: 10, fontWeight: '700' }}>
                         {remainingLabel}
                       </Label>
-                      <Label style={{ color: remaining < 0 ? '#B21D1D' : '#171719', fontSize: 13, fontWeight: '900', marginLeft: 5 }}>
+                      <Label style={{ color: remaining < 0 ? '#FFB1B1' : summaryText, fontSize: 13, fontWeight: '900', marginLeft: 5 }}>
                         {finance.isPending ? '—' : money(remaining)}
                       </Label>
                     </View>
@@ -674,8 +679,8 @@ export function DashboardScreen() {
                       shadowOffset: { width: 0, height: 3 },
                     }}
                   >
-                    <View style={{ width: 24, height: 28, borderRadius: 7, backgroundColor: isDark ? '#FFD900' : '#1D1D20', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name={action.icon} size={15} color={isDark ? '#171719' : '#FFFFFF'} />
+                    <View style={{ width: 24, height: 28, borderRadius: 7, backgroundColor: isDark ? '#666A72' : '#1D1D20', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={action.icon} size={15} color="#FFFFFF" />
                     </View>
                   </View>
                   <Label style={{ color: homeColors.body, fontSize: 10, fontWeight: '700', marginTop: 8, textAlign: 'center' }}>
@@ -735,8 +740,8 @@ export function DashboardScreen() {
                       opacity: pressed ? 0.68 : 1,
                     })}
                   >
-                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: item.amount >= 0 ? (isDark ? '#605D1E' : '#F4F5A2') : (isDark ? '#2B2B32' : '#171719'), alignItems: 'center', justifyContent: 'center' }}>
-                      <Label style={{ color: item.amount >= 0 ? (isDark ? '#FFF28A' : '#6D7100') : '#FFFFFF', fontSize: 13, fontWeight: '900' }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: item.amount >= 0 ? (isDark ? '#41434A' : '#E4E5E8') : (isDark ? '#2B2B32' : '#171719'), alignItems: 'center', justifyContent: 'center' }}>
+                      <Label style={{ color: item.amount >= 0 ? (isDark ? '#FFFFFF' : '#555860') : '#FFFFFF', fontSize: 13, fontWeight: '900' }}>
                         {(item.merchantName || '?').charAt(0).toLocaleUpperCase('fr')}
                       </Label>
                     </View>

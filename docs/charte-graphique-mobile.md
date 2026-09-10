@@ -9,7 +9,7 @@ Cette charte décrit l’interface validée de l’accueil. Elle est la source d
 
 ## 1. Intention visuelle
 
-L’interface doit évoquer un assistant budget simple, moderne et accessible. Elle utilise un fond gris très clair, des surfaces blanches, une encre presque noire et un jaune vif comme accent principal. Le violet sert aux graphiques, comparaisons et détails décoratifs discrets.
+L’interface doit évoquer un assistant budget simple, moderne et accessible. Elle utilise un fond gris très clair, des surfaces blanches, une encre presque noire et un gris moyen comme accent principal. Le violet sert aux graphiques, comparaisons et détails décoratifs discrets.
 
 Les écrans doivent rester aérés malgré une densité d’information élevée. L’utilisateur doit identifier en quelques secondes :
 
@@ -31,9 +31,9 @@ Les composants ne doivent jamais simuler une donnée. Les montants, compteurs, d
 | Texte secondaire | `#858489` | Actions secondaires, dates, métadonnées |
 | Texte discret | `#A4A3A9` | Placeholders et informations désactivées |
 | Séparateur | `#F0EFF2` | Lignes internes aux listes uniquement |
-| Jaune principal | `#FFD900` | Accent, carte principale et action centrale |
-| Jaune lumineux | `#FFE839` | Départ du dégradé principal |
-| Jaune pâle | `#FFF26A80` | Halo décoratif à l’intérieur d’une carte jaune |
+| Gris accent clair | `#92959C` | Départ du dégradé principal |
+| Gris accent profond | `#70737A` | Fin du dégradé et action centrale |
+| Gris halo | `#BFC1C666` | Halo décoratif du panneau principal |
 | Violet profond | `#3518B9` | Série secondaire ou détail décoratif |
 | Violet clair | `#D8A9EF` | Comparaison ou état secondaire |
 | Vert positif | `#10A330` | Revenus, économies confirmées et succès |
@@ -42,7 +42,7 @@ Les composants ne doivent jamais simuler une donnée. Les montants, compteurs, d
 
 ### Variante sombre
 
-Le mode sombre conserve le panneau jaune et la même hiérarchie. Il remplace uniquement les surfaces, textes, séparateurs, ombres et états d’icônes :
+Le mode sombre conserve le panneau gris et la même hiérarchie. Il remplace les surfaces, textes, séparateurs, ombres et nuances d’accent :
 
 | Rôle | Valeur sombre |
 |---|---:|
@@ -57,12 +57,12 @@ Le mode sombre conserve le panneau jaune et la même hiérarchie. Il remplace un
 | Avatar neutre | `#493B34` |
 | Revenu positif | `#44D56A` |
 
-Les actions rapides utilisent une surface sombre avec un noyau jaune et une icône noire. La barre inférieure utilise `#17171CFA`. La zone système supérieure et l’indicateur inférieur adoptent également le fond sombre ; aucune bande blanche ne doit rester autour de l’écran.
+Les actions rapides utilisent une surface sombre avec un noyau gris moyen et une icône blanche. La barre inférieure utilise `#17171CFA`. Le panneau principal utilise `#73767D → #55585F`. La zone système supérieure et l’indicateur inférieur adoptent également le fond sombre ; aucune bande blanche ne doit rester autour de l’écran.
 
 ### Règles de couleur
 
-- Une page utilise au maximum un grand composant jaune.
-- Le violet ne remplace pas le jaune pour l’action principale.
+- Une page utilise au maximum un grand composant gris accentué.
+- Le violet reste réservé aux comparaisons et graphiques secondaires.
 - Le vert indique une valeur réellement positive. Il ne colore pas le fond complet d’une carte.
 - Le rouge est réservé aux dépassements et erreurs. Une dépense ordinaire reste en encre principale.
 - Les cartes de contenu restent blanches. Les grands aplats colorés sont réservés aux résumés.
@@ -123,9 +123,9 @@ export const shadows = {
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 5 },
   },
-  yellowHero: {
-    shadowColor: '#B79B00',
-    shadowOpacity: 0.20,
+  summaryHero: {
+    shadowColor: '#454850',
+    shadowOpacity: 0.22,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 9 },
   },
@@ -162,7 +162,7 @@ Le titre est à gauche en 18/800. L’action est à droite en 12–13 et en gris
 
 Le résumé est un **panneau mensuel unique** afin de ne pas évoquer un portefeuille de cartes bancaires. Il mesure au minimum **215 pt** de haut, occupe toute la largeur utile et utilise un rayon de **24 pt**.
 
-Le panneau jaune utilise le dégradé `#FFE839 → #FFD900`. Un halo circulaire jaune pâle peut dépasser dans l’angle supérieur droit et une forme violette très transparente peut décorer le bas du panneau. Aucun élément ne doit ressembler à une carte de paiement : pas de pile de cartes, puce, symbole sans-contact, numéro ou réseau de paiement.
+Le panneau utilise le dégradé gris `#92959C → #70737A` en mode clair et `#73767D → #55585F` en mode sombre. Un halo gris clair peut dépasser dans l’angle supérieur droit et une forme violette très transparente peut décorer le bas du panneau. Aucun élément ne doit ressembler à une carte de paiement : pas de pile de cartes, puce, symbole sans-contact, numéro ou réseau de paiement.
 
 Sa hiérarchie est fixe :
 
@@ -194,7 +194,7 @@ Une liste est contenue dans une seule carte blanche, rayon 17. Son en-tête util
 - une valeur alignée à droite 14/800 ;
 - un séparateur `#F0EFF2`, sauf après la dernière ligne.
 
-Un revenu peut utiliser un disque jaune pâle et une valeur verte. Une dépense utilise un disque sombre et une valeur noire.
+Un revenu peut utiliser un disque gris pâle et une valeur verte. Une dépense utilise un disque sombre et une valeur noire.
 
 ### 6.6 Navigation inférieure
 
@@ -208,7 +208,7 @@ La navigation comporte cinq entrées : Accueil, Abonnements, Finances, Économie
 - entrée active en `#171719` ;
 - entrées inactives en `#929295`.
 
-L’entrée centrale Finances utilise un disque jaune de **55 × 55 pt**, bordé de 5 pt dans la couleur du fond et remonté de 18 pt. Le contenu d’une page doit pouvoir défiler derrière la barre, avec un padding inférieur suffisant pour rester accessible.
+L’entrée centrale Finances utilise un disque gris moyen de **55 × 55 pt**, bordé de 5 pt dans la couleur du fond et remonté de 18 pt. Le contenu d’une page doit pouvoir défiler derrière la barre, avec un padding inférieur suffisant pour rester accessible.
 
 Le profil conserve le comportement validé : pas de barre inférieure, bouton de fermeture en haut pour revenir à l’écran précédent.
 
@@ -262,7 +262,7 @@ Les animations durent **160 à 240 ms**, avec une décélération douce. Elles s
 
 Les graphiques suivent la même palette :
 
-- série principale : `#FFD900` avec contour `#171719` si nécessaire ;
+- série principale : `#70737A` avec contour `#171719` si nécessaire ;
 - série de comparaison : `#3518B9` ;
 - grille : `#E7E6EA` ;
 - labels : `#858489` ;
@@ -311,7 +311,7 @@ Les autres écrans doivent extraire des composants partagés dès qu’un même 
 - [ ] En-tête compact conforme ou variante détail conforme.
 - [ ] Titres, montants et métadonnées aux bonnes tailles.
 - [ ] Cartes blanches sans bordure visible, rayon 17.
-- [ ] Jaune réservé à l’accent principal.
+- [ ] Gris moyen réservé à l’accent principal.
 - [ ] Quatre actions rapides maximum.
 - [ ] États chargement, vide, erreur et succès présents.
 - [ ] Données obtenues par API, sans valeur simulée.
