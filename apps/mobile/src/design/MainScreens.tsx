@@ -50,7 +50,6 @@ import {
   normalizeAccentColor,
   DEFAULT_ACCENT_COLOR,
 } from '../theme/accent';
-import { resolveBackgroundColor } from '../theme/background';
 export function useNav() {
   return useNavigation<NativeStackNavigationProp<RootStackParams>>();
 }
@@ -300,11 +299,8 @@ export function ScreenWithTabs({
   children: React.ReactNode;
   active: keyof TabsParams;
 }) {
-  const theme = useSession((s) => s.theme);
-  const selectedBackground = useSession((s) => s.backgroundColor);
-  const pageBackground = resolveBackgroundColor(selectedBackground, theme);
   return (
-    <View style={{ flex: 1, backgroundColor: pageBackground }}>
+    <View style={{ flex: 1 }}>
       {children}
       <BottomBar active={active} />
     </View>
@@ -403,13 +399,11 @@ export function DashboardScreen() {
   const token = useLiveToken();
   const isDark = useSession((s) => s.theme) === 'dark';
   const accentColor = useSession((s) => s.accentColor);
-  const selectedBackground = useSession((s) => s.backgroundColor);
-  const pageBackground = resolveBackgroundColor(selectedBackground, isDark ? 'dark' : 'light');
   const normalizedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR;
   const accentForeground = accentTextColor(normalizedAccent);
   const homeColors = isDark
     ? {
-        background: pageBackground,
+        background: '#0B0B0F',
         surface: '#18181D',
         elevated: '#222228',
         text: '#F8F7FA',
@@ -422,7 +416,7 @@ export function DashboardScreen() {
         shadow: '#000000',
       }
     : {
-        background: pageBackground,
+        background: '#F4F3F7',
         surface: '#FFFFFF',
         elevated: '#FFFFFF',
         text: '#171719',
@@ -998,9 +992,6 @@ export function DashboardScreen() {
 }
 export function SubscriptionsScreen() {
   const nav = useNav();
-  const theme = useSession((s) => s.theme);
-  const selectedBackground = useSession((s) => s.backgroundColor);
-  const pageBackground = resolveBackgroundColor(selectedBackground, theme);
   const q = usePayments();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Tous');
@@ -1032,16 +1023,12 @@ export function SubscriptionsScreen() {
     <ImageBackground
       source={require('../../assets/home-fabric.png')}
       resizeMode="cover"
-      imageStyle={{ opacity: 0.28 }}
-      style={{ flex: 1, backgroundColor: pageBackground }}
+      imageStyle={{ opacity: 0.96 }}
+      style={{ flex: 1, backgroundColor: '#08111D' }}
     >
       <LinearGradient
         pointerEvents="none"
-        colors={
-          theme === 'dark'
-            ? ['#00000070', '#00000018', '#00000055']
-            : ['#FFFFFF70', '#FFFFFF18', '#FFFFFF55']
-        }
+        colors={['#02060CE8', '#0B14205C', '#182432ED']}
         locations={[0, 0.46, 1]}
         style={{ position: 'absolute', inset: 0 }}
       />
@@ -1250,7 +1237,10 @@ export function SubscriptionDetail() {
   });
   return (
     <ScreenWithTabs active="Subscriptions">
-      <Page style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 10 }}>
+      <Page
+        backgroundColor="#020609"
+        style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 10 }}
+      >
         {!p ? (
           <State loading={q.isPending} error={q.error} title="Abonnement introuvable" />
         ) : (
@@ -1555,9 +1545,6 @@ export function SubscriptionDetail() {
 }
 export function SavingsScreen() {
   const nav = useNav();
-  const theme = useSession((s) => s.theme);
-  const selectedBackground = useSession((s) => s.backgroundColor);
-  const pageBackground = resolveBackgroundColor(selectedBackground, theme);
   const q = useRecommendations();
   const d = useOverview();
   const [filter, setFilter] = useState('Toutes');
@@ -1585,16 +1572,12 @@ export function SavingsScreen() {
     <ImageBackground
       source={require('../../assets/home-fabric.png')}
       resizeMode="cover"
-      imageStyle={{ opacity: 0.28 }}
-      style={{ flex: 1, backgroundColor: pageBackground }}
+      imageStyle={{ opacity: 0.96 }}
+      style={{ flex: 1, backgroundColor: '#08111D' }}
     >
       <LinearGradient
         pointerEvents="none"
-        colors={
-          theme === 'dark'
-            ? ['#00000070', '#00000018', '#00000055']
-            : ['#FFFFFF70', '#FFFFFF18', '#FFFFFF55']
-        }
+        colors={['#02060CE8', '#0B14205C', '#182432ED']}
         locations={[0, 0.46, 1]}
         style={{ position: 'absolute', inset: 0 }}
       />
@@ -1895,7 +1878,10 @@ export function RecommendationDetail() {
     },
   });
   return (
-    <Page style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 14 }}>
+    <Page
+      backgroundColor="#020609"
+      style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 14 }}
+    >
       {!r ? (
         <State loading={q.isPending} error={q.error} title="Recommandation introuvable" />
       ) : (

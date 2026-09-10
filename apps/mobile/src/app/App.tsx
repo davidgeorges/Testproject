@@ -22,7 +22,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import { DEFAULT_ACCENT_COLOR, normalizeAccentColor } from '../theme/accent';
-import { resolveBackgroundColor } from '../theme/background';
 import { api } from '../services/api';
 import { watchFirebaseToken } from '../services/firebase';
 import { registerForPushNotifications } from '../services/notifications';
@@ -183,8 +182,6 @@ function MainTabs() {
 function Navigator({ onChange }: { onChange: () => void }) {
   const c = useColors();
   const dark = useSession((s) => s.theme) === 'dark';
-  const selectedBackground = useSession((s) => s.backgroundColor);
-  const pageBackground = resolveBackgroundColor(selectedBackground, dark ? 'dark' : 'light');
   const token = useLiveToken();
   const authInitialized = useSession((s) => s.authInitialized);
   const base = dark ? DarkTheme : DefaultTheme;
@@ -211,8 +208,8 @@ function Navigator({ onChange }: { onChange: () => void }) {
         ...base,
         colors: {
           ...base.colors,
-          background: pageBackground,
-          card: pageBackground,
+          background: c.background,
+          card: c.background,
           text: c.text,
           border: c.border,
           primary: '#087AFF',
@@ -222,7 +219,13 @@ function Navigator({ onChange }: { onChange: () => void }) {
       <Stack.Navigator
         initialRouteName={token || PREVIEW_ENABLED ? 'Main' : 'Welcome'}
         screenOptions={({ route, navigation: nav }) => ({
-          contentStyle: { backgroundColor: pageBackground },
+          contentStyle: {
+            backgroundColor: ['Subscription', 'Recommendation', 'Login', 'Register'].includes(
+              route.name,
+            )
+              ? '#020609'
+              : c.background,
+          },
           animation: 'fade',
           headerTransparent: true,
           header: ({ options }) => {
@@ -637,9 +640,6 @@ export default function App() {
               useSession
                 .getState()
                 .setAccentColor(normalizeAccentColor(profile.accentColor) ?? DEFAULT_ACCENT_COLOR);
-              useSession
-                .getState()
-                .setBackgroundColor(normalizeAccentColor(profile.backgroundColor));
             })
             .catch(() => undefined);
           void registerForPushNotifications().catch(() => undefined);

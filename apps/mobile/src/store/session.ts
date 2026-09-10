@@ -11,7 +11,6 @@ type Session = {
   preview: boolean;
   theme: 'dark' | 'light';
   accentColor: string;
-  backgroundColor: string | null;
   setToken: (token: string | null) => void;
   setIdentity: (
     identity: { userId: string; email: string | null; displayName: string | null } | null,
@@ -19,7 +18,6 @@ type Session = {
   setAuthInitialized: (initialized: boolean) => void;
   setTheme: (theme: 'dark' | 'light') => void;
   setAccentColor: (accentColor: string) => void;
-  setBackgroundColor: (backgroundColor: string | null) => void;
   setPreview: (preview: boolean) => void;
 };
 // Demo tokens deliberately stay in memory. Production Firebase sessions need the native secure persistence adapter.
@@ -32,13 +30,11 @@ export const useSession = create<Session>((set) => ({
   preview: PREVIEW_ENABLED,
   theme: 'dark',
   accentColor: DEFAULT_ACCENT_COLOR,
-  backgroundColor: null,
   setToken: (token) => set({ token }),
   setIdentity: (identity) => set(identity ?? { userId: null, email: null, displayName: null }),
   setAuthInitialized: (authInitialized) => set({ authInitialized }),
   setTheme: (theme) => set({ theme }),
   setAccentColor: (accentColor) => set({ accentColor }),
-  setBackgroundColor: (backgroundColor) => set({ backgroundColor }),
   setPreview: (preview) => set({ preview: PREVIEW_ENABLED && preview }),
 }));
 export const useLiveToken = () => useSession((s) => (s.preview ? null : s.token));

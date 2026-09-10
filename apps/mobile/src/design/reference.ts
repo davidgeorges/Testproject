@@ -394,7 +394,6 @@ export function useProfile() {
           firstName: PREVIEW_ENABLED ? 'Thomas' : 'Utilisateur',
           theme: useSession.getState().theme,
           accentColor: useSession.getState().accentColor,
-          backgroundColor: useSession.getState().backgroundColor,
           notificationsEnabled: true,
         }),
   });

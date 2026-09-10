@@ -181,10 +181,7 @@ export const api = {
     ),
   profile: () => request<Profile>('/profile'),
   saveProfile: (
-    profile: Pick<
-      Profile,
-      'firstName' | 'theme' | 'accentColor' | 'backgroundColor' | 'notificationsEnabled'
-    >,
+    profile: Pick<Profile, 'firstName' | 'theme' | 'accentColor' | 'notificationsEnabled'>,
   ) => request<Profile>('/profile', { method: 'PATCH', body: JSON.stringify(profile) }),
   acceptLegal: (version: string) =>
     request('/consents/legal', { method: 'POST', body: JSON.stringify({ version }) }),

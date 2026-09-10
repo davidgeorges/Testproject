@@ -938,10 +938,6 @@ namespace SubscriptionApp.Persistence.Migrations
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)");
 
-                    b.Property<string>("BackgroundColor")
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
