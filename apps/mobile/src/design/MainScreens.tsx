@@ -48,7 +48,6 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
     ['Home', 'Accueil', 'home-outline'],
     ['Subscriptions', 'Abonnements', 'reader-outline'],
     ['Savings', 'Économies', 'water-outline'],
-    ['Premium', 'Premium', 'star-outline'],
     ['Profile', 'Profil', 'person-outline'],
   ];
   return (
