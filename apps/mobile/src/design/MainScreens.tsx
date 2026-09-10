@@ -280,9 +280,9 @@ export function DashboardScreen() {
             accessibilityLabel="Voir mon profil"
             onPress={() => nav.navigate('Main', { screen: 'Profile' })}
             style={({ pressed }) => ({
-              width: 49,
-              height: 49,
-              borderRadius: 25,
+              width: 42,
+              height: 42,
+              borderRadius: 21,
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: '#8FAC9CDA',
@@ -291,7 +291,7 @@ export function DashboardScreen() {
               opacity: pressed ? 0.75 : 1,
             })}
           >
-            <Ionicons name="person-outline" size={25} color="#FFFFFF" />
+            <Ionicons name="person-outline" size={21} color="#FFFFFF" />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -299,9 +299,9 @@ export function DashboardScreen() {
             onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
             style={({ pressed }) => ({
               flex: 1,
-              minHeight: 49,
-              borderRadius: 25,
-              paddingHorizontal: 17,
+              minHeight: 42,
+              borderRadius: 21,
+              paddingHorizontal: 15,
               flexDirection: 'row',
               alignItems: 'center',
               gap: 10,
@@ -309,8 +309,8 @@ export function DashboardScreen() {
               opacity: pressed ? 0.78 : 1,
             })}
           >
-            <Ionicons name="search" size={25} color="#FFFFFF" />
-            <Label style={{ fontSize: 17, color: '#FFFFFF', fontWeight: '500' }}>Rechercher</Label>
+            <Ionicons name="search" size={21} color="#FFFFFF" />
+            <Label style={{ fontSize: 15, color: '#FFFFFF', fontWeight: '500' }}>Rechercher</Label>
           </Pressable>
         </View>
 
