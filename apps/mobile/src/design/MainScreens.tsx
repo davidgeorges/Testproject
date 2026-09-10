@@ -38,7 +38,6 @@ export function useNav() {
 export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
-  const floatingHome = active === 'Home';
   const glassTheme =
     active === 'Home' ||
     active === 'Subscriptions' ||
@@ -55,19 +54,18 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
     <View
       style={{
         flexDirection: 'row',
-        backgroundColor: floatingHome ? '#363E47F2' : glassTheme ? '#05090D' : c.background,
-        borderTopWidth: floatingHome ? 0 : 1,
-        borderWidth: floatingHome ? 1 : 0,
-        borderColor: floatingHome ? '#DDE5EA2E' : glassTheme ? '#202A33' : c.border,
-        paddingTop: floatingHome ? 5 : 6,
-        paddingBottom: floatingHome ? 5 : glassTheme ? 4 : 7,
-        paddingHorizontal: floatingHome ? 6 : glassTheme ? 8 : 0,
-        marginHorizontal: floatingHome ? 16 : 0,
-        marginBottom: floatingHome ? 9 : 0,
-        borderRadius: floatingHome ? 30 : 0,
-        shadowColor: floatingHome ? '#000000' : 'transparent',
-        shadowOpacity: floatingHome ? 0.42 : 0,
-        shadowRadius: floatingHome ? 18 : 0,
+        backgroundColor: glassTheme ? '#555D66F2' : c.background,
+        borderTopWidth: glassTheme ? 0 : 1,
+        borderWidth: glassTheme ? 1 : 0,
+        borderColor: glassTheme ? '#EEF3F526' : c.border,
+        paddingVertical: glassTheme ? 4 : 6,
+        paddingHorizontal: glassTheme ? 5 : 0,
+        marginHorizontal: glassTheme ? 15 : 0,
+        marginBottom: glassTheme ? 9 : 0,
+        borderRadius: glassTheme ? 31 : 0,
+        shadowColor: glassTheme ? '#000000' : 'transparent',
+        shadowOpacity: glassTheme ? 0.44 : 0,
+        shadowRadius: glassTheme ? 18 : 0,
         shadowOffset: { width: 0, height: 8 },
       }}
     >
@@ -80,28 +78,23 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           onPress={() => nav.navigate('Main', { screen: key })}
           style={({ pressed }) => ({
             flex: 1,
-            minHeight: floatingHome ? 51 : 46,
+            minHeight: glassTheme ? 55 : 46,
             alignItems: 'center',
             justifyContent: 'center',
             gap: 3,
-            borderRadius: floatingHome ? 24 : 16,
+            borderRadius: glassTheme ? 27 : 16,
             opacity: pressed ? 0.72 : 1,
-            backgroundColor:
-              glassTheme && key === active
-                ? floatingHome
-                  ? '#FFFFFF1C'
-                  : '#151C23'
-                : 'transparent',
+            backgroundColor: glassTheme && key === active ? '#868D95A3' : 'transparent',
           })}
         >
           <Ionicons
             name={active === key && key === 'Home' ? 'home' : icon}
-            size={glassTheme ? 23 : 21}
+            size={glassTheme ? 22 : 21}
             color={
               glassTheme
                 ? key === active
                   ? '#FFFFFF'
-                  : '#778293'
+                  : '#D1D5DA'
                 : key === active
                   ? '#1888FF'
                   : c.muted
@@ -115,7 +108,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
               color: glassTheme
                 ? key === active
                   ? '#FFFFFF'
-                  : '#778293'
+                  : '#D1D5DA'
                 : key === active
                   ? '#1888FF'
                   : c.muted,
