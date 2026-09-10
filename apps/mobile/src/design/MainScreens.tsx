@@ -948,7 +948,7 @@ export function SubscriptionDetail() {
               </View>
             </LinearGradient>
             <LinearGradient
-              colors={['#111820', '#080D12']}
+              colors={['#4B5966D4', '#354451D4']}
               style={{
                 borderRadius: 22,
                 borderWidth: 1,
@@ -1002,7 +1002,7 @@ export function SubscriptionDetail() {
               ))}
             </LinearGradient>
             <LinearGradient
-              colors={['#111820', '#080D12']}
+              colors={['#4B5966D4', '#354451D4']}
               style={{
                 borderRadius: 22,
                 borderWidth: 1,
@@ -1062,7 +1062,7 @@ export function SubscriptionDetail() {
               style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
             >
               <LinearGradient
-                colors={['#111820', '#080D12']}
+                colors={['#4B5966D4', '#354451D4']}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1598,7 +1598,7 @@ export function RecommendationDetail() {
       ) : (
         <>
           <LinearGradient
-            colors={['#111820', '#080D12']}
+            colors={['#4B5966D4', '#354451D4']}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -1649,7 +1649,7 @@ export function RecommendationDetail() {
             Votre situation actuelle
           </Label>
           <LinearGradient
-            colors={['#111820', '#080D12']}
+            colors={['#4B5966D4', '#354451D4']}
             style={{
               borderRadius: 21,
               borderWidth: 1,
@@ -1771,7 +1771,7 @@ export function RecommendationDetail() {
             </View>
           </LinearGradient>
           <LinearGradient
-            colors={['#111820', '#080D12']}
+            colors={['#4B5966D4', '#354451D4']}
             style={{
               gap: 5,
               padding: 13,

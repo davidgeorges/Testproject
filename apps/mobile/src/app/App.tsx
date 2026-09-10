@@ -226,11 +226,9 @@ function Navigator({ onChange }: { onChange: () => void }) {
                 height: 44,
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: ['Subscription', 'Recommendation', 'Login', 'Register'].includes(
-                  route.name,
-                )
-                  ? '#020609'
-                  : c.background,
+                backgroundColor: '#263541',
+                borderBottomWidth: 1,
+                borderBottomColor: '#E9EFF224',
                 paddingHorizontal: 6,
               }}
             >

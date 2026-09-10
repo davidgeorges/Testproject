@@ -99,7 +99,7 @@ export function Welcome() {
 
   return (
     <LinearGradient
-      colors={['#020609', '#07100E', '#020609']}
+      colors={['#02060C', '#0B1420', '#182432']}
       locations={[0, 0.55, 1]}
       style={{ flex: 1 }}
     >
@@ -458,7 +458,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
   }
   return (
     <LinearGradient
-      colors={['#020609', '#07100E', '#020609']}
+      colors={['#02060C', '#0B1420', '#182432']}
       locations={[0, 0.52, 1]}
       style={{ flex: 1 }}
     >
@@ -499,7 +499,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
         >
           <View style={{ alignItems: 'center', gap: 14 }}>
             <LinearGradient
-              colors={['#283138', '#11181E', '#080D11']}
+              colors={['#5A6672', '#3C4A57', '#263541']}
               style={{
                 width: 66,
                 height: 66,
@@ -537,7 +537,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
           </View>
 
           <LinearGradient
-            colors={['#151D23E8', '#0A1015F2']}
+            colors={['#4B5966E8', '#354451F0']}
             style={{
               gap: register ? 13 : 15,
               padding: 17,
@@ -680,10 +680,10 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                 style={({ pressed }) => ({
                   opacity: pressed || authBusy ? 0.7 : 1,
                   height: 52,
-                  borderColor: '#34414B',
+                  borderColor: '#E9EFF238',
                   borderWidth: 1,
                   borderRadius: 16,
-                  backgroundColor: '#111920CC',
+                  backgroundColor: '#4B5966CC',
                   flexDirection: 'row',
                   gap: 10,
                   alignItems: 'center',

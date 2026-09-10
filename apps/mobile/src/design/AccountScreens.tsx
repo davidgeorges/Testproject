@@ -47,18 +47,16 @@ function Row({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        minHeight: 65,
-        borderBottomWidth: 0.5,
-        borderColor: c.border,
+        minHeight: 61,
+        borderBottomWidth: 1,
+        borderColor: '#DDE5EA24',
         paddingVertical: 8,
         paddingHorizontal: 10,
-        backgroundColor: c.surface,
-        borderRadius: 10,
-        marginBottom: 5,
+        backgroundColor: 'transparent',
       }}
     >
       <LinearGradient
-        colors={[color, color]}
+        colors={color === '#0877FF' ? ['#465665', '#34424F'] : [color, color]}
         style={{
           width: 35,
           height: 35,
@@ -541,7 +539,7 @@ export function PremiumScreen() {
   });
   const premium = status.data?.isPremium === true;
   return (
-    <LinearGradient colors={['#020609', '#07100E', '#020609']} style={{ flex: 1 }}>
+    <LinearGradient colors={['#02060C', '#0B1420', '#182432']} style={{ flex: 1 }}>
       <Page
         fill
         transparent
@@ -596,7 +594,7 @@ export function PremiumScreen() {
           </Label>
         </LinearGradient>
         <LinearGradient
-          colors={['#111820', '#080D12']}
+          colors={['#4B5966D4', '#354451D4']}
           style={{
             gap: 0,
             paddingHorizontal: 14,

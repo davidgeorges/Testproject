@@ -6,6 +6,7 @@ import {
   Text,
   View,
   Image,
+  ImageBackground,
   TextInput,
   type ViewStyle,
   type TextStyle,
@@ -56,11 +57,11 @@ export function Page({
   scrollEventThrottle?: number;
 }>) {
   const c = useColors();
-  return (
+  const content = (
     <ScrollView
       style={{
         flex: 1,
-        backgroundColor: transparent ? 'transparent' : (backgroundColor ?? c.background),
+        backgroundColor: 'transparent',
       }}
       contentContainerStyle={[
         { padding: 20, paddingTop: 16, paddingBottom: 24, gap: 16, flexGrow: fill ? 1 : undefined },
@@ -74,16 +75,38 @@ export function Page({
       {children}
     </ScrollView>
   );
+  if (transparent) return content;
+  return (
+    <ImageBackground
+      source={require('../../assets/home-fabric.png')}
+      resizeMode="cover"
+      imageStyle={{ opacity: 0.96 }}
+      style={{ flex: 1, backgroundColor: backgroundColor ?? c.background }}
+    >
+      <LinearGradient
+        pointerEvents="none"
+        colors={['#02060CE8', '#0B14205C', '#182432ED']}
+        locations={[0, 0.46, 1]}
+        style={{ position: 'absolute', inset: 0 }}
+      />
+      {content}
+    </ImageBackground>
+  );
 }
 export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
   const c = useColors();
+  const dark = useSession((s) => s.theme) === 'dark';
   return (
     <LinearGradient
-      colors={
-        useSession((s) => s.theme) === 'dark' ? ['#14212E', '#0C1722'] : [c.surface, c.surface]
-      }
+      colors={dark ? ['#4B5966E0', '#354451E0'] : [c.surface, c.surface]}
       style={[
-        { borderRadius: 13, padding: 14, gap: 8, borderWidth: 1, borderColor: c.border },
+        {
+          borderRadius: 23,
+          padding: 14,
+          gap: 8,
+          borderWidth: 1,
+          borderColor: dark ? '#E9EFF238' : c.border,
+        },
         style,
       ]}
     >
@@ -115,7 +138,7 @@ export function Button({
       accessibilityState={{ disabled: disabled || loading }}
       style={({ pressed }) => ({
         opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
-        shadowColor: secondary ? 'transparent' : '#0066FF',
+        shadowColor: secondary ? 'transparent' : '#000000',
         shadowOffset: { width: 0, height: 3 },
         shadowRadius: 12,
         shadowOpacity: 0.35,
@@ -126,17 +149,17 @@ export function Button({
           danger
             ? ['#2B1720', '#1A111B']
             : secondary
-              ? [c.elevated, c.surface]
-              : ['#087BFF', '#0754FF']
+              ? ['#4B5966E0', '#354451E0']
+              : ['#7D8A96', '#53616E']
         }
         style={{
-          borderRadius: 12,
+          borderRadius: 20,
           minHeight: 48,
           alignItems: 'center',
           justifyContent: 'center',
           padding: 12,
           borderWidth: 1,
-          borderColor: secondary ? c.border : danger ? '#EF444430' : '#3981FF',
+          borderColor: secondary ? '#E9EFF238' : danger ? '#EF444430' : '#DDE6EC4D',
         }}
       >
         {loading ? (
@@ -264,9 +287,9 @@ export function Field({
           flexDirection: 'row',
           alignItems: 'center',
           borderWidth: 1,
-          borderColor: c.border,
-          borderRadius: 11,
-          backgroundColor: c.surface,
+          borderColor: '#E9EFF238',
+          borderRadius: 20,
+          backgroundColor: '#4B5966C7',
         }}
       >
         <TextInput
@@ -307,7 +330,7 @@ export function Search({
         alignItems: 'center',
         gap: 8,
         paddingHorizontal: 12,
-        backgroundColor: c.elevated,
+        backgroundColor: '#5B6068D9',
         borderRadius: 20,
       }}
     >
@@ -344,7 +367,9 @@ export function Chips({
           style={{ flex: 1, minHeight: 36, justifyContent: 'center' }}
         >
           <LinearGradient
-            colors={value === item ? ['#4584FF', '#1552FF'] : [c.elevated, c.surface]}
+            colors={
+              value === item ? ['#7E8995', '#65717D'] : ['#4B5966D4', '#354451D4']
+            }
             style={{
               borderRadius: 20,
               paddingVertical: 7,
