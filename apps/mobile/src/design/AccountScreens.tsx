@@ -409,6 +409,8 @@ const paletteColors = [
   '#8B5CF6',
   '#EC4899',
 ];
+const ORIGINAL_THEME = 'dark' as const;
+const ORIGINAL_THEME_ACCENT = '#FFD900';
 
 function ColorPickerControl({
   value,
@@ -622,6 +624,43 @@ export function SettingsScreen() {
       setMessage(error.message);
     },
   });
+  const resetAppearance = useMutation({
+    mutationFn: async () => {
+      if (!token || !q.data)
+        throw new Error('Votre profil doit être chargé avant la réinitialisation.');
+      return api.saveProfile({
+        ...q.data,
+        theme: ORIGINAL_THEME,
+        accentColor: ORIGINAL_THEME_ACCENT,
+      });
+    },
+    onMutate: () => {
+      const previous = {
+        theme: useSession.getState().theme,
+        accentColor: useSession.getState().accentColor,
+      };
+      useSession.getState().setTheme(ORIGINAL_THEME);
+      useSession.getState().setAccentColor(ORIGINAL_THEME_ACCENT);
+      setCustomAccent(ORIGINAL_THEME_ACCENT);
+      return previous;
+    },
+    onSuccess: (profile) => {
+      useSession.getState().setTheme(profile.theme);
+      useSession
+        .getState()
+        .setAccentColor(normalizeAccentColor(profile.accentColor) ?? ORIGINAL_THEME_ACCENT);
+      cache.setQueryData(['profile', token], profile);
+      setMessage('Thème d’origine jaune restauré.');
+    },
+    onError: (error, _variables, previous) => {
+      if (previous) {
+        useSession.getState().setTheme(previous.theme);
+        useSession.getState().setAccentColor(previous.accentColor);
+        setCustomAccent(previous.accentColor);
+      }
+      setMessage(error.message);
+    },
+  });
   const applyCustomAccent = () => {
     const normalized = normalizeAccentColor(customAccent);
     if (!normalized) {
@@ -695,6 +734,12 @@ export function SettingsScreen() {
                 {saveAccent.isPending ? 'Enregistrement…' : 'Appliquer'}
               </Label>
             </Pressable>
+            <Button
+              title="Réinitialiser le thème d’origine"
+              secondary
+              loading={resetAppearance.isPending}
+              onPress={() => resetAppearance.mutate()}
+            />
           </View>
           <Pressable
             accessibilityRole="button"
