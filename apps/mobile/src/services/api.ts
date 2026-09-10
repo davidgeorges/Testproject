@@ -24,18 +24,21 @@ export class ApiError extends Error {
   }
 }
 export const idempotencyKey = () => `request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+type ApiRequestInit = RequestInit & { timeoutMs?: number };
+
+async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
   const token = useSession.getState().token;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const { timeoutMs = 15000, ...requestInit } = init;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${API_URL}/api/v1${path}`, {
-      ...init,
+      ...requestInit,
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init.headers,
+        ...requestInit.headers,
       },
     });
     if (!response.ok) {
@@ -90,6 +93,7 @@ export const api = {
   completeTink: (code: string, credentialsId: string | null, state: string | null, key: string) =>
     request<Connection>('/bank/tink/callback', {
       method: 'POST',
+      timeoutMs: 60000,
       headers: { 'Idempotency-Key': key },
       body: JSON.stringify({ code, credentialsId, state }),
     }),
