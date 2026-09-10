@@ -54,9 +54,7 @@ async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
     return (await response.json()) as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new Error(
-      'Connexion impossible. Vérifiez votre réseau et que le serveur local est démarré.',
-    );
+    throw new Error('Connexion au service impossible. Vérifiez votre réseau puis réessayez.');
   } finally {
     clearTimeout(timeout);
   }
