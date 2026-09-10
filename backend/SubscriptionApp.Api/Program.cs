@@ -918,6 +918,9 @@ api.MapPut(
             return Results.BadRequest(new { code = "INVALID_CATEGORY", message = "Cette catégorie n’est pas reconnue.", correlationId = c.TraceIdentifier });
         if (request.MonthlyLimit <= 0 || request.MonthlyLimit > 1_000_000)
             return Results.BadRequest(new { code = "INVALID_BUDGET", message = "Le budget mensuel doit être supérieur à zéro.", correlationId = c.TraceIdentifier });
+        var displayName = request.DisplayName?.Trim();
+        if (displayName?.Length > 60)
+            return Results.BadRequest(new { code = "INVALID_BUDGET_NAME", message = "L’intitulé ne peut pas dépasser 60 caractères.", correlationId = c.TraceIdentifier });
         var categoryType = request.CategoryType?.Trim().ToLowerInvariant();
         if (categoryType is not ("fixed" or "variable")) categoryType = FinanceCategories.DefaultType(normalizedCategory);
         var now = time.GetUtcNow();
@@ -927,6 +930,7 @@ api.MapPut(
             Id = existing?.Id ?? Guid.NewGuid(),
             UserId = User(c),
             Category = normalizedCategory,
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName,
             MonthlyLimit = decimal.Round(request.MonthlyLimit, 2),
             CategoryType = categoryType,
             CreatedAt = existing?.CreatedAt ?? now,
@@ -1731,7 +1735,7 @@ public sealed record ProfileRequest(
 );
 
 public sealed record SubscriptionPreferenceRequest(string? Category, string Status);
-public sealed record CategoryBudgetRequest(decimal MonthlyLimit, string? CategoryType);
+public sealed record CategoryBudgetRequest(decimal MonthlyLimit, string? CategoryType, string? DisplayName = null);
 public sealed record TransactionCategoryRequest(string Category);
 
 public sealed record OfferRequest(

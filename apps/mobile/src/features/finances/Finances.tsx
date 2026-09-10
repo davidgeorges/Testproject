@@ -258,15 +258,18 @@ export function FinancesScreen() {
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [excludeInternalTransfers, setExcludeInternalTransfers] = useState(true);
-  const [editingBudget, setEditingBudget] = useState<{ category: string; value: string } | null>(
-    null,
-  );
+  const [editingBudget, setEditingBudget] = useState<{
+    category: string;
+    value: string;
+    displayName: string;
+  } | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [budgetsOpen, setBudgetsOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [creatingBudget, setCreatingBudget] = useState(false);
   const [newBudgetCategory, setNewBudgetCategory] = useState('');
+  const [newBudgetName, setNewBudgetName] = useState('');
   const [newBudgetValue, setNewBudgetValue] = useState('');
   const [newBudgetType, setNewBudgetType] = useState<FinanceCategoryType>('variable');
 
@@ -326,15 +329,18 @@ export function FinancesScreen() {
       categoryId,
       amount,
       type,
+      displayName,
     }: {
       categoryId: string;
       amount: number;
       type: FinanceCategoryType;
-    }) => api.saveFinanceBudget(categoryId, amount, type),
+      displayName?: string | null;
+    }) => api.saveFinanceBudget(categoryId, amount, type, displayName),
     onSuccess: async () => {
       setEditingBudget(null);
       setCreatingBudget(false);
       setNewBudgetCategory('');
+      setNewBudgetName('');
       setNewBudgetValue('');
       await refreshFinance();
     },
@@ -1321,7 +1327,7 @@ export function FinancesScreen() {
                   </View>
                   <View style={{ gap: 7 }}>
                     <Label muted style={{ fontSize: 11 }}>
-                      Intitulé
+                      Catégorie
                     </Label>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
                       {availableBudgetCategories.map((item) => (
@@ -1337,6 +1343,24 @@ export function FinancesScreen() {
                       ))}
                     </View>
                   </View>
+                  <TextInput
+                    accessibilityLabel="Intitulé personnalisé du budget"
+                    value={newBudgetName}
+                    maxLength={60}
+                    onChangeText={setNewBudgetName}
+                    placeholder="Intitulé personnalisé (facultatif)"
+                    placeholderTextColor={pageColors.muted}
+                    style={{
+                      minHeight: 44,
+                      borderRadius: 13,
+                      borderWidth: 1,
+                      borderColor: pageColors.separator,
+                      backgroundColor: pageColors.elevated,
+                      color: pageColors.text,
+                      paddingHorizontal: 12,
+                      fontWeight: '700',
+                    }}
+                  />
                   <TextInput
                     accessibilityLabel="Montant mensuel du budget"
                     value={newBudgetValue}
@@ -1381,6 +1405,7 @@ export function FinancesScreen() {
                           categoryId: newBudgetCategory,
                           amount,
                           type: newBudgetType,
+                          displayName: newBudgetName.trim() || null,
                         });
                     }}
                     style={({ pressed }) => ({
@@ -1433,11 +1458,12 @@ export function FinancesScreen() {
                 const progress = limit ? Math.min((spent / limit) * 100, 100) : 0;
                 const status = summary?.status ?? 'unset';
                 const type = budget.categoryType;
+                const displayName = budget.displayName?.trim() || definition.label;
                 return (
                   <Card key={budget.id} style={{ gap: 8 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <View style={{ flex: 1 }}>
-                        <Label style={{ fontWeight: '800' }}>{definition.label}</Label>
+                        <Label style={{ fontWeight: '800' }}>{displayName}</Label>
                         <Label muted style={{ fontSize: 10 }}>
                           {type === 'fixed' ? 'Fixe' : 'Variable'} · {money(spent)} dépensés
                         </Label>
@@ -1447,6 +1473,7 @@ export function FinancesScreen() {
                           setEditingBudget({
                             category: definition.id,
                             value: String(budget.monthlyLimit),
+                            displayName: budget.displayName ?? '',
                           })
                         }
                       >
@@ -1478,13 +1505,30 @@ export function FinancesScreen() {
                     </View>
                     {editingBudget?.category === definition.id ? (
                       <View style={{ gap: 8 }}>
+                        <TextInput
+                          accessibilityLabel={`Intitulé du budget ${displayName}`}
+                          value={editingBudget.displayName}
+                          maxLength={60}
+                          onChangeText={(value) =>
+                            setEditingBudget({ ...editingBudget, displayName: value })
+                          }
+                          placeholder={`Intitulé (par défaut : ${definition.label})`}
+                          placeholderTextColor={pageColors.muted}
+                          style={{
+                            minHeight: 42,
+                            borderRadius: 12,
+                            backgroundColor: pageColors.elevated,
+                            color: pageColors.text,
+                            paddingHorizontal: 11,
+                          }}
+                        />
                         <View style={{ flexDirection: 'row', gap: 7 }}>
                           <TextInput
                             autoFocus
                             value={editingBudget.value}
                             keyboardType="decimal-pad"
                             onChangeText={(value) =>
-                              setEditingBudget({ category: definition.id, value: numeric(value) })
+                              setEditingBudget({ ...editingBudget, value: numeric(value) })
                             }
                             placeholder="Budget mensuel"
                             placeholderTextColor={pageColors.muted}
@@ -1501,7 +1545,12 @@ export function FinancesScreen() {
                             onPress={() => {
                               const amount = Number(editingBudget.value);
                               if (Number.isFinite(amount) && amount > 0)
-                                saveBudget.mutate({ categoryId: definition.id, amount, type });
+                                saveBudget.mutate({
+                                  categoryId: definition.id,
+                                  amount,
+                                  type,
+                                  displayName: editingBudget.displayName.trim() || null,
+                                });
                             }}
                             style={{
                               minWidth: 52,
@@ -1523,6 +1572,7 @@ export function FinancesScreen() {
                                 categoryId: definition.id,
                                 amount: budget.monthlyLimit,
                                 type: 'fixed',
+                                displayName: budget.displayName,
                               })
                             }
                           />
@@ -1534,6 +1584,7 @@ export function FinancesScreen() {
                                 categoryId: definition.id,
                                 amount: budget.monthlyLimit,
                                 type: 'variable',
+                                displayName: budget.displayName,
                               })
                             }
                           />

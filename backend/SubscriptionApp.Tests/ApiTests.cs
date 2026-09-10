@@ -198,9 +198,11 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var budgetResponse = await c.PutAsJsonAsync(
             "/api/v1/finances/budgets/abonnements",
-            new { monthlyLimit = 100m, categoryType = "fixed" }
+            new { monthlyLimit = 100m, categoryType = "fixed", displayName = "Streaming familial" }
         );
         budgetResponse.EnsureSuccessStatusCode();
+        var savedBudget = await budgetResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Streaming familial", savedBudget.GetProperty("displayName").GetString());
 
         var rows = await c.GetFromJsonAsync<JsonElement>("/api/v1/finances/transactions?limit=10");
         var first = rows.GetProperty("items")[0];
@@ -218,6 +220,11 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var overview = await c.GetFromJsonAsync<JsonElement>("/api/v1/finances/overview");
         Assert.Equal(100m, overview.GetProperty("monthlyBudget").GetDecimal());
         Assert.True(overview.GetProperty("transactionCount").GetInt32() > 0);
+        Assert.Contains(
+            overview.GetProperty("categories").EnumerateArray(),
+            item => item.GetProperty("category").GetString() == "abonnements"
+                && item.GetProperty("label").GetString() == "Streaming familial"
+        );
 
         var csv = await c.GetStringAsync("/api/v1/finances/export.csv");
         Assert.Contains("Date;Type;Montant", csv);

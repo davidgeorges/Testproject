@@ -91,6 +91,7 @@ export interface FinanceTransaction extends BankTransaction {
 export interface CategoryBudget {
   id: string;
   category: string;
+  displayName: string | null;
   monthlyLimit: number;
   categoryType: FinanceCategoryType;
   createdAt: string;

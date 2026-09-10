@@ -20,7 +20,7 @@ public sealed class FinanceServiceTests
         var transfer = new BankTransaction { UserId = userId, ConnectionId = connection.Id, ExternalId = "move", AccountKey = "main", BookedAt = new(2026, 9, 4), Amount = -300, MerchantName = "Virement interne", Category = "other", Currency = "EUR", IsInternalTransfer = true };
         await store.Synchronize(connection, [rent, groceries, transfer], default);
         await store.SaveTransactionCategoryRule(new() { UserId = userId, TransactionId = rent.Id, Category = "logement" }, default);
-        await store.SaveCategoryBudget(new() { UserId = userId, Category = "logement", MonthlyLimit = 850, CategoryType = "fixed" }, default);
+        await store.SaveCategoryBudget(new() { UserId = userId, Category = "logement", DisplayName = "Maison", MonthlyLimit = 850, CategoryType = "fixed" }, default);
         await store.SaveCategoryBudget(new() { UserId = userId, Category = "courses", MonthlyLimit = 300, CategoryType = "variable" }, default);
 
         var service = new FinanceService(store, new FixedTimeProvider(new DateTimeOffset(2026, 9, 10, 12, 0, 0, TimeSpan.Zero)));
@@ -30,7 +30,7 @@ public sealed class FinanceServiceTests
         Assert.Equal(900, overview.FixedExpense);
         Assert.Equal(120, overview.VariableExpense);
         Assert.Equal(1150, overview.MonthlyBudget);
-        Assert.Contains(overview.Categories, category => category.Category == "logement" && category.Status == "exceeded");
+        Assert.Contains(overview.Categories, category => category.Category == "logement" && category.Label == "Maison" && category.Status == "exceeded");
         Assert.DoesNotContain(overview.Categories, category => category.Category == "transfert");
     }
 

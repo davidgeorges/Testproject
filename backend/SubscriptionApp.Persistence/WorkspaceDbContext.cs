@@ -174,6 +174,9 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
             .Property(budget => budget.MonthlyLimit)
             .HasPrecision(18, 2);
         b.Entity<CategoryBudget>()
+            .Property(budget => budget.DisplayName)
+            .HasMaxLength(60);
+        b.Entity<CategoryBudget>()
             .HasOne<UserProfile>()
             .WithMany()
             .HasForeignKey(budget => budget.UserId)

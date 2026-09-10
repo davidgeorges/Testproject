@@ -121,10 +121,15 @@ export const api = {
       `/finances/transactions${financeQuery({ ...filters })}${financeQuery(filters) ? '&' : '?'}limit=${limit}`,
     ),
   financeBudgets: () => request<CategoryBudget[]>('/finances/budgets'),
-  saveFinanceBudget: (category: string, monthlyLimit: number, categoryType: 'fixed' | 'variable') =>
+  saveFinanceBudget: (
+    category: string,
+    monthlyLimit: number,
+    categoryType: 'fixed' | 'variable',
+    displayName?: string | null,
+  ) =>
     request<CategoryBudget>(`/finances/budgets/${encodeURIComponent(category)}`, {
       method: 'PUT',
-      body: JSON.stringify({ monthlyLimit, categoryType }),
+      body: JSON.stringify({ monthlyLimit, categoryType, displayName }),
     }),
   deleteFinanceBudget: (category: string) =>
     request(`/finances/budgets/${encodeURIComponent(category)}`, { method: 'DELETE' }),

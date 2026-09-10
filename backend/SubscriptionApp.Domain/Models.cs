@@ -55,6 +55,7 @@ public sealed class CategoryBudget
     public Guid Id { get; set; } = Guid.NewGuid();
     public string UserId { get; set; } = "";
     public string Category { get; set; } = "";
+    public string? DisplayName { get; set; }
     public decimal MonthlyLimit { get; set; }
     public string CategoryType { get; set; } = "variable";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -218,7 +218,7 @@ public sealed class FinanceService(IWorkspaceStore store, TimeProvider time)
                 var remaining = periodLimit - expense;
                 var status = periodLimit is null ? "unset" : expense > periodLimit ? "exceeded" : expense >= periodLimit * .85m ? "near" : "ok";
                 return new FinanceCategorySummary(
-                    category, FinanceCategories.Label(category), income, expense, group.Length,
+                    category, budget?.DisplayName ?? FinanceCategories.Label(category), income, expense, group.Length,
                     budget?.CategoryType ?? FinanceCategories.DefaultType(category), budget?.MonthlyLimit,
                     periodLimit, remaining, status
                 );
