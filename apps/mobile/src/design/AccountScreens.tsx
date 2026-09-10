@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Pressable, Switch, Share, Modal, ImageBackground, Animated } from 'react-native';
+import {
+  View,
+  Pressable,
+  Switch,
+  Share,
+  Modal,
+  ImageBackground,
+  Animated,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -388,7 +397,9 @@ export function ProfileScreen() {
     </ImageBackground>
   );
 }
-const accentChoices = [
+const paletteColors = [
+  '#0B0B0F',
+  '#FFFFFF',
   '#70737A',
   '#6D5CE7',
   '#2F76D2',
@@ -397,9 +408,6 @@ const accentChoices = [
   '#C56A32',
   '#C45C7A',
   '#B84C4C',
-];
-const backgroundChoices = [
-  '#0B0B0F',
   '#111827',
   '#15202B',
   '#1A1630',
@@ -407,7 +415,142 @@ const backgroundChoices = [
   '#2A1812',
   '#2B1B24',
   '#222222',
+  '#EF4444',
+  '#F97316',
+  '#EAB308',
+  '#22C55E',
+  '#06B6D4',
+  '#3B82F6',
+  '#8B5CF6',
+  '#EC4899',
 ];
+
+function ColorPickerControl({
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const c = useColors();
+  const [open, setOpen] = useState(false);
+  const webPicker =
+    Platform.OS === 'web'
+      ? React.createElement('input', {
+          type: 'color',
+          value,
+          disabled,
+          'aria-label': label,
+          onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+            onChange(event.target.value.toUpperCase()),
+          style: {
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            opacity: 0,
+            cursor: disabled ? 'default' : 'pointer',
+          },
+        })
+      : null;
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        disabled={disabled}
+        onPress={Platform.OS === 'web' ? undefined : () => setOpen(true)}
+        style={({ pressed }) => ({
+          minHeight: 48,
+          borderRadius: 15,
+          borderWidth: 1,
+          borderColor: c.border,
+          backgroundColor: '#FFFFFF0D',
+          paddingHorizontal: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          opacity: pressed || disabled ? 0.65 : 1,
+          overflow: 'hidden',
+        })}
+      >
+        <View
+          style={{
+            width: 54,
+            height: 28,
+            borderRadius: 8,
+            backgroundColor: value,
+            borderWidth: 1,
+            borderColor: '#FFFFFF38',
+          }}
+        />
+        <Label style={{ flex: 1, fontSize: 13, fontWeight: '700' }}>Ouvrir la palette</Label>
+        <Ionicons name="color-palette-outline" size={20} color={c.muted} />
+        {webPicker}
+      </Pressable>
+      {Platform.OS !== 'web' ? (
+        <Modal
+          visible={open}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOpen(false)}
+        >
+          <Pressable
+            onPress={() => setOpen(false)}
+            style={{
+              flex: 1,
+              backgroundColor: '#000000AA',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+            }}
+          >
+            <Pressable
+              onPress={() => undefined}
+              style={{
+                width: '100%',
+                maxWidth: 360,
+                padding: 18,
+                borderRadius: 22,
+                backgroundColor: c.surface,
+                gap: 15,
+              }}
+            >
+              <Label style={{ fontSize: 18, fontWeight: '800' }}>{label}</Label>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {paletteColors.map((color) => (
+                  <Pressable
+                    key={color}
+                    accessibilityLabel={color}
+                    onPress={() => {
+                      onChange(color);
+                      setOpen(false);
+                    }}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 9,
+                      backgroundColor: color,
+                      borderWidth: color === value ? 3 : 1,
+                      borderColor: color === value ? c.text : c.border,
+                    }}
+                  />
+                ))}
+              </View>
+              <Label muted style={{ fontSize: 12 }}>
+                Vous pouvez aussi saisir une valeur hexadécimale dans le champ prévu.
+              </Label>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+    </>
+  );
+}
 
 export function SettingsScreen() {
   const nav = useNav();
@@ -579,36 +722,12 @@ export function SettingsScreen() {
                 {accentColor}
               </Label>
             </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 11 }}>
-              {accentChoices.map((color) => {
-                const selected = color === accentColor;
-                return (
-                  <Pressable
-                    key={color}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Choisir la couleur ${color}`}
-                    accessibilityState={{ selected }}
-                    disabled={saveAccent.isPending}
-                    onPress={() => saveAccent.mutate(color)}
-                    style={({ pressed }) => ({
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      backgroundColor: color,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: selected ? 3 : 1,
-                      borderColor: selected ? c.text : c.border,
-                      opacity: pressed || saveAccent.isPending ? 0.65 : 1,
-                    })}
-                  >
-                    {selected ? (
-                      <Ionicons name="checkmark" size={18} color={accentTextColor(color)} />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
+            <ColorPickerControl
+              label="Palette de la couleur d’accent"
+              value={normalizeAccentColor(customAccent) ?? accentColor}
+              onChange={setCustomAccent}
+              disabled={saveAccent.isPending}
+            />
             <Field
               label="Couleur personnalisée"
               placeholder="#70737A"
@@ -646,36 +765,12 @@ export function SettingsScreen() {
                 {resolvedBackground}
               </Label>
             </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 11 }}>
-              {backgroundChoices.map((color) => {
-                const selected = color === resolvedBackground;
-                return (
-                  <Pressable
-                    key={color}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Choisir le fond ${color}`}
-                    accessibilityState={{ selected }}
-                    disabled={saveBackground.isPending}
-                    onPress={() => saveBackground.mutate(color)}
-                    style={({ pressed }) => ({
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      backgroundColor: color,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: selected ? 3 : 1,
-                      borderColor: selected ? c.text : c.border,
-                      opacity: pressed || saveBackground.isPending ? 0.65 : 1,
-                    })}
-                  >
-                    {selected ? (
-                      <Ionicons name="checkmark" size={18} color={accentTextColor(color)} />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
+            <ColorPickerControl
+              label="Palette du fond de l’application"
+              value={normalizeAccentColor(customBackground) ?? resolvedBackground}
+              onChange={setCustomBackground}
+              disabled={saveBackground.isPending}
+            />
             <Field
               label="Fond personnalisé"
               placeholder="#0B0B0F"
