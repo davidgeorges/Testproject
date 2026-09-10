@@ -542,15 +542,29 @@ app.MapPost("/api/v1/webhooks/tink", async (HttpContext c, IConfiguration config
     var bearerValid = supplied.Length == expected.Length
         && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes(expected));
     var signatureValid = false;
-    var signature = c.Request.Headers["X-Tink-Signature"].ToString();
-    try
+    var signatureHeader = c.Request.Headers["X-Tink-Signature"].ToString();
+    var signatureParts = signatureHeader.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .Select(part => part.Split('=', 2))
+        .Where(part => part.Length == 2)
+        .ToArray();
+    var timestampText = signatureParts.FirstOrDefault(part => part[0] == "t")?[1];
+    var signatureText = signatureParts.FirstOrDefault(part => part[0] == "v1")?[1];
+    if (timestampText is not null && signatureText is not null && long.TryParse(timestampText, out var timestamp))
     {
-        var suppliedSignature = Convert.FromHexString(signature);
-        var expectedSignature = HMACSHA256.HashData(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(rawBody));
-        signatureValid = suppliedSignature.Length == expectedSignature.Length
-            && CryptographicOperations.FixedTimeEquals(suppliedSignature, expectedSignature);
+        try
+        {
+            var age = (time.GetUtcNow() - DateTimeOffset.FromUnixTimeSeconds(timestamp)).Duration();
+            if (age <= TimeSpan.FromMinutes(10))
+            {
+                var suppliedSignature = Convert.FromHexString(signatureText);
+                var message = Encoding.UTF8.GetBytes($"{timestampText}.{rawBody}");
+                var expectedSignature = HMACSHA256.HashData(Encoding.UTF8.GetBytes(expected), message);
+                signatureValid = suppliedSignature.Length == expectedSignature.Length
+                    && CryptographicOperations.FixedTimeEquals(suppliedSignature, expectedSignature);
+            }
+        }
+        catch (ArgumentException) { }
     }
-    catch (FormatException) { }
     if (!bearerValid && !signatureValid) return Results.Unauthorized();
 
     JsonElement root;
@@ -566,7 +580,7 @@ app.MapPost("/api/v1/webhooks/tink", async (HttpContext c, IConfiguration config
                 return value.GetString();
         return null;
     }
-    var eventType = Text(root, "type", "eventType") ?? "unknown";
+    var eventType = Text(root, "event", "type", "eventType") ?? "unknown";
     var eventId = Text(root, "eventId", "id") ?? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawBody)));
     var credentialsId = Text(root, "credentialsId", "credentialId");
     if (string.IsNullOrWhiteSpace(credentialsId) && root.TryGetProperty("data", out var data))
@@ -593,7 +607,11 @@ app.MapPost("/api/v1/webhooks/tink", async (HttpContext c, IConfiguration config
             return Results.Ok(new { accepted = true, ignored = true });
         }
         var normalizedType = eventType.Trim().Replace('.', '_').Replace('-', '_').ToUpperInvariant();
-        if (normalizedType is "AUTHORIZATION_REVOKED" or "CREDENTIALS_INVALID" or "CREDENTIALS_DELETED")
+        var credentialStatus = root.TryGetProperty("content", out var eventContent)
+            ? Text(eventContent, "credentialsStatus", "status")?.Trim().ToUpperInvariant()
+            : null;
+        if (normalizedType is "AUTHORIZATION_REVOKED" or "CREDENTIALS_INVALID" or "CREDENTIALS_DELETED"
+            || credentialStatus is "AUTHENTICATION_ERROR" or "SESSION_EXPIRED")
         {
             await store.SetConnectionStatus(connection, "reconnect_required", ct);
             await store.AddNotification(new()

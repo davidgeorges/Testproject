@@ -741,18 +741,19 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         const string signingSecret = "tink-webhook-signing-secret-long-enough-for-tests";
         using var c = factory.CreateClient();
-        var raw = JsonSerializer.Serialize(new { id = $"event-{Guid.NewGuid():N}", type = "test", data = new { } });
+        var raw = JsonSerializer.Serialize(new { id = $"event-{Guid.NewGuid():N}", @event = "test", content = new { } });
         Assert.Equal(
             HttpStatusCode.Unauthorized,
             (await c.PostAsync("/api/v1/webhooks/tink", new StringContent(raw, Encoding.UTF8, "application/json"))).StatusCode
         );
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
         var signature = Convert.ToHexString(HMACSHA256.HashData(
-            Encoding.UTF8.GetBytes(signingSecret), Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+            Encoding.UTF8.GetBytes(signingSecret), Encoding.UTF8.GetBytes($"{timestamp}.{raw}"))).ToLowerInvariant();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/webhooks/tink")
         {
             Content = new StringContent(raw, Encoding.UTF8, "application/json"),
         };
-        request.Headers.TryAddWithoutValidation("X-Tink-Signature", signature);
+        request.Headers.TryAddWithoutValidation("X-Tink-Signature", $"t={timestamp},v1={signature}");
         var response = await c.SendAsync(request);
         response.EnsureSuccessStatusCode();
         Assert.True((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("test").GetBoolean());
