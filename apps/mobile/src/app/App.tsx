@@ -220,32 +220,56 @@ function Navigator({ onChange }: { onChange: () => void }) {
               : c.background,
           },
           animation: 'fade',
-          headerTransparent: route.name === 'Bank',
+          headerTransparent: true,
           header: ({ options }) => {
             const controls = (
               <>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Retour"
-                onPress={() => (nav.canGoBack() ? nav.goBack() : nav.navigate('Main'))}
-                style={({ pressed }) => ({
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: pressed ? '#87929CBF' : '#5B6874CC',
-                  borderWidth: 1,
-                  borderColor: '#EFF4F54A',
-                  opacity: pressed ? 0.78 : 1,
-                })}
-              >
-                <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
-              </Pressable>
-              <Label style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: '600' }}>
-                {options.title ?? ''}
-              </Label>
-              <View style={{ width: 34 }} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Retour"
+                  onPress={() => (nav.canGoBack() ? nav.goBack() : nav.navigate('Main'))}
+                  style={({ pressed }) => ({
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: pressed ? '#87929CBF' : '#5B6874CC',
+                    borderWidth: 1,
+                    borderColor: '#EFF4F54A',
+                    opacity: pressed ? 0.78 : 1,
+                  })}
+                >
+                  <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+                </Pressable>
+                {options.title ? (
+                  <View
+                    style={{
+                      flex: 1,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        minHeight: 30,
+                        borderRadius: 16,
+                        paddingHorizontal: 14,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#5B6874B8',
+                        borderWidth: 1,
+                        borderColor: '#EFF4F536',
+                      }}
+                    >
+                      <Label style={{ textAlign: 'center', fontSize: 13, fontWeight: '600' }}>
+                        {options.title}
+                      </Label>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ flex: 1 }} />
+                )}
+                <View style={{ width: 34 }} />
               </>
             );
             const style = {
@@ -254,19 +278,7 @@ function Navigator({ onChange }: { onChange: () => void }) {
               alignItems: 'center' as const,
               paddingHorizontal: 10,
             };
-            if (route.name === 'Bank') {
-              return <View style={style}>{controls}</View>;
-            }
-            return (
-              <LinearGradient
-                colors={['#344451F2', '#263541F2']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={style}
-              >
-                {controls}
-            </LinearGradient>
-            );
+            return <View style={style}>{controls}</View>;
           },
         })}
       >

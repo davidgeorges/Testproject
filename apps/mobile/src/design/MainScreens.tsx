@@ -889,7 +889,7 @@ export function SubscriptionDetail() {
     <ScreenWithTabs active="Subscriptions">
       <Page
         backgroundColor="#020609"
-        style={{ gap: 10, paddingHorizontal: 16, paddingTop: 3, paddingBottom: 10 }}
+        style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 10 }}
       >
         {!p ? (
           <State loading={q.isPending} error={q.error} title="Abonnement introuvable" />
@@ -1588,7 +1588,7 @@ export function RecommendationDetail() {
   return (
     <Page
       backgroundColor="#020609"
-      style={{ gap: 10, paddingHorizontal: 16, paddingTop: 3, paddingBottom: 14 }}
+      style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 14 }}
     >
       {!r ? (
         <State loading={q.isPending} error={q.error} title="Recommandation introuvable" />

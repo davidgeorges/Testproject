@@ -484,7 +484,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
         style={{
           gap: register ? 15 : 18,
           paddingHorizontal: 22,
-          paddingTop: register ? 8 : 34,
+          paddingTop: register ? 60 : 66,
           paddingBottom: 22,
         }}
       >
@@ -751,7 +751,7 @@ export function ResetPassword() {
     }
   };
   return (
-    <Page>
+    <Page style={{ paddingTop: 64 }}>
       <Label style={{ fontSize: 24, lineHeight: 31, fontWeight: '700' }}>
         Mot de passe oublié ?
       </Label>

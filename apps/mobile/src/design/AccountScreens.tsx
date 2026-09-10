@@ -436,7 +436,7 @@ export function SettingsScreen() {
       }
   };
   return (
-    <Page style={{ gap: 24 }}>
+    <Page style={{ gap: 24, paddingTop: 64 }}>
       <View style={{ gap: 8 }}>
         <Label style={{ fontWeight: '700', fontSize: 13 }}>Apparence</Label>
         <Card style={{ paddingVertical: 0, paddingHorizontal: 13 }}>
@@ -876,7 +876,7 @@ export function NotificationsScreen() {
     else nav.navigate('Main');
   };
   return (
-    <Page style={{ gap: 18 }}>
+    <Page style={{ gap: 18, paddingTop: 64 }}>
       {token && notifications.isLoading ? (
         <Card>
           <Label>Chargement des notifications…</Label>
@@ -1018,7 +1018,7 @@ export function InfoScreen() {
   const nav = useNav();
   const kind = route.params.kind;
   return (
-    <Page>
+    <Page style={{ paddingTop: 64 }}>
       <Ionicons
         name={
           kind === 'security'
@@ -1056,7 +1056,7 @@ export function InfoScreen() {
 export function MenuScreen() {
   const nav = useNav();
   return (
-    <Page style={{ gap: 20 }}>
+    <Page style={{ gap: 20, paddingTop: 64 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <View style={{ backgroundColor: '#0674FF', borderRadius: 7, padding: 5 }}>
           <Ionicons name="layers" color="white" size={20} />
