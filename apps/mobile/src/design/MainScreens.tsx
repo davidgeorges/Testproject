@@ -1379,7 +1379,7 @@ export function SavingsScreen() {
         </View>
 
         <LinearGradient
-          colors={['#526B67E8', '#2D4948E8', '#22343DE8']}
+          colors={['#5A6672E8', '#3C4A57E8', '#263541E8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{
@@ -1397,7 +1397,7 @@ export function SavingsScreen() {
         >
           <LinearGradient
             pointerEvents="none"
-            colors={['#47F2BC24', '#FFFFFF08', '#00000000']}
+            colors={['#FFFFFF20', '#C9D5DF0D', '#00000000']}
             style={{ position: 'absolute', left: -35, right: 70, top: -50, height: 110 }}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1422,7 +1422,7 @@ export function SavingsScreen() {
                 width: 46,
                 height: 46,
                 borderRadius: 23,
-                backgroundColor: '#0A513AC7',
+                backgroundColor: '#34434FC7',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -1440,7 +1440,7 @@ export function SavingsScreen() {
             }}
           >
             <LinearGradient
-              colors={['#20F2A0', '#4EE4E8']}
+              colors={['#F2F6F8', '#9FB9CC']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{ width: '72%', height: 4, borderRadius: 3 }}
