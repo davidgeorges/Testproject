@@ -28,6 +28,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                             ["Demo:Enabled"] = "true",
                             ["ConnectionStrings:Postgres"] = null,
                             ["RevenueCat:WebhookAuthorization"] = "Bearer webhook-test-secret",
+                            ["Tink:WebhookAuthorization"] = "tink-webhook-signing-secret-long-enough-for-tests",
                         }
                     )
             );
@@ -733,6 +734,28 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         );
         var response = await c.SendAsync(request);
         response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task TinkWebhookRequiresValidHmacAndAcceptsTestEvent()
+    {
+        const string signingSecret = "tink-webhook-signing-secret-long-enough-for-tests";
+        using var c = factory.CreateClient();
+        var raw = JsonSerializer.Serialize(new { id = $"event-{Guid.NewGuid():N}", type = "test", data = new { } });
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await c.PostAsync("/api/v1/webhooks/tink", new StringContent(raw, Encoding.UTF8, "application/json"))).StatusCode
+        );
+        var signature = Convert.ToHexString(HMACSHA256.HashData(
+            Encoding.UTF8.GetBytes(signingSecret), Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/webhooks/tink")
+        {
+            Content = new StringContent(raw, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.TryAddWithoutValidation("X-Tink-Signature", signature);
+        var response = await c.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        Assert.True((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("test").GetBoolean());
     }
 
     [Fact]

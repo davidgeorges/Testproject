@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
@@ -531,18 +532,53 @@ app.MapPost("/api/v1/webhooks/revenuecat", async (RevenueCatWebhookRequest reque
     }, renewsAt, ct);
     return Results.Ok(new { accepted = true, duplicateOrStale = !applied });
 });
-app.MapPost("/api/v1/webhooks/tink", async (TinkWebhookRequest request, HttpContext c, IConfiguration configuration, IWorkspaceStore store, IIdempotencyStore idempotency, TimeProvider time, CancellationToken ct) =>
+app.MapPost("/api/v1/webhooks/tink", async (HttpContext c, IConfiguration configuration, IWorkspaceStore store, IIdempotencyStore idempotency, TimeProvider time, CancellationToken ct) =>
 {
     var expected = configuration["Tink:WebhookAuthorization"];
+    if (string.IsNullOrWhiteSpace(expected)) return Results.Unauthorized();
+    using var reader = new StreamReader(c.Request.Body, Encoding.UTF8);
+    var rawBody = await reader.ReadToEndAsync(ct);
     var supplied = c.Request.Headers.Authorization.ToString();
-    if (string.IsNullOrWhiteSpace(expected)
-        || supplied.Length != expected.Length
-        || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes(expected)))
-        return Results.Unauthorized();
-    if (string.IsNullOrWhiteSpace(request.CredentialsId) || string.IsNullOrWhiteSpace(request.EventId))
-        return Results.BadRequest(new { code = "INVALID_TINK_EVENT", message = "L’événement Tink est incomplet.", correlationId = c.TraceIdentifier });
-    var cacheKey = $"tink-webhook:{request.EventId}";
-    var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{request.CredentialsId}|{request.Type}")));
+    var bearerValid = supplied.Length == expected.Length
+        && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes(expected));
+    var signatureValid = false;
+    var signature = c.Request.Headers["X-Tink-Signature"].ToString();
+    try
+    {
+        var suppliedSignature = Convert.FromHexString(signature);
+        var expectedSignature = HMACSHA256.HashData(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(rawBody));
+        signatureValid = suppliedSignature.Length == expectedSignature.Length
+            && CryptographicOperations.FixedTimeEquals(suppliedSignature, expectedSignature);
+    }
+    catch (FormatException) { }
+    if (!bearerValid && !signatureValid) return Results.Unauthorized();
+
+    JsonElement root;
+    try { root = JsonDocument.Parse(rawBody).RootElement.Clone(); }
+    catch (JsonException)
+    {
+        return Results.BadRequest(new { code = "INVALID_TINK_EVENT", message = "L’événement Tink est invalide.", correlationId = c.TraceIdentifier });
+    }
+    static string? Text(JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+            if (element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String)
+                return value.GetString();
+        return null;
+    }
+    var eventType = Text(root, "type", "eventType") ?? "unknown";
+    var eventId = Text(root, "eventId", "id") ?? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawBody)));
+    var credentialsId = Text(root, "credentialsId", "credentialId");
+    if (string.IsNullOrWhiteSpace(credentialsId) && root.TryGetProperty("data", out var data))
+        credentialsId = Text(data, "credentialsId", "credentialId");
+    if (string.IsNullOrWhiteSpace(credentialsId) && root.TryGetProperty("content", out var content))
+        credentialsId = Text(content, "credentialsId", "credentialId");
+    if (eventType.Equals("test", StringComparison.OrdinalIgnoreCase))
+        return Results.Ok(new { accepted = true, test = true });
+    if (string.IsNullOrWhiteSpace(credentialsId))
+        return Results.Ok(new { accepted = true, ignored = true, reason = "credentials_id_missing" });
+    var cacheKey = $"tink-webhook:{eventId}";
+    var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{credentialsId}|{eventType}")));
     var decision = await idempotency.Begin(cacheKey, fingerprint, time.GetUtcNow().AddDays(7), ct);
     if (decision.State == IdempotencyState.Conflict)
         return Results.Conflict(new { code = "TINK_EVENT_CONFLICT", message = "Cet identifiant d’événement a déjà été utilisé.", correlationId = c.TraceIdentifier });
@@ -550,14 +586,14 @@ app.MapPost("/api/v1/webhooks/tink", async (TinkWebhookRequest request, HttpCont
         return Results.Ok(new { accepted = true, duplicate = true });
     try
     {
-        var connection = await store.ConnectionByProviderReference("tink", request.CredentialsId, ct);
+        var connection = await store.ConnectionByProviderReference("tink", credentialsId, ct);
         if (connection is null)
         {
             await idempotency.Complete(cacheKey, fingerprint, 200, null, ct);
             return Results.Ok(new { accepted = true, ignored = true });
         }
-        var eventType = request.Type.Trim().ToUpperInvariant();
-        if (eventType is "AUTHORIZATION_REVOKED" or "CREDENTIALS_INVALID")
+        var normalizedType = eventType.Trim().Replace('.', '_').Replace('-', '_').ToUpperInvariant();
+        if (normalizedType is "AUTHORIZATION_REVOKED" or "CREDENTIALS_INVALID" or "CREDENTIALS_DELETED")
         {
             await store.SetConnectionStatus(connection, "reconnect_required", ct);
             await store.AddNotification(new()
@@ -567,7 +603,7 @@ app.MapPost("/api/v1/webhooks/tink", async (TinkWebhookRequest request, HttpCont
                 Title = "Reconnectez votre banque",
                 Body = "Votre banque demande une nouvelle authentification.",
                 ResourceId = connection.Id.ToString(),
-                SourceKey = $"tink:{request.EventId}",
+                SourceKey = $"tink:{eventId}",
             }, ct);
             await idempotency.Complete(cacheKey, fingerprint, 200, null, ct);
             return Results.Ok(new { accepted = true, reconnectRequired = true });
