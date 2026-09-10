@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Pressable, Share, Modal, Text, TextInput, ImageBackground } from 'react-native';
+import {
+  View,
+  Pressable,
+  Share,
+  Modal,
+  Text,
+  TextInput,
+  ImageBackground,
+  Animated,
+} from 'react-native';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -35,6 +44,8 @@ import type { Category } from '../types/api';
 export function useNav() {
   return useNavigation<NativeStackNavigationProp<RootStackParams>>();
 }
+const dashboardScrollY = new Animated.Value(0);
+
 export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
@@ -51,7 +62,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
     ['Profile', 'Profil', 'person-outline'],
   ];
   return (
-    <View
+    <Animated.View
       style={{
         flexDirection: 'row',
         position: glassTheme ? 'absolute' : 'relative',
@@ -65,7 +76,16 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         borderColor: glassTheme ? '#EEF3F526' : c.border,
         paddingVertical: glassTheme ? 2 : 6,
         paddingHorizontal: glassTheme ? 5 : 0,
-        marginHorizontal: glassTheme ? 15 : 0,
+        marginHorizontal:
+          active === 'Home'
+            ? dashboardScrollY.interpolate({
+                inputRange: [0, 95],
+                outputRange: [15, 91],
+                extrapolate: 'clamp',
+              })
+            : glassTheme
+              ? 15
+              : 0,
         marginBottom: 0,
         borderRadius: glassTheme ? 27 : 0,
         shadowColor: glassTheme ? '#000000' : 'transparent',
@@ -105,25 +125,47 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                   : c.muted
             }
           />
-          <Label
+          <Animated.View
             style={{
-              fontSize: glassTheme ? 10 : 9,
-              lineHeight: 13,
-              fontWeight: key === active ? '700' : '500',
-              color: glassTheme
-                ? key === active
-                  ? '#FFFFFF'
-                  : '#D1D5DA'
-                : key === active
-                  ? '#1888FF'
-                  : c.muted,
+              overflow: 'hidden',
+              opacity:
+                active === 'Home'
+                  ? dashboardScrollY.interpolate({
+                      inputRange: [0, 55, 95],
+                      outputRange: [1, 0.35, 0],
+                      extrapolate: 'clamp',
+                    })
+                  : 1,
+              maxHeight:
+                active === 'Home'
+                  ? dashboardScrollY.interpolate({
+                      inputRange: [0, 95],
+                      outputRange: [13, 0],
+                      extrapolate: 'clamp',
+                    })
+                  : 13,
             }}
           >
-            {title}
-          </Label>
+            <Label
+              style={{
+                fontSize: glassTheme ? 10 : 9,
+                lineHeight: 13,
+                fontWeight: key === active ? '700' : '500',
+                color: glassTheme
+                  ? key === active
+                    ? '#FFFFFF'
+                    : '#D1D5DA'
+                  : key === active
+                    ? '#1888FF'
+                    : c.muted,
+              }}
+            >
+              {title}
+            </Label>
+          </Animated.View>
         </Pressable>
       ))}
-    </View>
+    </Animated.View>
   );
 }
 export function ScreenWithTabs({
@@ -254,6 +296,12 @@ export function DashboardScreen() {
       : showReference
         ? '10:28'
         : '08:41';
+
+  React.useEffect(() => {
+    dashboardScrollY.setValue(0);
+    return () => dashboardScrollY.setValue(0);
+  }, []);
+
   return (
     <ImageBackground
       source={require('../../assets/home-fabric.png')}
@@ -270,7 +318,11 @@ export function DashboardScreen() {
       <Page
         fill
         transparent
-        style={{ gap: 0, paddingHorizontal: 17, paddingTop: 10, paddingBottom: 14 }}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: dashboardScrollY } } }], {
+          useNativeDriver: false,
+        })}
+        scrollEventThrottle={16}
+        style={{ gap: 0, paddingHorizontal: 17, paddingTop: 10, paddingBottom: 210 }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
           <Pressable

@@ -9,6 +9,7 @@ import {
   TextInput,
   type ViewStyle,
   type TextStyle,
+  type ScrollViewProps,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -44,11 +45,15 @@ export function Page({
   fill = false,
   transparent = false,
   backgroundColor,
+  onScroll,
+  scrollEventThrottle,
 }: PropsWithChildren<{
   style?: ViewStyle;
   fill?: boolean;
   transparent?: boolean;
   backgroundColor?: string;
+  onScroll?: ScrollViewProps['onScroll'];
+  scrollEventThrottle?: number;
 }>) {
   const c = useColors();
   return (
@@ -63,6 +68,8 @@ export function Page({
       ]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
+      onScroll={onScroll}
+      scrollEventThrottle={scrollEventThrottle}
     >
       {children}
     </ScrollView>
