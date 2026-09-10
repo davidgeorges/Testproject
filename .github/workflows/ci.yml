@@ -41,7 +41,7 @@ jobs:
       - run: dotnet ef migrations script --idempotent --no-build --configuration Release --project backend/SubscriptionApp.Persistence --startup-project backend/SubscriptionApp.Persistence --output deployment/postgres-migrations.sql
       - run: git diff --exit-code -- deployment/postgres-migrations.sql
       - run: docker build -f backend/SubscriptionApp.Api/Dockerfile -t subscription-api:ci .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-tests
