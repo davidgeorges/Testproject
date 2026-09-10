@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,74 +42,253 @@ import type { RootStackParams } from '../app/navigation';
 import { date, money } from '../utils/format';
 export function Welcome() {
   const nav = useNav();
+  const intro = useRef(new Animated.Value(0)).current;
+  const float = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+  const orbit = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const entrance = Animated.timing(intro, {
+      toValue: 1,
+      duration: 850,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    const floating = Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, {
+          toValue: 1,
+          duration: 1700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(float, {
+          toValue: 0,
+          duration: 1700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const pulsing = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1250, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1250, useNativeDriver: true }),
+      ]),
+    );
+    const orbiting = Animated.loop(
+      Animated.timing(orbit, {
+        toValue: 1,
+        duration: 8000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    entrance.start();
+    floating.start();
+    pulsing.start();
+    orbiting.start();
+    return () => {
+      entrance.stop();
+      floating.stop();
+      pulsing.stop();
+      orbiting.stop();
+    };
+  }, [float, intro, orbit, pulse]);
+
   return (
     <LinearGradient
-      colors={['#071426', '#030B19', '#130766']}
-      locations={[0, 0.62, 1]}
+      colors={['#020609', '#07100E', '#020609']}
+      locations={[0, 0.55, 1]}
       style={{ flex: 1 }}
     >
       <LinearGradient
-        colors={['#07306580', 'transparent']}
+        colors={['#20F2A01A', 'transparent']}
         style={{
           position: 'absolute',
-          right: 0,
-          top: 0,
-          width: 190,
-          height: 220,
-          borderRadius: 100,
+          left: 45,
+          right: 45,
+          top: 190,
+          height: 280,
+          borderRadius: 150,
         }}
       />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Commencer"
         onPress={() => nav.navigate('Login')}
-        style={{ flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 24 }}
+        style={{ flex: 1, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' }}
       >
-        <LinearGradient
-          colors={['#007CFF', '#1240ED']}
+        <Animated.View
           style={{
-            height: 98,
-            width: 98,
-            borderRadius: 25,
+            opacity: intro,
             alignItems: 'center',
             justifyContent: 'center',
-            shadowColor: '#007AFF',
-            shadowRadius: 30,
-            shadowOpacity: 0.45,
-            shadowOffset: { width: 0, height: 8 },
+            gap: 20,
+            transform: [
+              {
+                translateY: Animated.add(
+                  intro.interpolate({ inputRange: [0, 1], outputRange: [105, 48] }),
+                  float.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }),
+                ),
+              },
+              { scale: intro.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) },
+            ],
           }}
         >
-          <Ionicons name="layers" size={61} color="#DAE7FF" />
-        </LinearGradient>
-        <Label style={{ fontSize: 36, lineHeight: 43, fontWeight: '700', color: 'white' }}>
-          Votre application
-        </Label>
-        <Label style={{ fontSize: 25, lineHeight: 33, color: 'white', textAlign: 'center' }}>
-          Votre argent{'\n'}mérite mieux
-        </Label>
-        <View style={{ flexDirection: 'row', gap: 24, marginTop: 24 }}>
-          {[
-            ['reader-outline', 'Analyse'],
-            ['search-outline', 'Compare'],
-            ['wallet-outline', 'Économise'],
-          ].map(([icon, label]) => (
-            <View key={label} style={{ alignItems: 'center', gap: 10 }}>
-              <View style={{ backgroundColor: '#42417D', borderRadius: 25, padding: 12 }}>
-                <Ionicons name={icon as IconName} size={23} color="white" />
-              </View>
-              <Label style={{ color: '#fff', fontSize: 13 }}>{label}</Label>
-            </View>
-          ))}
-        </View>
+          <View style={{ width: 142, height: 142, alignItems: 'center', justifyContent: 'center' }}>
+            <Animated.View
+              style={{
+                position: 'absolute',
+                width: 132,
+                height: 132,
+                borderRadius: 66,
+                borderWidth: 1,
+                borderColor: '#7A8A8566',
+                transform: [
+                  {
+                    rotate: orbit.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 5,
+                  left: 33,
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: '#20F2A0',
+                  shadowColor: '#20F2A0',
+                  shadowOpacity: 0.8,
+                  shadowRadius: 8,
+                }}
+              />
+              <View
+                style={{
+                  position: 'absolute',
+                  right: 2,
+                  bottom: 41,
+                  width: 5,
+                  height: 5,
+                  borderRadius: 3,
+                  backgroundColor: '#DDE5ED',
+                }}
+              />
+            </Animated.View>
+            <Animated.View
+              style={{
+                position: 'absolute',
+                width: 112,
+                height: 112,
+                borderRadius: 56,
+                backgroundColor: '#20F2A018',
+                opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }),
+                transform: [
+                  { scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.12] }) },
+                ],
+              }}
+            />
+            <LinearGradient
+              colors={['#2B343B', '#111820', '#070C11']}
+              style={{
+                height: 94,
+                width: 94,
+                borderRadius: 29,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#78859088',
+                shadowColor: '#DDE7F0',
+                shadowRadius: 24,
+                shadowOpacity: 0.24,
+                shadowOffset: { width: 0, height: 10 },
+              }}
+            >
+              <Ionicons name="layers" size={55} color="#F1F5F9" />
+            </LinearGradient>
+          </View>
+          <View style={{ alignItems: 'center', gap: 7 }}>
+            <Label
+              style={{
+                fontSize: 31,
+                lineHeight: 38,
+                fontWeight: '800',
+                color: 'white',
+                letterSpacing: -0.8,
+              }}
+            >
+              Votre application
+            </Label>
+            <Label style={{ fontSize: 18, lineHeight: 25, color: '#A6B0BE', textAlign: 'center' }}>
+              Votre argent mérite mieux
+            </Label>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 13, marginTop: 13 }}>
+            {[
+              ['reader-outline', 'Analyse'],
+              ['search-outline', 'Compare'],
+              ['wallet-outline', 'Économise'],
+            ].map(([icon, label], index) => (
+              <Animated.View
+                key={label}
+                style={{
+                  alignItems: 'center',
+                  gap: 7,
+                  opacity: intro,
+                  transform: [
+                    {
+                      translateY: intro.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [28 + index * 8, 0],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 18,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#111820',
+                    borderWidth: 1,
+                    borderColor: '#2D3842',
+                  }}
+                >
+                  <Ionicons name={icon as IconName} size={21} color="#EFF3F7" />
+                </View>
+                <Label style={{ color: '#AAB4C0', fontSize: 11 }}>{label}</Label>
+              </Animated.View>
+            ))}
+          </View>
+        </Animated.View>
       </Pressable>
-      <View style={{ padding: 30, paddingBottom: 38, gap: 8 }}>
-        <Label style={{ textAlign: 'center', fontSize: 13, color: '#B8C5E4' }}>
+      <Animated.View
+        style={{
+          paddingHorizontal: 30,
+          paddingBottom: 35,
+          gap: 7,
+          opacity: intro,
+          transform: [
+            { translateY: intro.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) },
+          ],
+        }}
+      >
+        <Label style={{ textAlign: 'center', fontSize: 12, color: '#A0ABB8' }}>
           Un avenir plus serein{'\n'}commence aujourd’hui
         </Label>
-        <Label style={{ textAlign: 'center', fontSize: 10, color: '#7B8BAE' }}>
+        <Label style={{ textAlign: 'center', fontSize: 10, color: '#687482' }}>
           Touchez l’écran pour commencer · Nom à définir
         </Label>
-      </View>
+      </Animated.View>
     </LinearGradient>
   );
 }
