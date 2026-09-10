@@ -1,12 +1,30 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Animated,
+  Pressable,
+  ScrollView,
+  Share,
+  StatusBar,
+  TextInput,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useBankAccounts, useBankConnections } from '../../design/reference';
-import { Card, Label, Page, Search, Section, State, useColors } from '../../design/ui';
-import { ScreenWithTabs } from '../../design/MainScreens';
+import { useBankAccounts, useBankConnections, useProfile } from '../../design/reference';
+import { Button, Card, Label, Page, State, useColors } from '../../design/ui';
+import { dashboardScrollY, ScreenWithTabs, useNav } from '../../design/MainScreens';
 import { api } from '../../services/api';
-import { useLiveToken } from '../../store/session';
+import { useLiveToken, useSession } from '../../store/session';
+import {
+  accentTextColor,
+  accentWithAlpha,
+  DEFAULT_ACCENT_COLOR,
+  mixAccentColor,
+  normalizeAccentColor,
+  ORIGINAL_THEME_ACCENT,
+} from '../../theme/accent';
 import type { FinanceCategoryType, FinanceFilters } from '../../types/api';
 import { date, money } from '../../utils/format';
 
@@ -62,6 +80,9 @@ function Chip({
   selected: boolean;
   onPress: () => void;
 }) {
+  const c = useColors();
+  const accent =
+    normalizeAccentColor(useSession((state) => state.accentColor)) ?? DEFAULT_ACCENT_COLOR;
   return (
     <Pressable
       accessibilityRole="button"
@@ -73,13 +94,15 @@ function Chip({
         paddingHorizontal: 11,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: selected ? '#5F7285' : '#2B3542',
-        borderWidth: selected ? 1 : 0,
-        borderColor: '#8CB7DF',
+        backgroundColor: selected ? accent : c.elevated,
+        borderWidth: 1,
+        borderColor: selected ? accent : c.border,
         opacity: pressed ? 0.75 : 1,
       })}
     >
-      <Label style={{ color: selected ? '#F0F7FF' : '#B5C3D1', fontSize: 11 }}>{label}</Label>
+      <Label style={{ color: selected ? accentTextColor(accent) : c.muted, fontSize: 11 }}>
+        {label}
+      </Label>
     </Pressable>
   );
 }
@@ -95,9 +118,10 @@ function ChoiceRow({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const c = useColors();
   return (
     <View style={{ gap: 6 }}>
-      <Label style={{ color: '#94A8BB', fontSize: 11 }}>{title}</Label>
+      <Label style={{ color: c.muted, fontSize: 11 }}>{title}</Label>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', gap: 7 }}>
           {options.map((option) => (
@@ -114,28 +138,46 @@ function ChoiceRow({
   );
 }
 
-function Metric({ title, value, color }: { title: string; value: string; color: string }) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        minHeight: 82,
-        borderRadius: 14,
-        backgroundColor: '#1B2735',
-        padding: 11,
-        justifyContent: 'space-between',
-      }}
-    >
-      <Label style={{ color: '#9EB0C2', fontSize: 11 }}>{title}</Label>
-      <Label style={{ color, fontSize: 16, fontWeight: '800' }}>{value}</Label>
-    </View>
-  );
-}
-
 export function FinancesScreen() {
+  const nav = useNav();
   const token = useLiveToken();
-  const colors = useColors();
+  const isDark = useSession((state) => state.theme) === 'dark';
+  const accentColor = useSession((state) => state.accentColor);
+  const normalizedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR;
+  const accentForeground = accentTextColor(normalizedAccent);
+  const heroText =
+    isDark && normalizedAccent === ORIGINAL_THEME_ACCENT
+      ? '#FFFFFF'
+      : accentTextColor(normalizedAccent);
+  const pageColors = isDark
+    ? {
+        background: '#0B0B0F',
+        surface: '#18181D',
+        elevated: '#222228',
+        text: '#F8F7FA',
+        body: '#ECEBF0',
+        secondary: '#AAA8B1',
+        muted: '#777780',
+        separator: '#2A292F',
+        avatar: '#493B34',
+        avatarText: '#FFF7F0',
+        shadow: '#000000',
+      }
+    : {
+        background: '#F4F3F7',
+        surface: '#FFFFFF',
+        elevated: '#FFFFFF',
+        text: '#171719',
+        body: '#242328',
+        secondary: '#858489',
+        muted: '#A4A3A9',
+        separator: '#F0EFF2',
+        avatar: '#E8D6C8',
+        avatarText: '#2B2420',
+        shadow: '#34313D',
+      };
   const queryClient = useQueryClient();
+  const profile = useProfile();
   const months = useMemo(monthChoices, []);
   const [fromMonth, setFromMonth] = useState(currentMonth());
   const [toMonth, setToMonth] = useState(currentMonth());
@@ -149,6 +191,9 @@ export function FinancesScreen() {
     null,
   );
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [budgetsOpen, setBudgetsOpen] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
 
   const orderedMonths = fromMonth <= toMonth ? [fromMonth, toMonth] : [toMonth, fromMonth];
   const filters = useMemo<FinanceFilters>(
@@ -171,11 +216,13 @@ export function FinancesScreen() {
     queryKey: ['finance-overview', token, filters],
     queryFn: () => api.financeOverview(filters),
     enabled: Boolean(token),
+    placeholderData: (previous) => previous,
   });
   const transactions = useQuery({
     queryKey: ['finance-transactions', token, filters],
     queryFn: () => api.financeTransactions(filters),
     enabled: Boolean(token),
+    placeholderData: (previous) => previous,
   });
   const budgets = useQuery({
     queryKey: ['finance-budgets', token],
@@ -287,9 +334,12 @@ export function FinancesScreen() {
   if (overview.isPending || transactions.isPending || budgets.isPending)
     return (
       <ScreenWithTabs active="Finances">
-        <Page>
-          <State loading />
-        </Page>
+        <View style={{ flex: 1, backgroundColor: pageColors.background }}>
+          <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+          <Page transparent>
+            <State loading />
+          </Page>
+        </View>
       </ScreenWithTabs>
     );
   const error =
@@ -297,14 +347,17 @@ export function FinancesScreen() {
   if (error && !overview.data)
     return (
       <ScreenWithTabs active="Finances">
-        <Page>
-          <State
-            error={error as Error}
-            retry={() => {
-              void retryAll();
-            }}
-          />
-        </Page>
+        <View style={{ flex: 1, backgroundColor: pageColors.background }}>
+          <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+          <Page transparent>
+            <State
+              error={error as Error}
+              retry={() => {
+                void retryAll();
+              }}
+            />
+          </Page>
+        </View>
       </ScreenWithTabs>
     );
 
@@ -316,437 +369,1008 @@ export function FinancesScreen() {
   const alerts = data.categories.filter(
     (item) => item.status === 'exceeded' || item.status === 'near',
   );
+  const topCategories = [...data.categories]
+    .filter((item) => item.expense > 0)
+    .sort((left, right) => right.expense - left.expense)
+    .slice(0, 4);
+  const heroGradient = [
+    mixAccentColor(normalizedAccent, '#FFFFFF', isDark ? 0.1 : 0.2),
+    mixAccentColor(normalizedAccent, '#000000', isDark ? 0.16 : 0.06),
+  ] as const;
+  const heroMuted = mixAccentColor(
+    normalizedAccent,
+    heroText === '#FFFFFF' ? '#FFFFFF' : '#000000',
+    0.72,
+  );
+  const initial = (profile.data?.firstName?.trim() || 'Vous').charAt(0).toLocaleUpperCase('fr');
+  const activeFilterCount = [
+    fromMonth !== currentMonth() || toMonth !== currentMonth(),
+    connectionId !== 'all',
+    accountId !== 'all',
+    category !== 'all',
+    kind !== 'all',
+    !excludeInternalTransfers,
+  ].filter(Boolean).length;
+  const editingItem = transactions.data?.items.find((item) => item.id === editingTransaction);
+  const resetFilters = () => {
+    const month = currentMonth();
+    setFromMonth(month);
+    setToMonth(month);
+    setKind('all');
+    setConnectionId('all');
+    setAccountId('all');
+    setCategory('all');
+    setExcludeInternalTransfers(true);
+  };
 
   return (
     <ScreenWithTabs active="Finances">
-      <Page>
-        <View style={{ gap: 4 }}>
-          <Label style={{ color: '#F2F7FF', fontSize: 28, fontWeight: '800' }}>Finances</Label>
-          <Label style={{ color: '#91A6BA' }}>Données synchronisées de vos comptes connectés</Label>
-        </View>
-        <Card style={{ gap: 10 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <ChoiceRow
-                title="Du mois"
-                options={months}
-                value={fromMonth}
-                onChange={setFromMonth}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ChoiceRow title="Au mois" options={months} value={toMonth} onChange={setToMonth} />
-            </View>
-          </View>
-          <ChoiceRow
-            title="Banques"
-            options={bankChoices}
-            value={connectionId}
-            onChange={(value) => {
-              setConnectionId(value);
-              setAccountId('all');
-            }}
-          />
-          <ChoiceRow
-            title="Comptes"
-            options={accountChoices}
-            value={accountId}
-            onChange={setAccountId}
-          />
-          <ChoiceRow
-            title="Catégories"
-            options={[{ id: 'all', label: 'Toutes' }, ...categories]}
-            value={category}
-            onChange={setCategory}
-          />
-          <Search
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Commerçant, libellé banque, compte…"
-          />
-          <View style={{ flexDirection: 'row', gap: 7 }}>
-            <Chip label="Toutes" selected={kind === 'all'} onPress={() => setKind('all')} />
-            <Chip label="Revenus" selected={kind === 'income'} onPress={() => setKind('income')} />
-            <Chip
-              label="Dépenses"
-              selected={kind === 'expense'}
-              onPress={() => setKind('expense')}
-            />
-          </View>
-          <Pressable
-            onPress={() => setExcludeInternalTransfers((value) => !value)}
-            style={{
-              minHeight: 36,
-              borderRadius: 12,
-              backgroundColor: '#2C3C4C',
-              justifyContent: 'center',
-              paddingHorizontal: 12,
-            }}
-          >
-            <Label style={{ color: '#D9E7F4', fontSize: 11 }}>
-              {excludeInternalTransfers
-                ? '✓ Virements internes exclus des calculs'
-                : 'Virements internes inclus dans les calculs'}
-            </Label>
-          </Pressable>
-        </Card>
-
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Metric title="Revenus" value={money(data.income)} color="#4DE3A8" />
-          <Metric title="Dépenses" value={money(data.expense)} color="#FFAA78" />
-          <Metric title="Solde" value={money(data.net)} color="#8CCBFF" />
-        </View>
-        {alerts.length ? (
-          <Card style={{ borderColor: '#8D6544', gap: 7 }}>
-            <Label style={{ color: '#FFC182', fontWeight: '800' }}>Alertes budget</Label>
-            {alerts.map((item) => (
-              <Label
-                key={item.category}
-                style={{ color: item.status === 'exceeded' ? '#FF9A91' : '#FFD28A', fontSize: 12 }}
-              >
-                {item.status === 'exceeded' ? 'Dépassement' : 'Seuil de 85 % atteint'} ·{' '}
-                {item.label}
-                {item.remaining !== null && item.remaining < 0
-                  ? ` de ${money(Math.abs(item.remaining))}`
-                  : ''}
-              </Label>
-            ))}
-          </Card>
-        ) : null}
-
-        <Section title={`Cashflow · ${period}`} />
-        <Card style={{ gap: 11 }}>
-          {data.cashflow.map((row) => {
-            const max = Math.max(row.expense, row.planned, 1);
-            return (
-              <View key={row.month} style={{ gap: 5 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Label style={{ fontWeight: '700' }}>{monthLabel(row.month)}</Label>
-                  <Label style={{ color: row.delta > 0 ? '#FF928A' : '#79DFAE', fontSize: 11 }}>
-                    Écart {money(row.delta)}
-                  </Label>
-                </View>
-                <Label style={{ color: '#93A6B7', fontSize: 11 }}>
-                  Prévu {money(row.planned)} · Réel {money(row.expense)} · Net {money(row.net)}
-                </Label>
-                <View
-                  style={{
-                    height: 7,
-                    borderRadius: 5,
-                    backgroundColor: '#293746',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <View
-                    style={{
-                      height: 7,
-                      width: `${Math.min((row.expense / max) * 100, 100)}%`,
-                      backgroundColor: row.delta > 0 ? '#F47F76' : '#59D29B',
-                    }}
-                  />
-                </View>
-              </View>
-            );
+      <View style={{ flex: 1, backgroundColor: pageColors.background }}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+        <Page
+          fill
+          transparent
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: dashboardScrollY } } }], {
+            useNativeDriver: false,
           })}
-        </Card>
-
-        <Section title="Prévision et structure des dépenses" />
-        <Card style={{ gap: 9 }}>
-          <View style={{ flexDirection: 'row', gap: 14 }}>
-            <View style={{ flex: 1 }}>
-              <Label style={{ color: '#9CAFC1', fontSize: 11 }}>Fixes</Label>
-              <Label style={{ fontWeight: '800' }}>{money(data.fixedExpense)}</Label>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Label style={{ color: '#9CAFC1', fontSize: 11 }}>Variables</Label>
-              <Label style={{ fontWeight: '800' }}>{money(data.variableExpense)}</Label>
-            </View>
-          </View>
-          {data.forecast.available ? (
-            <View style={{ borderTopWidth: 1, borderTopColor: '#2D3C4B', paddingTop: 9 }}>
-              <Label
-                style={{
-                  color: data.forecast.isOverrun ? '#FF988D' : '#7DDFAD',
-                  fontWeight: '700',
-                }}
-              >
-                Projection : {money(data.forecast.projected)} sur {money(data.forecast.planned)}
-              </Label>
-              <Label style={{ color: '#92A6B9', fontSize: 11, marginTop: 3 }}>
-                {data.forecast.isOverrun
-                  ? `Risque de dépassement de ${money(data.forecast.overrunAmount)}`
-                  : 'Rythme compatible avec votre plafond'}{' '}
-                · {data.forecast.remainingDays} jours restants
-              </Label>
-            </View>
-          ) : (
-            <Label style={{ color: '#92A6B9', fontSize: 11 }}>
-              Ajoutez au moins un budget pour activer la prévision mensuelle.
-            </Label>
-          )}
-        </Card>
-
-        <Section title="Budgets par catégorie" />
-        <View style={{ gap: 8 }}>
-          {categories.map((definition) => {
-            const budget = budgetMap.get(definition.id);
-            const summary = summaryMap.get(definition.id);
-            const limit = summary?.periodLimit ?? budget?.monthlyLimit ?? null;
-            const spent = summary?.expense ?? 0;
-            const progress = limit ? Math.min((spent / limit) * 100, 100) : 0;
-            const status = summary?.status ?? 'unset';
-            const type = budget?.categoryType ?? definition.type;
-            return (
-              <Card key={definition.id} style={{ gap: 8 }}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View>
-                    <Label style={{ fontWeight: '800' }}>{definition.label}</Label>
-                    <Label style={{ color: '#8FA3B7', fontSize: 10 }}>
-                      {type === 'fixed' ? 'Dépense fixe' : 'Dépense variable'}
-                    </Label>
-                  </View>
-                  <Pressable
-                    onPress={() =>
-                      setEditingBudget({
-                        category: definition.id,
-                        value: budget ? String(budget.monthlyLimit) : '',
-                      })
-                    }
-                  >
-                    <Label style={{ color: '#83C8FF', fontSize: 11 }}>
-                      {budget ? 'Modifier' : 'Définir'}
-                    </Label>
-                  </Pressable>
-                </View>
-                <View
-                  style={{
-                    height: 7,
-                    borderRadius: 5,
-                    backgroundColor: '#293746',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <View
-                    style={{
-                      height: 7,
-                      width: `${progress}%`,
-                      backgroundColor:
-                        status === 'exceeded'
-                          ? '#F47470'
-                          : status === 'near'
-                            ? '#EDB55B'
-                            : '#54D39A',
-                    }}
-                  />
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Label style={{ color: '#9BADBE', fontSize: 11 }}>Dépensé {money(spent)}</Label>
-                  <Label style={{ color: '#D8E5F2', fontSize: 11 }}>
-                    {limit ? `Plafond ${money(limit)}` : 'Sans plafond'}
-                  </Label>
-                </View>
-                {editingBudget?.category === definition.id ? (
-                  <View style={{ gap: 7 }}>
-                    <View style={{ flexDirection: 'row', gap: 7 }}>
-                      <TextInput
-                        autoFocus
-                        value={editingBudget.value}
-                        keyboardType="decimal-pad"
-                        onChangeText={(value) =>
-                          setEditingBudget({ category: definition.id, value: numeric(value) })
-                        }
-                        placeholder="Budget mensuel"
-                        placeholderTextColor="#6F8397"
-                        style={{
-                          flex: 1,
-                          minHeight: 38,
-                          borderRadius: 11,
-                          backgroundColor: '#192533',
-                          color: '#F2F7FF',
-                          paddingHorizontal: 10,
-                        }}
-                      />
-                      <Pressable
-                        onPress={() => {
-                          const amount = Number(editingBudget.value);
-                          if (Number.isFinite(amount) && amount > 0)
-                            saveBudget.mutate({ categoryId: definition.id, amount, type });
-                        }}
-                        style={{
-                          minWidth: 48,
-                          borderRadius: 11,
-                          backgroundColor: '#3A5268',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Label>OK</Label>
-                      </Pressable>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 7 }}>
-                      <Chip
-                        label="Fixe"
-                        selected={type === 'fixed'}
-                        onPress={() =>
-                          budget &&
-                          saveBudget.mutate({
-                            categoryId: definition.id,
-                            amount: budget.monthlyLimit,
-                            type: 'fixed',
-                          })
-                        }
-                      />
-                      <Chip
-                        label="Variable"
-                        selected={type === 'variable'}
-                        onPress={() =>
-                          budget &&
-                          saveBudget.mutate({
-                            categoryId: definition.id,
-                            amount: budget.monthlyLimit,
-                            type: 'variable',
-                          })
-                        }
-                      />
-                      {budget ? (
-                        <Pressable
-                          onPress={() => removeBudget.mutate(definition.id)}
-                          style={{ justifyContent: 'center', paddingHorizontal: 7 }}
-                        >
-                          <Label style={{ color: '#FF9A91', fontSize: 11 }}>Supprimer</Label>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  </View>
-                ) : null}
-              </Card>
-            );
-          })}
-        </View>
-
-        <Section
-          title={`Transactions · ${transactions.data?.total ?? 0}`}
-          action="Exporter"
-          onPress={() => {
-            void exportCsv();
-          }}
-        />
-        <Card style={{ padding: 0, overflow: 'hidden' }}>
-          {(transactions.data?.items ?? []).map((item, index) => (
-            <View
-              key={item.id}
-              style={{
-                borderBottomWidth: index === (transactions.data?.items.length ?? 0) - 1 ? 0 : 1,
-                borderBottomColor: '#2D3B47',
-              }}
+          scrollEventThrottle={16}
+          style={{ gap: 0, paddingHorizontal: 14, paddingTop: 7, paddingBottom: 128 }}
+        >
+          <View style={{ minHeight: 57, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Voir mon profil"
+              onPress={() => nav.navigate('Main', { screen: 'Profile' })}
+              style={({ pressed }) => ({
+                width: 43,
+                height: 43,
+                borderRadius: 22,
+                backgroundColor: pageColors.avatar,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.65 : 1,
+              })}
             >
+              <Label style={{ color: pageColors.avatarText, fontSize: 17, fontWeight: '900' }}>
+                {initial}
+              </Label>
               <View
                 style={{
-                  minHeight: 76,
-                  flexDirection: 'row',
+                  position: 'absolute',
+                  right: -3,
+                  bottom: -2,
+                  width: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  backgroundColor: pageColors.surface,
                   alignItems: 'center',
-                  gap: 10,
-                  padding: 11,
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#3A3940' : '#DAD9DE',
                 }}
+              >
+                <Ionicons name="settings-outline" size={12} color={pageColors.secondary} />
+              </View>
+            </Pressable>
+            <View
+              style={{
+                flex: 1,
+                height: 46,
+                paddingHorizontal: 16,
+                borderRadius: 23,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                backgroundColor: pageColors.surface,
+              }}
+            >
+              <Ionicons name="search-outline" size={20} color={pageColors.muted} />
+              <TextInput
+                accessibilityLabel="Rechercher une transaction"
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Rechercher"
+                placeholderTextColor={pageColors.muted}
+                style={
+                  { flex: 1, color: pageColors.text, fontSize: 15, outlineStyle: 'none' } as never
+                }
+              />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+              onPress={() => nav.navigate('Notifications')}
+              style={({ pressed }) => ({
+                width: 43,
+                height: 43,
+                borderRadius: 22,
+                backgroundColor: pageColors.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.65 : 1,
+              })}
+            >
+              <Ionicons name="notifications-outline" size={23} color={pageColors.text} />
+            </Pressable>
+          </View>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: 18,
+              paddingHorizontal: 4,
+            }}
+          >
+            <Label style={{ flex: 1, color: pageColors.text, fontSize: 18, fontWeight: '800' }}>
+              Finances
+            </Label>
+            <Label style={{ color: pageColors.secondary, fontSize: 13 }}>{period}</Label>
+          </View>
+
+          <LinearGradient
+            colors={heroGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              minHeight: 205,
+              marginTop: 13,
+              borderRadius: 24,
+              padding: 19,
+              overflow: 'hidden',
+              shadowColor: pageColors.shadow,
+              shadowOpacity: isDark ? 0.34 : 0.2,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 9 },
+            }}
+          >
+            <View
+              style={{
+                position: 'absolute',
+                width: 190,
+                height: 190,
+                borderRadius: 95,
+                right: -68,
+                top: -72,
+                backgroundColor: accentWithAlpha(
+                  mixAccentColor(normalizedAccent, '#FFFFFF', 0.58),
+                  0.34,
+                ),
+              }}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 11,
+                  backgroundColor: mixAccentColor(normalizedAccent, '#000000', 0.2),
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="wallet-outline" size={17} color={heroText} />
+              </View>
+              <Label style={{ marginLeft: 10, color: heroText, fontSize: 19, fontWeight: '900' }}>
+                Solde du mois
+              </Label>
+            </View>
+            <Label
+              style={{
+                marginTop: 18,
+                color: heroText,
+                fontSize: 34,
+                lineHeight: 40,
+                fontWeight: '900',
+                letterSpacing: -0.9,
+              }}
+            >
+              {money(data.net)}
+            </Label>
+            <View
+              style={{
+                flexDirection: 'row',
+                marginTop: 18,
+                paddingTop: 13,
+                borderTopWidth: 1,
+                borderTopColor: accentWithAlpha(heroText, 0.24),
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Label style={{ color: heroMuted, fontSize: 10, fontWeight: '700' }}>REVENUS</Label>
+                <Label style={{ color: heroText, fontSize: 16, fontWeight: '900', marginTop: 2 }}>
+                  {money(data.income)}
+                </Label>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Label style={{ color: heroMuted, fontSize: 10, fontWeight: '700' }}>
+                  DÉPENSES
+                </Label>
+                <Label style={{ color: heroText, fontSize: 16, fontWeight: '900', marginTop: 2 }}>
+                  {money(data.expense)}
+                </Label>
+              </View>
+            </View>
+          </LinearGradient>
+
+          <View style={{ flexDirection: 'row', gap: 7, marginTop: 24 }}>
+            {[
+              {
+                label: 'Filtres',
+                icon: 'options-outline' as const,
+                badge: activeFilterCount || undefined,
+                action: () => setFiltersOpen(true),
+              },
+              {
+                label: 'Budgets',
+                icon: 'pie-chart-outline' as const,
+                action: () => setBudgetsOpen(true),
+              },
+              {
+                label: 'Analyse',
+                icon: 'stats-chart-outline' as const,
+                action: () => setAnalysisOpen(true),
+              },
+              {
+                label: 'Exporter',
+                icon: 'share-outline' as const,
+                action: () => void exportCsv(),
+              },
+            ].map((action) => (
+              <Pressable
+                key={action.label}
+                accessibilityRole="button"
+                accessibilityLabel={action.label}
+                onPress={action.action}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  alignItems: 'center',
+                  opacity: pressed ? 0.65 : 1,
+                })}
               >
                 <View
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: '#293A49',
+                    width: 57,
+                    height: 58,
+                    borderRadius: 19,
+                    backgroundColor: pageColors.elevated,
                     alignItems: 'center',
                     justifyContent: 'center',
+                    shadowColor: pageColors.shadow,
+                    shadowOpacity: isDark ? 0.24 : 0.06,
+                    shadowRadius: 7,
+                    shadowOffset: { width: 0, height: 3 },
                   }}
                 >
-                  <Ionicons
-                    name={item.amount >= 0 ? 'trending-up-outline' : 'trending-down-outline'}
-                    size={17}
-                    color={item.amount >= 0 ? '#4DE3A8' : '#F0B078'}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Label style={{ fontWeight: '800' }}>{item.merchantName || 'Transaction'}</Label>
-                  <Label style={{ color: '#92A6B8', fontSize: 11 }}>
-                    {date(item.bookedAt)} · {item.categoryLabel}
-                    {item.isCustomCategory ? ' · personnalisée' : ''}
-                  </Label>
-                  <Label style={{ color: '#71879B', fontSize: 10 }}>
-                    {item.bankName} · {item.accountName}
-                    {item.isInternalTransfer ? ' · virement interne' : ''}
-                  </Label>
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 5 }}>
-                  <Label
-                    style={{ color: item.amount >= 0 ? '#4DE3A8' : colors.text, fontWeight: '800' }}
-                  >
-                    {item.amount > 0 ? '+' : ''}
-                    {money(item.amount)}
-                  </Label>
-                  <Pressable
-                    onPress={() =>
-                      setEditingTransaction(editingTransaction === item.id ? null : item.id)
-                    }
+                  <View
                     style={{
                       width: 28,
-                      height: 28,
+                      height: 30,
                       borderRadius: 9,
-                      backgroundColor: '#2B3C4D',
+                      backgroundColor: normalizedAccent,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name="swap-horizontal" size={14} color="#DCE9F5" />
-                  </Pressable>
-                </View>
-              </View>
-              {editingTransaction === item.id ? (
-                <View style={{ paddingHorizontal: 11, paddingBottom: 11, gap: 7 }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={{ flexDirection: 'row', gap: 7 }}>
-                      {categories.map((entry) => (
-                        <Chip
-                          key={entry.id}
-                          label={entry.label}
-                          selected={item.category === entry.id}
-                          onPress={() => saveCategory.mutate({ id: item.id, categoryId: entry.id })}
-                        />
-                      ))}
-                    </View>
-                  </ScrollView>
-                  {item.isCustomCategory ? (
-                    <Pressable onPress={() => resetCategory.mutate(item.id)}>
-                      <Label style={{ color: '#8CCBFF', fontSize: 11 }}>
-                        Revenir à la catégorie automatique
+                    <Ionicons name={action.icon} size={16} color={accentForeground} />
+                  </View>
+                  {action.badge ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        right: 6,
+                        top: 5,
+                        minWidth: 17,
+                        height: 17,
+                        borderRadius: 9,
+                        paddingHorizontal: 4,
+                        backgroundColor: '#E55454',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Label style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '900' }}>
+                        {action.badge}
                       </Label>
-                    </Pressable>
+                    </View>
                   ) : null}
                 </View>
-              ) : null}
-            </View>
-          ))}
-          {!transactions.data?.items.length ? (
-            <View style={{ padding: 20, alignItems: 'center', gap: 7 }}>
-              <Ionicons name="search-outline" size={22} color="#8498AC" />
-              <Label style={{ color: '#96A8BA' }}>Aucune transaction trouvée.</Label>
+                <Label
+                  style={{
+                    color: pageColors.body,
+                    fontSize: 10,
+                    fontWeight: '700',
+                    marginTop: 7,
+                  }}
+                >
+                  {action.label}
+                </Label>
+              </Pressable>
+            ))}
+          </View>
+
+          {alerts.length ? (
+            <Pressable
+              onPress={() => setBudgetsOpen(true)}
+              style={({ pressed }) => ({
+                marginTop: 22,
+                minHeight: 62,
+                borderRadius: 17,
+                paddingHorizontal: 15,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isDark ? '#2D211B' : '#FFF1E7',
+                opacity: pressed ? 0.72 : 1,
+              })}
+            >
+              <Ionicons name="warning-outline" size={22} color="#E9864F" />
+              <View style={{ flex: 1, marginLeft: 11 }}>
+                <Label style={{ color: pageColors.text, fontSize: 13, fontWeight: '800' }}>
+                  {alerts.length} alerte{alerts.length > 1 ? 's' : ''} budget
+                </Label>
+                <Label style={{ color: pageColors.secondary, fontSize: 11, marginTop: 2 }}>
+                  Appuyez pour voir les catégories concernées
+                </Label>
+              </View>
+              <Ionicons name="chevron-forward" size={17} color={pageColors.muted} />
+            </Pressable>
+          ) : null}
+
+          {topCategories.length ? (
+            <View style={{ marginTop: 24 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}>
+                <Label style={{ flex: 1, color: pageColors.text, fontSize: 18, fontWeight: '800' }}>
+                  Dépenses principales
+                </Label>
+                <Pressable onPress={() => setAnalysisOpen(true)}>
+                  <Label style={{ color: pageColors.secondary, fontSize: 12 }}>Voir tout</Label>
+                </Pressable>
+              </View>
+              <View
+                style={{
+                  marginTop: 10,
+                  borderRadius: 17,
+                  paddingHorizontal: 15,
+                  paddingVertical: 8,
+                  backgroundColor: pageColors.surface,
+                  shadowColor: pageColors.shadow,
+                  shadowOpacity: isDark ? 0.28 : 0.07,
+                  shadowRadius: 12,
+                  shadowOffset: { width: 0, height: 5 },
+                }}
+              >
+                {topCategories.map((item, index) => (
+                  <View
+                    key={item.category}
+                    style={{
+                      minHeight: 58,
+                      justifyContent: 'center',
+                      borderBottomWidth: index === topCategories.length - 1 ? 0 : 1,
+                      borderBottomColor: pageColors.separator,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Label
+                        style={{ flex: 1, color: pageColors.body, fontSize: 13, fontWeight: '700' }}
+                      >
+                        {item.label}
+                      </Label>
+                      <Label style={{ color: pageColors.body, fontSize: 13, fontWeight: '800' }}>
+                        {money(item.expense)}
+                      </Label>
+                    </View>
+                    <View
+                      style={{
+                        height: 5,
+                        marginTop: 7,
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                        backgroundColor: pageColors.separator,
+                      }}
+                    >
+                      <View
+                        style={{
+                          height: 5,
+                          width: `${Math.min((item.expense / Math.max(data.expense, 1)) * 100, 100)}%`,
+                          borderRadius: 3,
+                          backgroundColor: normalizedAccent,
+                        }}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
             </View>
           ) : null}
-        </Card>
-        {error && (!connections.data?.length || !accounts.data?.length) ? (
-          <State
-            error={error as Error}
-            retry={() => {
-              void retryAll();
+
+          <View style={{ marginTop: 24 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}>
+              <Label style={{ flex: 1, color: pageColors.text, fontSize: 18, fontWeight: '800' }}>
+                Transactions
+              </Label>
+              <Label style={{ color: pageColors.secondary, fontSize: 12 }}>
+                {transactions.data?.total ?? 0}
+              </Label>
+            </View>
+          </View>
+          <View
+            style={{
+              marginTop: 10,
+              borderRadius: 17,
+              paddingHorizontal: 15,
+              backgroundColor: pageColors.surface,
+              overflow: 'hidden',
+              shadowColor: pageColors.shadow,
+              shadowOpacity: isDark ? 0.28 : 0.07,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 5 },
             }}
-          />
-        ) : null}
-      </Page>
+          >
+            {(transactions.data?.items ?? []).map((item, index) => (
+              <Pressable
+                key={item.id}
+                onPress={() => setEditingTransaction(item.id)}
+                style={{
+                  borderBottomWidth: index === (transactions.data?.items.length ?? 0) - 1 ? 0 : 1,
+                  borderBottomColor: pageColors.separator,
+                }}
+              >
+                <View
+                  style={{
+                    minHeight: 68,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 11,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor:
+                        item.amount >= 0
+                          ? accentWithAlpha(normalizedAccent, isDark ? 0.5 : 0.18)
+                          : isDark
+                            ? '#2B2B32'
+                            : '#171719',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons
+                      name={item.amount >= 0 ? 'trending-up-outline' : 'trending-down-outline'}
+                      size={17}
+                      color={item.amount >= 0 ? normalizedAccent : '#FFFFFF'}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Label
+                      numberOfLines={1}
+                      style={{ color: pageColors.body, fontSize: 14, fontWeight: '700' }}
+                    >
+                      {item.merchantName || 'Transaction'}
+                    </Label>
+                    <Label
+                      numberOfLines={1}
+                      style={{ color: pageColors.secondary, fontSize: 10, marginTop: 2 }}
+                    >
+                      {date(item.bookedAt)} · {item.categoryLabel}
+                      {' · '}
+                      {item.bankName}
+                    </Label>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Label
+                      style={{
+                        color: item.amount >= 0 ? '#20B657' : pageColors.body,
+                        fontSize: 14,
+                        fontWeight: '800',
+                      }}
+                    >
+                      {item.amount > 0 ? '+' : ''}
+                      {money(item.amount)}
+                    </Label>
+                    <Label style={{ color: pageColors.muted, fontSize: 9, marginTop: 2 }}>
+                      {item.accountName}
+                    </Label>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={pageColors.muted} />
+                </View>
+              </Pressable>
+            ))}
+            {!transactions.data?.items.length ? (
+              <View style={{ padding: 20, alignItems: 'center', gap: 7 }}>
+                <Ionicons name="search-outline" size={22} color={pageColors.muted} />
+                <Label style={{ color: pageColors.secondary }}>Aucune transaction trouvée.</Label>
+              </View>
+            ) : null}
+          </View>
+          {error && (!connections.data?.length || !accounts.data?.length) ? (
+            <State
+              error={error as Error}
+              retry={() => {
+                void retryAll();
+              }}
+            />
+          ) : null}
+        </Page>
+      </View>
+
+      {filtersOpen ? (
+        <View
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 100,
+            backgroundColor: '#000000B8',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              maxHeight: '88%',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 18,
+              paddingBottom: 28,
+              backgroundColor: pageColors.background,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+              <Label style={{ flex: 1, color: pageColors.text, fontSize: 21, fontWeight: '900' }}>
+                Filtrer les finances
+              </Label>
+              <Pressable
+                accessibilityLabel="Fermer les filtres"
+                onPress={() => setFiltersOpen(false)}
+                style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="close" size={24} color={pageColors.text} />
+              </Pressable>
+            </View>
+            <ScrollView
+              contentContainerStyle={{ gap: 15, paddingBottom: 78 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <ChoiceRow
+                    title="Du mois"
+                    options={months}
+                    value={fromMonth}
+                    onChange={setFromMonth}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ChoiceRow
+                    title="Au mois"
+                    options={months}
+                    value={toMonth}
+                    onChange={setToMonth}
+                  />
+                </View>
+              </View>
+              <ChoiceRow
+                title="Banques"
+                options={bankChoices}
+                value={connectionId}
+                onChange={(value) => {
+                  setConnectionId(value);
+                  setAccountId('all');
+                }}
+              />
+              <ChoiceRow
+                title="Comptes"
+                options={accountChoices}
+                value={accountId}
+                onChange={setAccountId}
+              />
+              <ChoiceRow
+                title="Catégories"
+                options={[{ id: 'all', label: 'Toutes' }, ...categories]}
+                value={category}
+                onChange={setCategory}
+              />
+              <View style={{ flexDirection: 'row', gap: 7 }}>
+                <Chip label="Toutes" selected={kind === 'all'} onPress={() => setKind('all')} />
+                <Chip
+                  label="Revenus"
+                  selected={kind === 'income'}
+                  onPress={() => setKind('income')}
+                />
+                <Chip
+                  label="Dépenses"
+                  selected={kind === 'expense'}
+                  onPress={() => setKind('expense')}
+                />
+              </View>
+              <Pressable
+                onPress={() => setExcludeInternalTransfers((value) => !value)}
+                style={{
+                  minHeight: 48,
+                  borderRadius: 15,
+                  paddingHorizontal: 13,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: pageColors.surface,
+                  borderWidth: 1,
+                  borderColor: pageColors.separator,
+                }}
+              >
+                <Ionicons
+                  name={excludeInternalTransfers ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={21}
+                  color={excludeInternalTransfers ? normalizedAccent : pageColors.muted}
+                />
+                <Label style={{ flex: 1, marginLeft: 9, color: pageColors.body, fontSize: 12 }}>
+                  Exclure les virements internes des calculs
+                </Label>
+              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 9 }}>
+                <View style={{ flex: 1 }}>
+                  <Button title="Réinitialiser" secondary onPress={resetFilters} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title="Afficher" onPress={() => setFiltersOpen(false)} />
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
+
+      {analysisOpen ? (
+        <View
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 100,
+            backgroundColor: '#000000B8',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              maxHeight: '86%',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 18,
+              paddingBottom: 28,
+              backgroundColor: pageColors.background,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+              <Label style={{ flex: 1, color: pageColors.text, fontSize: 21, fontWeight: '900' }}>
+                Analyse du mois
+              </Label>
+              <Pressable
+                accessibilityLabel="Fermer l’analyse"
+                onPress={() => setAnalysisOpen(false)}
+                style={{ width: 40, alignItems: 'center' }}
+              >
+                <Ionicons name="close" size={24} color={pageColors.text} />
+              </Pressable>
+            </View>
+            <ScrollView
+              contentContainerStyle={{ gap: 12, paddingBottom: 78 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <Card style={{ gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 14 }}>
+                  <View style={{ flex: 1 }}>
+                    <Label muted style={{ fontSize: 11 }}>
+                      Dépenses fixes
+                    </Label>
+                    <Label style={{ fontSize: 18, fontWeight: '900' }}>
+                      {money(data.fixedExpense)}
+                    </Label>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Label muted style={{ fontSize: 11 }}>
+                      Dépenses variables
+                    </Label>
+                    <Label style={{ fontSize: 18, fontWeight: '900' }}>
+                      {money(data.variableExpense)}
+                    </Label>
+                  </View>
+                </View>
+                <View
+                  style={{
+                    borderTopWidth: 1,
+                    borderTopColor: pageColors.separator,
+                    paddingTop: 11,
+                  }}
+                >
+                  <Label style={{ color: pageColors.body, fontWeight: '800' }}>
+                    {data.forecast.available
+                      ? `Projection : ${money(data.forecast.projected)}`
+                      : 'Prévision indisponible'}
+                  </Label>
+                  <Label style={{ color: pageColors.secondary, fontSize: 11, marginTop: 3 }}>
+                    {data.forecast.available
+                      ? data.forecast.isOverrun
+                        ? `Risque de dépassement de ${money(data.forecast.overrunAmount)}`
+                        : `Rythme compatible avec votre plafond · ${data.forecast.remainingDays} jours restants`
+                      : 'Définissez au moins un budget pour activer la prévision.'}
+                  </Label>
+                </View>
+              </Card>
+              {data.cashflow.map((row) => {
+                const max = Math.max(row.expense, row.planned, 1);
+                return (
+                  <Card key={row.month} style={{ gap: 7 }}>
+                    <View style={{ flexDirection: 'row' }}>
+                      <Label style={{ flex: 1, fontWeight: '800' }}>{monthLabel(row.month)}</Label>
+                      <Label style={{ color: row.delta > 0 ? '#E86D67' : '#20B657', fontSize: 11 }}>
+                        Écart {money(row.delta)}
+                      </Label>
+                    </View>
+                    <Label muted style={{ fontSize: 11 }}>
+                      Prévu {money(row.planned)} · Réel {money(row.expense)} · Net {money(row.net)}
+                    </Label>
+                    <View
+                      style={{
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: pageColors.separator,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <View
+                        style={{
+                          height: 6,
+                          width: `${Math.min((row.expense / max) * 100, 100)}%`,
+                          backgroundColor: row.delta > 0 ? '#E86D67' : normalizedAccent,
+                        }}
+                      />
+                    </View>
+                  </Card>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
+
+      {budgetsOpen ? (
+        <View
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 100,
+            backgroundColor: '#000000B8',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              maxHeight: '90%',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 18,
+              paddingBottom: 28,
+              backgroundColor: pageColors.background,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+              <View style={{ flex: 1 }}>
+                <Label style={{ color: pageColors.text, fontSize: 21, fontWeight: '900' }}>
+                  Budgets
+                </Label>
+                <Label style={{ color: pageColors.secondary, fontSize: 11 }}>
+                  Plafonds mensuels par catégorie
+                </Label>
+              </View>
+              <Pressable
+                accessibilityLabel="Fermer les budgets"
+                onPress={() => setBudgetsOpen(false)}
+                style={{ width: 40, alignItems: 'center' }}
+              >
+                <Ionicons name="close" size={24} color={pageColors.text} />
+              </Pressable>
+            </View>
+            <ScrollView
+              contentContainerStyle={{ gap: 8, paddingBottom: 78 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {categories.map((definition) => {
+                const budget = budgetMap.get(definition.id);
+                const summary = summaryMap.get(definition.id);
+                const limit = summary?.periodLimit ?? budget?.monthlyLimit ?? null;
+                const spent = summary?.expense ?? 0;
+                const progress = limit ? Math.min((spent / limit) * 100, 100) : 0;
+                const status = summary?.status ?? 'unset';
+                const type = budget?.categoryType ?? definition.type;
+                return (
+                  <Card key={definition.id} style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ flex: 1 }}>
+                        <Label style={{ fontWeight: '800' }}>{definition.label}</Label>
+                        <Label muted style={{ fontSize: 10 }}>
+                          {type === 'fixed' ? 'Fixe' : 'Variable'} · {money(spent)} dépensés
+                        </Label>
+                      </View>
+                      <Pressable
+                        onPress={() =>
+                          setEditingBudget({
+                            category: definition.id,
+                            value: budget ? String(budget.monthlyLimit) : '',
+                          })
+                        }
+                      >
+                        <Label style={{ color: normalizedAccent, fontSize: 11, fontWeight: '800' }}>
+                          {budget ? money(budget.monthlyLimit) : 'Définir'}
+                        </Label>
+                      </Pressable>
+                    </View>
+                    <View
+                      style={{
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: pageColors.separator,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <View
+                        style={{
+                          height: 6,
+                          width: `${progress}%`,
+                          backgroundColor:
+                            status === 'exceeded'
+                              ? '#E86D67'
+                              : status === 'near'
+                                ? '#E7A942'
+                                : normalizedAccent,
+                        }}
+                      />
+                    </View>
+                    {editingBudget?.category === definition.id ? (
+                      <View style={{ gap: 8 }}>
+                        <View style={{ flexDirection: 'row', gap: 7 }}>
+                          <TextInput
+                            autoFocus
+                            value={editingBudget.value}
+                            keyboardType="decimal-pad"
+                            onChangeText={(value) =>
+                              setEditingBudget({ category: definition.id, value: numeric(value) })
+                            }
+                            placeholder="Budget mensuel"
+                            placeholderTextColor={pageColors.muted}
+                            style={{
+                              flex: 1,
+                              minHeight: 42,
+                              borderRadius: 12,
+                              backgroundColor: pageColors.elevated,
+                              color: pageColors.text,
+                              paddingHorizontal: 11,
+                            }}
+                          />
+                          <Pressable
+                            onPress={() => {
+                              const amount = Number(editingBudget.value);
+                              if (Number.isFinite(amount) && amount > 0)
+                                saveBudget.mutate({ categoryId: definition.id, amount, type });
+                            }}
+                            style={{
+                              minWidth: 52,
+                              borderRadius: 12,
+                              backgroundColor: normalizedAccent,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Label style={{ color: accentForeground, fontWeight: '900' }}>OK</Label>
+                          </Pressable>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 7 }}>
+                          <Chip
+                            label="Fixe"
+                            selected={type === 'fixed'}
+                            onPress={() =>
+                              budget &&
+                              saveBudget.mutate({
+                                categoryId: definition.id,
+                                amount: budget.monthlyLimit,
+                                type: 'fixed',
+                              })
+                            }
+                          />
+                          <Chip
+                            label="Variable"
+                            selected={type === 'variable'}
+                            onPress={() =>
+                              budget &&
+                              saveBudget.mutate({
+                                categoryId: definition.id,
+                                amount: budget.monthlyLimit,
+                                type: 'variable',
+                              })
+                            }
+                          />
+                          {budget ? (
+                            <Pressable
+                              onPress={() => removeBudget.mutate(definition.id)}
+                              style={{ justifyContent: 'center', paddingHorizontal: 7 }}
+                            >
+                              <Label style={{ color: '#E86D67', fontSize: 11 }}>Supprimer</Label>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      </View>
+                    ) : null}
+                  </Card>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
+
+      {editingItem ? (
+        <View
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 100,
+            backgroundColor: '#000000B8',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 18,
+              paddingBottom: 102,
+              backgroundColor: pageColors.background,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 13 }}>
+              <View style={{ flex: 1 }}>
+                <Label style={{ color: pageColors.text, fontSize: 20, fontWeight: '900' }}>
+                  {editingItem?.merchantName}
+                </Label>
+                <Label style={{ color: pageColors.secondary, fontSize: 11 }}>
+                  Modifier la catégorie
+                </Label>
+              </View>
+              <Pressable
+                accessibilityLabel="Fermer les catégories"
+                onPress={() => setEditingTransaction(null)}
+                style={{ width: 40, alignItems: 'center' }}
+              >
+                <Ionicons name="close" size={24} color={pageColors.text} />
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 7 }}>
+                {categories.map((entry) => (
+                  <Chip
+                    key={entry.id}
+                    label={entry.label}
+                    selected={editingItem?.category === entry.id}
+                    onPress={() =>
+                      editingItem &&
+                      saveCategory.mutate({ id: editingItem.id, categoryId: entry.id })
+                    }
+                  />
+                ))}
+              </View>
+            </ScrollView>
+            {editingItem?.isCustomCategory ? (
+              <Pressable
+                onPress={() => resetCategory.mutate(editingItem.id)}
+                style={{ marginTop: 14 }}
+              >
+                <Label style={{ color: normalizedAccent, fontSize: 12, fontWeight: '700' }}>
+                  Revenir à la catégorie automatique
+                </Label>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
     </ScreenWithTabs>
   );
 }

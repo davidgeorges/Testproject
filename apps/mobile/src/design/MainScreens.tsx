@@ -64,7 +64,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
   const normalizedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR;
   const accentForeground = accentTextColor(normalizedAccent);
   if (active === 'Profile') return null;
-  const homeLight = active === 'Home' || active === 'Subscriptions';
+  const homeLight = active === 'Home' || active === 'Subscriptions' || active === 'Finances';
   const glassTheme =
     active === 'Home' ||
     active === 'Subscriptions' ||
@@ -193,7 +193,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         paddingVertical: homeLight ? 9 : glassTheme ? 2 : 6,
         paddingHorizontal: homeLight ? 14 : glassTheme ? 5 : 0,
         marginHorizontal:
-          active === 'Finances' || active === 'Savings'
+          active === 'Savings'
             ? dashboardScrollY.interpolate({
                 inputRange: [0, 95],
                 outputRange: [15, 91],
@@ -253,7 +253,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
               overflow: 'hidden',
               opacity: homeLight
                 ? 0
-                : active === 'Finances' || active === 'Savings'
+                : active === 'Savings'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 55, 95],
                       outputRange: [1, 0.35, 0],
@@ -262,7 +262,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                   : 1,
               maxHeight: homeLight
                 ? 0
-                : active === 'Finances' || active === 'Savings'
+                : active === 'Savings'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 95],
                       outputRange: [13, 0],
