@@ -18,7 +18,7 @@ Toutes les corrections prioritaires réalisables uniquement dans le dépôt ont 
 | P1 02 | Clé de chiffrement bancaire séparée et format de ciphertext versionné ; lecture des anciennes valeurs conservée pour migration. |
 | P1 03 | Pagination Tink jusqu’à épuisement, limite de sécurité de 100 pages/10 000 opérations et erreur explicite plutôt qu’une troncature silencieuse. |
 | P1 05–06 | Synchronisation mobile par job durable et interrogation d’état. Codes Tink conservés, erreurs permanentes classées et reconnexion demandée. |
-| P1 07 | Readiness étendue au webhook Tink, à la clé de chiffrement et au callback natif. |
+| P1 07 | Webhook Tink Events v2 créé pour `refresh:finished`, `account-transactions:modified` et `account:updated`. Le corps brut est vérifié avec `X-Tink-Signature` (`t=…,v1=…`), HMAC-SHA256, comparaison en temps constant et fenêtre anti-rejeu de dix minutes. |
 | P1 08 | Signature HMAC RevenueCat sur le corps brut avec timestamp et fenêtre anti-rejeu de cinq minutes. |
 | P1 10–11 | Désinscription push au logout ; tickets Expo persistés, reçus contrôlés après quinze minutes, reprises et désactivation de `DeviceNotRegistered`. |
 | P1 12 | Le profil existant et ses préférences ne sont plus écrasés lors de l’authentification. |
@@ -42,7 +42,7 @@ Autres changements livrés : suppression de compte mobile sans faux succès, web
 | Contrôle | Résultat |
 | --- | --- |
 | Build .NET Release | réussi, 0 avertissement |
-| Tests .NET | 66 réussis, 0 échec, 2 ignorés faute de Docker local |
+| Tests .NET | 67 réussis, 0 échec, 2 ignorés faute de Docker local |
 | TypeScript | réussi |
 | Prettier | réussi |
 | Export Expo Web | réussi |
@@ -56,14 +56,21 @@ Les deux tests ignorés couvrent PostgreSQL et Redis et sont exécutés par la C
 
 ## Actions qui nécessitent un accès externe ou une décision
 
-1. **Neon :** renouveler le mot de passe PostgreSQL précédemment communiqué, mettre à jour Render, révoquer l’ancien et vérifier les journaux.
-2. **Render :** ajouter `Banking__TokenEncryptionKey`, `Tink__NativeRedirectUri`, `Tink__WebhookAuthorization`, `RevenueCat__WebhookSigningSecret`, les identifiants produits RevenueCat exacts, les domaines partenaires et un compte de service Firebase Admin. `/health/ready` indique chaque manque.
-3. **Tink :** autoriser `subscriptionapp://banking/callback`, configurer le webhook et tester connexion, reconnexion, expiration et révocation sur Android/iOS physiques.
-4. **RevenueCat et stores :** créer/associer les vrais produits sandbox Apple/Google, renseigner les clés SDK publiques de chaque plateforme et tester tout le cycle d’achat. Aucun achat réel n’est requis pour la recette sandbox.
-5. **Catalogue :** obtenir des offres et accords partenaires vérifiés. Le code refuse désormais un domaine non autorisé, mais ne peut pas inventer une offre commerciale réelle.
-6. **Juridique :** fournir l’identité de l’entreprise, le responsable de traitement, le support et les décisions de conservation afin de publier CGU, confidentialité, mentions légales et déclarations stores.
-7. **Infrastructure :** aligner les régions, créer un staging séparé, brancher OpenTelemetry à une plateforme d’alertes et exécuter une restauration Neon suivant le runbook.
-8. **Recette :** tester appareils réels, accessibilité, charge, panne fournisseur, sauvegarde, rollback et réaliser un test d’intrusion indépendant.
+1. **Neon :** valider dans la console la réinitialisation du mot de passe PostgreSQL précédemment communiqué, puis mettre à jour immédiatement `ConnectionStrings__Postgres` sur Render et vérifier la readiness.
+2. **Tink :** se reconnecter à la console pour ajouter `subscriptionapp://banking/callback` aux URI autorisées, puis tester le retour sur Android/iOS physiques. Le webhook Events v2 est déjà créé, signé et testé en production.
+3. **RevenueCat et stores :** les produits gratuits du Test Store `monthly` et `yearly` sont associés à l’offering. Les produits sandbox Apple/Google exigent les comptes développeur et la création préalable des abonnements dans App Store Connect et Play Console ; cette étape n’a pas été effectuée puisqu’aucun achat en ligne n’est autorisé.
+4. **Catalogue :** obtenir les domaines, offres et accords partenaires vérifiés. Le code refuse désormais un domaine non autorisé, mais ne peut pas inventer une offre commerciale réelle.
+5. **Juridique :** fournir l’identité de l’entreprise, le responsable de traitement, le support et les décisions de conservation afin de publier les CGU, la politique de confidentialité, les mentions légales et les déclarations stores définitives.
+6. **Infrastructure :** aligner les régions, créer un staging séparé, brancher OpenTelemetry à une plateforme d’alertes et exécuter une restauration Neon suivant le runbook.
+7. **Recette :** tester appareils réels, accessibilité, charge, panne fournisseur, sauvegarde, rollback et réaliser un test d’intrusion indépendant.
+
+## Configuration fournisseur vérifiée
+
+- Render contient les clés de chiffrement bancaire, le callback Tink natif, les secrets de webhooks Tink et RevenueCat, la table exacte des produits RevenueCat et le compte de service Firebase Admin.
+- `/health/ready` répond `200` avec tous les indicateurs à `true`, dont `database`, `bankingWebhook`, `bankingEncryption`, `bankingNative`, `identity`, `push`, `premiumProducts` et `premiumEvents`.
+- Le webhook Tink de production répond `200` à un événement de test signé selon le format Events v2.
+- Firebase Admin est actif pour l’identité et les notifications push.
+- RevenueCat est opérationnel avec son Test Store gratuit ; l’association aux stores Apple et Google reste dépendante des comptes et produits externes.
 
 ## Risques techniques encore ouverts dans le code
 
