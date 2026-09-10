@@ -9,6 +9,7 @@ import {
   Platform,
   Animated,
   Easing,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -292,22 +293,112 @@ export function Welcome() {
     </LinearGradient>
   );
 }
+
+function GlassAuthField({
+  icon,
+  label,
+  placeholder,
+  value,
+  onChangeText,
+  password = false,
+}: {
+  icon: IconName;
+  label: string;
+  placeholder: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  password?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <View style={{ gap: 8 }}>
+      <Label style={{ color: '#DDE5EC', fontSize: 12, fontWeight: '600' }}>{label}</Label>
+      <View
+        style={{
+          minHeight: 54,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 14,
+          borderRadius: 17,
+          borderWidth: 1,
+          borderColor: '#33414B',
+          backgroundColor: '#111920D9',
+        }}
+      >
+        <Ionicons name={icon} size={19} color="#83909D" />
+        <TextInput
+          accessibilityLabel={label}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#66727E"
+          secureTextEntry={password && !visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={{
+            flex: 1,
+            minHeight: 52,
+            paddingHorizontal: 12,
+            color: '#F7F9FB',
+            fontSize: 14,
+          }}
+        />
+        {password && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+            onPress={() => setVisible((current) => !current)}
+            style={{ width: 38, height: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons
+              name={visible ? 'eye-off-outline' : 'eye-outline'}
+              size={20}
+              color="#9BA6B1"
+            />
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export function AuthScreen({ register = false }: { register?: boolean }) {
   const nav = useNav();
   const queryClient = useQueryClient();
-  const c = useColors();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [accept, setAccept] = useState(false);
   const [message, setMessage] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const authIntro = useRef(new Animated.Value(0)).current;
+  const authPulse = useRef(new Animated.Value(0)).current;
   const googleSignIn = useGoogleSignIn();
   const rules = [
     ['Au moins 8 caractères', password.length >= 8],
     ['Une majuscule', /[A-Z]/.test(password)],
     ['Un chiffre', /\d/.test(password)],
   ] as const;
+  useEffect(() => {
+    const entrance = Animated.timing(authIntro, {
+      toValue: 1,
+      duration: 650,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    const pulsing = Animated.loop(
+      Animated.sequence([
+        Animated.timing(authPulse, { toValue: 1, duration: 1450, useNativeDriver: true }),
+        Animated.timing(authPulse, { toValue: 0, duration: 1450, useNativeDriver: true }),
+      ]),
+    );
+    entrance.start();
+    pulsing.start();
+    return () => {
+      entrance.stop();
+      pulsing.stop();
+    };
+  }, [authIntro, authPulse]);
   async function finishAuthentication(firebase: FirebaseSession) {
     useSession.getState().setToken(firebase.token);
     useSession.getState().setIdentity(firebase);
@@ -366,115 +457,270 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
     }
   }
   return (
-    <Page fill style={{ gap: 19, paddingTop: 10 }}>
-      <View style={{ gap: 8 }}>
-        <Label style={{ fontSize: 25, lineHeight: 32, fontWeight: '700' }}>
-          {register ? 'Créer un compte' : 'Bienvenue !'}
-        </Label>
-        <Label muted style={{ fontSize: 13, lineHeight: 19 }}>
-          {register
-            ? 'Quelques informations pour bien commencer.'
-            : 'Connectez-vous pour reprendre\nle contrôle de vos dépenses.'}
-        </Label>
-      </View>
-      {register && (
-        <Field label="Nom complet" placeholder="Jean Dupont" value={name} onChangeText={setName} />
-      )}
-      <Field label="Email" placeholder="votre@email.com" value={email} onChangeText={setEmail} />
-      <Field
-        label="Mot de passe"
-        placeholder=""
-        value={password}
-        onChangeText={setPassword}
-        password
+    <LinearGradient
+      colors={['#020609', '#07100E', '#020609']}
+      locations={[0, 0.52, 1]}
+      style={{ flex: 1 }}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 48,
+          left: 62,
+          width: 255,
+          height: 255,
+          borderRadius: 128,
+          backgroundColor: '#20F2A00D',
+          opacity: authPulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }),
+          transform: [
+            { scale: authPulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] }) },
+          ],
+        }}
       />
-      {register ? (
-        <View style={{ gap: 7 }}>
-          {rules.map(([label, valid]) => (
-            <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="checkmark-circle" size={18} color={valid ? '#00DE86' : '#395466'} />
-              <Label muted style={{ fontSize: 12 }}>
-                {label}
-              </Label>
-            </View>
-          ))}
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: accept }}
-            onPress={() => setAccept(!accept)}
-            style={{ flexDirection: 'row', gap: 9, minHeight: 44, alignItems: 'center' }}
-          >
-            <Ionicons name={accept ? 'checkbox' : 'square-outline'} color="#3983FF" size={21} />
-            <Label style={{ flex: 1, fontSize: 12 }}>
-              J’accepte les <Label style={{ fontSize: 12, color: '#168CFF' }}>CGU</Label> et la{' '}
-              <Label style={{ fontSize: 12, color: '#168CFF' }}>Politique de confidentialité</Label>
-            </Label>
-          </Pressable>
-        </View>
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => nav.navigate('ResetPassword')}
-          style={{ alignSelf: 'flex-end', minHeight: 32 }}
+      <Page
+        fill
+        transparent
+        style={{
+          gap: register ? 15 : 18,
+          paddingHorizontal: 22,
+          paddingTop: register ? 8 : 34,
+          paddingBottom: 22,
+        }}
+      >
+        <Animated.View
+          style={{
+            gap: register ? 15 : 18,
+            opacity: authIntro,
+            transform: [
+              { translateY: authIntro.interpolate({ inputRange: [0, 1], outputRange: [34, 0] }) },
+            ],
+          }}
         >
-          <Label style={{ color: '#168CFF', fontSize: 12 }}>Mot de passe oublié ?</Label>
-        </Pressable>
-      )}
-      {message && <Label style={{ fontSize: 12, color: '#FF7485' }}>{message}</Label>}
-      <Button
-        title={register ? 'Créer mon compte' : 'Se connecter'}
-        loading={authBusy}
-        onPress={() => void submit()}
-      />
-      {!register && (
-        <>
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
-            <Label muted style={{ fontSize: 12 }}>
-              ou
-            </Label>
-            <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Pressable
-              accessibilityLabel="Connexion Google"
-              accessibilityRole="button"
-              disabled={authBusy}
-              onPress={() => void googleLogin()}
+          <View style={{ alignItems: 'center', gap: 14 }}>
+            <LinearGradient
+              colors={['#283138', '#11181E', '#080D11']}
               style={{
-                flex: 1,
-                borderColor: c.border,
-                borderWidth: 1,
-                borderRadius: 12,
-                height: 52,
+                width: 66,
+                height: 66,
+                borderRadius: 22,
                 alignItems: 'center',
                 justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#6D7A8480',
+                shadowColor: '#20F2A0',
+                shadowOpacity: 0.18,
+                shadowRadius: 20,
+                shadowOffset: { width: 0, height: 8 },
               }}
             >
-              {authBusy ? (
-                <ActivityIndicator color="#4285F4" />
-              ) : (
-                <Ionicons name="logo-google" size={25} color="#4285F4" />
-              )}
-            </Pressable>
+              <Ionicons
+                name={register ? 'person-add-outline' : 'layers'}
+                size={34}
+                color="#F4F7F9"
+              />
+            </LinearGradient>
+            <View style={{ alignItems: 'center', gap: 5 }}>
+              <Label
+                style={{ fontSize: 29, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7 }}
+              >
+                {register ? 'Créer un compte' : 'Bienvenue !'}
+              </Label>
+              <Label
+                style={{ color: '#939EAA', fontSize: 13, lineHeight: 19, textAlign: 'center' }}
+              >
+                {register
+                  ? 'Quelques informations pour bien commencer.'
+                  : 'Retrouvez une vision claire de vos dépenses.'}
+              </Label>
+            </View>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => nav.navigate('Register')}
-            style={{ alignItems: 'center', paddingTop: 5, minHeight: 44 }}
+
+          <LinearGradient
+            colors={['#151D23E8', '#0A1015F2']}
+            style={{
+              gap: register ? 13 : 15,
+              padding: 17,
+              borderRadius: 25,
+              borderWidth: 1,
+              borderColor: '#2C3740',
+              shadowColor: '#000',
+              shadowOpacity: 0.42,
+              shadowRadius: 24,
+              shadowOffset: { width: 0, height: 14 },
+            }}
           >
-            <Label muted style={{ fontSize: 12 }}>
-              Pas encore de compte ?{' '}
-              <Label style={{ fontSize: 12, color: '#168CFF' }}>Créer un compte</Label>
-            </Label>
-          </Pressable>
-        </>
-      )}
-      <View style={{ flex: 1 }} />
-      <Label muted style={{ fontSize: 10, lineHeight: 15, textAlign: 'center' }}>
-        Vos identifiants sont protégés par Firebase Authentication.
-      </Label>
-    </Page>
+            {register && (
+              <GlassAuthField
+                icon="person-outline"
+                label="Nom complet"
+                placeholder="Jean Dupont"
+                value={name}
+                onChangeText={setName}
+              />
+            )}
+            <GlassAuthField
+              icon="mail-outline"
+              label="Email"
+              placeholder="votre@email.com"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <GlassAuthField
+              icon="lock-closed-outline"
+              label="Mot de passe"
+              placeholder="Votre mot de passe"
+              value={password}
+              onChangeText={setPassword}
+              password
+            />
+            {register ? (
+              <View style={{ gap: 7 }}>
+                {rules.map(([label, valid]) => (
+                  <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={17}
+                      color={valid ? '#20F2A0' : '#43515C'}
+                    />
+                    <Label style={{ color: '#9BA6B1', fontSize: 11 }}>{label}</Label>
+                  </View>
+                ))}
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: accept }}
+                  onPress={() => setAccept(!accept)}
+                  style={{ flexDirection: 'row', gap: 9, minHeight: 40, alignItems: 'center' }}
+                >
+                  <Ionicons
+                    name={accept ? 'checkbox' : 'square-outline'}
+                    color={accept ? '#20F2A0' : '#73808B'}
+                    size={20}
+                  />
+                  <Label style={{ flex: 1, fontSize: 11, color: '#AAB4BE' }}>
+                    J’accepte les <Label style={{ fontSize: 11, color: '#20F2A0' }}>CGU</Label> et
+                    la{' '}
+                    <Label style={{ fontSize: 11, color: '#20F2A0' }}>
+                      Politique de confidentialité
+                    </Label>
+                  </Label>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => nav.navigate('ResetPassword')}
+                style={{ alignSelf: 'flex-end', minHeight: 32, justifyContent: 'center' }}
+              >
+                <Label style={{ color: '#20F2A0', fontSize: 12, fontWeight: '600' }}>
+                  Mot de passe oublié ?
+                </Label>
+              </Pressable>
+            )}
+            {message && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 7,
+                  borderRadius: 12,
+                  padding: 10,
+                  backgroundColor: '#3B151B',
+                }}
+              >
+                <Ionicons name="alert-circle-outline" size={17} color="#FF7D8D" />
+                <Label style={{ flex: 1, fontSize: 11, color: '#FF9EAA' }}>{message}</Label>
+              </View>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              disabled={authBusy}
+              onPress={() => void submit()}
+              style={({ pressed }) => ({ opacity: pressed || authBusy ? 0.72 : 1 })}
+            >
+              <LinearGradient
+                colors={['#35F5AE', '#13C985']}
+                style={{
+                  minHeight: 52,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#20F2A0',
+                  shadowOpacity: 0.24,
+                  shadowRadius: 14,
+                  shadowOffset: { width: 0, height: 7 },
+                }}
+              >
+                {authBusy ? (
+                  <ActivityIndicator color="#04100B" />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Label style={{ color: '#03120C', fontSize: 14, fontWeight: '800' }}>
+                      {register ? 'Créer mon compte' : 'Se connecter'}
+                    </Label>
+                    <Ionicons name="arrow-forward" size={18} color="#03120C" />
+                  </View>
+                )}
+              </LinearGradient>
+            </Pressable>
+          </LinearGradient>
+
+          {!register && (
+            <>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <View style={{ height: 1, flex: 1, backgroundColor: '#26313A' }} />
+                <Label style={{ color: '#707C87', fontSize: 11 }}>ou continuer avec</Label>
+                <View style={{ height: 1, flex: 1, backgroundColor: '#26313A' }} />
+              </View>
+              <Pressable
+                accessibilityLabel="Connexion Google"
+                accessibilityRole="button"
+                disabled={authBusy}
+                onPress={() => void googleLogin()}
+                style={({ pressed }) => ({
+                  opacity: pressed || authBusy ? 0.7 : 1,
+                  height: 52,
+                  borderColor: '#34414B',
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  backgroundColor: '#111920CC',
+                  flexDirection: 'row',
+                  gap: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                })}
+              >
+                <Ionicons name="logo-google" size={21} color="#F2F5F7" />
+                <Label style={{ color: '#EEF2F5', fontSize: 13, fontWeight: '700' }}>
+                  Continuer avec Google
+                </Label>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => nav.navigate('Register')}
+                style={{ alignItems: 'center', minHeight: 42, justifyContent: 'center' }}
+              >
+                <Label style={{ color: '#8995A0', fontSize: 12 }}>
+                  Pas encore de compte ?{' '}
+                  <Label style={{ fontSize: 12, color: '#20F2A0', fontWeight: '700' }}>
+                    Créer un compte
+                  </Label>
+                </Label>
+              </Pressable>
+            </>
+          )}
+        </Animated.View>
+        <View style={{ flex: 1, minHeight: 6 }} />
+        <View
+          style={{ flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Ionicons name="shield-checkmark-outline" size={14} color="#65717C" />
+          <Label style={{ fontSize: 9, lineHeight: 14, color: '#65717C', textAlign: 'center' }}>
+            Connexion sécurisée par Firebase Authentication
+          </Label>
+        </View>
+      </Page>
+    </LinearGradient>
   );
 }
 export function Login() {

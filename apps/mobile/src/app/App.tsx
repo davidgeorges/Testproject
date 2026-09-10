@@ -213,10 +213,11 @@ function Navigator({ onChange }: { onChange: () => void }) {
         initialRouteName={token || PREVIEW_ENABLED ? 'Main' : 'Welcome'}
         screenOptions={({ route, navigation: nav }) => ({
           contentStyle: {
-            backgroundColor:
-              route.name === 'Subscription' || route.name === 'Recommendation'
-                ? '#020609'
-                : c.background,
+            backgroundColor: ['Subscription', 'Recommendation', 'Login', 'Register'].includes(
+              route.name,
+            )
+              ? '#020609'
+              : c.background,
           },
           animation: 'fade',
           header: ({ options }) => (
@@ -225,10 +226,11 @@ function Navigator({ onChange }: { onChange: () => void }) {
                 height: 44,
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor:
-                  route.name === 'Subscription' || route.name === 'Recommendation'
-                    ? '#020609'
-                    : c.background,
+                backgroundColor: ['Subscription', 'Recommendation', 'Login', 'Register'].includes(
+                  route.name,
+                )
+                  ? '#020609'
+                  : c.background,
                 paddingHorizontal: 6,
               }}
             >
