@@ -280,6 +280,7 @@ if (string.IsNullOrEmpty(connectionString))
 else
 {
     builder.Services.AddDbContext<WorkspaceDbContext>(o => o.UseNpgsql(connectionString));
+    dataProtection.PersistKeysToDbContext<WorkspaceDbContext>();
     builder.Services.AddScoped<IWorkspaceStore, PostgresWorkspaceStore>();
     builder.Services.AddScoped<PostgresOfferCatalog>();
     builder.Services.AddScoped<IOfferCatalog, CachedOfferCatalog>();

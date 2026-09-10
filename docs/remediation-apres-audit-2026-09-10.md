@@ -5,7 +5,7 @@
 
 ## Résultat
 
-Toutes les corrections réalisables uniquement dans le dépôt ont été appliquées. Les éléments encore ouverts nécessitent une console fournisseur, un contrat, une identité d’entreprise, une décision juridique, un appareil physique ou un service payant. Aucun achat n’a été effectué.
+Toutes les corrections prioritaires réalisables uniquement dans le dépôt ont été appliquées. Les éléments encore ouverts nécessitent une console fournisseur, un contrat, une identité d’entreprise, une décision juridique, un appareil physique ou un service payant. Aucun achat n’a été effectué.
 
 ## Éléments corrigés
 
@@ -27,7 +27,7 @@ Toutes les corrections réalisables uniquement dans le dépôt ont été appliqu
 | P1 16 | Économie réalisée persistée avec date et montant annuel confirmé ; filtre et total Réalisées fonctionnels. |
 | P1 17 | Chaque création/modification/désactivation d’offre administrateur produit maintenant un audit métier. |
 | P1 21 | Arbre Expo dédupliqué ; Expo Doctor passe 20 contrôles sur 20 et est obligatoire en CI. |
-| P2 03–04 | OpenAPI retiré de la production, informations de mode retirées de `/health`, CSP ajoutée. |
+| P2 03–04 | OpenAPI retiré de la production, informations de mode retirées de `/health`, CSP et HSTS ajoutées, en tenant compte du proxy HTTPS Render. |
 | P2 10 | Plafond de cinq banques sérialisé en PostgreSQL par verrou transactionnel pour éviter la course concurrente. |
 | P2 16 | Webhook d’affiliation protégé par timestamp signé et fenêtre anti-rejeu. |
 | P2 17 | Plans RevenueCat déterminés par une table d’identifiants produits exacte, plus par recherche de mots dans le nom. |
@@ -35,7 +35,7 @@ Toutes les corrections réalisables uniquement dans le dépôt ont été appliqu
 | P2 19 | Erreurs Firebase mappées sans exposition des messages fournisseur. |
 | P2 29–30 | CI enrichie avec format .NET, audit NuGet, audit npm niveau élevé, Expo Doctor, Dependabot npm/NuGet/Docker/Actions. Format .NET réparé. |
 
-Autres changements livrés : suppression de compte mobile sans faux succès, webhook RevenueCat étendu aux pauses, problèmes de facturation et remboursements, audit des consentements et économies réalisées, configuration Tink native documentée, procédures de réponse à incident, rotation, sauvegarde/restauration, publication et inventaire des données.
+Autres changements livrés : suppression de compte mobile sans faux succès, webhook RevenueCat étendu aux pauses, problèmes de facturation et remboursements, audit des consentements et économies réalisées, clés ASP.NET persistées dans PostgreSQL entre les redéploiements, image Alpine complétée pour Npgsql, configuration Tink native documentée, procédures de réponse à incident, rotation, sauvegarde/restauration, publication et inventaire des données.
 
 ## Validation exécutée
 

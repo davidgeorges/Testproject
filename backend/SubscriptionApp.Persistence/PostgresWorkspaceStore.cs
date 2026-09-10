@@ -341,7 +341,7 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var job = await db.SyncJobs
             .FromSqlInterpolated($"SELECT * FROM bank_sync_jobs WHERE \"Status\" = 'queued' OR (\"Status\" = 'running' AND \"LeaseExpiresAt\" <= {now}) ORDER BY \"CreatedAt\" LIMIT 1 FOR UPDATE SKIP LOCKED")
-            .FirstOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(ct);
         if (job is not null)
         {
             job.Status = "running"; job.Attempts++; job.UpdatedAt = now; job.LeaseExpiresAt = now.Add(lease);
@@ -602,7 +602,7 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         var retryAt = now.AddMinutes(-1);
         var job = await db.AccountDeletionJobs
             .FromSqlInterpolated($"SELECT * FROM account_deletion_jobs WHERE \"Attempts\" < 10 AND (\"Status\" = 'pending' OR (\"Status\" = 'failed' AND \"UpdatedAt\" <= {retryAt}) OR (\"Status\" = 'processing' AND \"UpdatedAt\" <= {stale})) ORDER BY \"CreatedAt\" LIMIT 1 FOR UPDATE SKIP LOCKED")
-            .FirstOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(ct);
         if (job is not null)
         {
             job.Status = "processing";

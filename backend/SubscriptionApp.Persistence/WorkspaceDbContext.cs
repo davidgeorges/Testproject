@@ -1,11 +1,13 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SubscriptionApp.Domain;
 
 namespace SubscriptionApp.Persistence;
 
 public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> options)
-    : DbContext(options)
+    : DbContext(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<UserProfile> Profiles => Set<UserProfile>();
     public DbSet<BankConnection> Connections => Set<BankConnection>();
     public DbSet<BankAccount> Accounts => Set<BankAccount>();
@@ -29,6 +31,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<DataProtectionKey>().ToTable("data_protection_keys");
         b.Entity<UserProfile>().ToTable("user_profiles").HasKey(p => p.Id);
         b.Entity<BankConnection>()
             .ToTable("bank_connections")
