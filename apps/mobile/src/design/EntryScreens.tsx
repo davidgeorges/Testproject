@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -131,10 +132,16 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
     useSession.getState().setIdentity(firebase);
     useSession.getState().setPreview(false);
     const firstName =
-      firebase.displayName?.trim().split(/\s+/)[0] ??
-      firebase.email?.split('@')[0] ??
+      (register ? name.trim().split(/\s+/)[0] : '') ||
+      firebase.displayName?.trim().split(/\s+/)[0] ||
+      firebase.email?.split('@')[0] ||
       'Utilisateur';
-    const profile = await api.saveProfile({ firstName, theme: 'dark', notificationsEnabled: true });
+    const existing = await api.profile();
+    const profile =
+      existing.firstName === 'Utilisateur'
+        ? await api.saveProfile({ ...existing, firstName })
+        : existing;
+    if (register && accept) await api.acceptLegal('1.0');
     queryClient.setQueryData(['profile', firebase.token], profile);
   }
   async function submit() {
@@ -248,42 +255,27 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
             <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            {(['logo-apple', 'logo-google', 'finger-print'] as const).map((icon, i) => (
-              <Pressable
-                key={icon}
-                accessibilityLabel={
-                  ['Connexion Apple', 'Connexion Google', 'Connexion biométrique'][i]
-                }
-                accessibilityRole="button"
-                disabled={authBusy}
-                onPress={() =>
-                  i === 1
-                    ? void googleLogin()
-                    : setMessage(
-                        'Cette méthode de connexion sera disponible dans une prochaine étape.',
-                      )
-                }
-                style={{
-                  flex: 1,
-                  borderColor: c.border,
-                  borderWidth: 1,
-                  borderRadius: 12,
-                  height: 52,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {authBusy && i === 1 ? (
-                  <ActivityIndicator color="#4285F4" />
-                ) : (
-                  <Ionicons
-                    name={icon}
-                    size={25}
-                    color={i === 2 ? '#8B61FF' : i === 1 ? '#4285F4' : c.text}
-                  />
-                )}
-              </Pressable>
-            ))}
+            <Pressable
+              accessibilityLabel="Connexion Google"
+              accessibilityRole="button"
+              disabled={authBusy}
+              onPress={() => void googleLogin()}
+              style={{
+                flex: 1,
+                borderColor: c.border,
+                borderWidth: 1,
+                borderRadius: 12,
+                height: 52,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {authBusy ? (
+                <ActivityIndicator color="#4285F4" />
+              ) : (
+                <Ionicons name="logo-google" size={25} color="#4285F4" />
+              )}
+            </Pressable>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -455,9 +447,28 @@ export function BankScreen() {
       if (!useSession.getState().token) {
         throw new Error('Connectez-vous avec Google avant de relier votre banque.');
       }
-      const { url } = await api.tinkLink();
-      await Linking.openURL(url);
-      return null;
+      const native = Platform.OS !== 'web';
+      const { url } = await api.tinkLink(native);
+      if (!native) {
+        await Linking.openURL(url);
+        return null;
+      }
+      const redirectUri =
+        process.env.EXPO_PUBLIC_TINK_REDIRECT_URI ?? 'subscriptionapp://banking/callback';
+      const result = await WebBrowser.openAuthSessionAsync(url, redirectUri);
+      if (result.type !== 'success') throw new Error('La connexion bancaire a été annulée.');
+      const params = new URL(result.url).searchParams;
+      const code = params.get('code');
+      if (!code) throw new Error(params.get('message') ?? 'Tink n’a retourné aucun code.');
+      const bank = await api.completeTink(
+        code,
+        params.get('credentials_id') ?? params.get('credentialsId'),
+        params.get('state'),
+        key.current,
+      );
+      cache.invalidateQueries();
+      nav.replace('Sync', { connectionId: bank.id });
+      return bank;
     },
     onSuccess: () => {
       setSelected(null);
@@ -779,7 +790,7 @@ export function TinkCallbackScreen() {
       return;
     }
     api
-      .completeTink(code, params.get('credentials_id'), idempotencyKey())
+      .completeTink(code, params.get('credentials_id'), params.get('state'), idempotencyKey())
       .then((bank) => {
         cache.invalidateQueries();
         nav.replace('Sync', { connectionId: bank.id });
@@ -821,8 +832,37 @@ export function SyncScreen() {
   const cache = useQueryClient();
   const key = useRef(idempotencyKey());
   const connectionId = route.params?.connectionId;
+  const [progress, setProgress] = useState(0);
   const mutation = useMutation({
-    mutationFn: (id: string) => api.sync(id, key.current),
+    mutationFn: async (id: string) => {
+      setProgress(10);
+      const job = await api.queueSync(id, key.current);
+      for (let attempt = 0; attempt < 120; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const current = await api.syncJob(job.id);
+        setProgress(
+          current.status === 'processing' ? Math.min(90, 35 + current.attempts * 15) : 20,
+        );
+        if (current.status === 'completed') return current;
+        if (current.status === 'failed')
+          throw new ApiError(
+            503,
+            current.errorCode ?? 'BANK_SYNC_FAILED',
+            current.errorCode === 'CONSENT_EXPIRED' ||
+            current.errorCode === 'TINK_TOKEN_MISSING' ||
+            current.errorCode === 'TINK_TOKEN_INVALID' ||
+            current.errorCode?.includes('401') ||
+            current.errorCode?.includes('403')
+              ? 'Votre connexion bancaire doit être renouvelée.'
+              : 'La synchronisation bancaire a échoué.',
+          );
+      }
+      throw new ApiError(
+        504,
+        'BANK_SYNC_TIMEOUT',
+        'La synchronisation continue en arrière-plan. Revenez dans quelques instants.',
+      );
+    },
     onSuccess: () => cache.invalidateQueries(),
   });
   const run = useRef<string | null>(null);
@@ -834,14 +874,19 @@ export function SyncScreen() {
     }
   }, [connectionId]);
   const preview = PREVIEW_ENABLED && !connectionId;
-  const percent = preview ? 75 : mutation.isSuccess ? 100 : 0;
+  const percent = preview ? 75 : mutation.isSuccess ? 100 : progress;
   const reconnectRequired =
     mutation.error instanceof ApiError &&
-    ['CONSENT_EXPIRED', 'TINK_TRANSACTIONS_401', 'TINK_TRANSACTIONS_403'].includes(
-      mutation.error.code,
-    );
+    [
+      'CONSENT_EXPIRED',
+      'TINK_TOKEN_MISSING',
+      'TINK_TOKEN_INVALID',
+      'TINK_TRANSACTIONS_401',
+      'TINK_TRANSACTIONS_403',
+    ].includes(mutation.error.code);
   const retry = () => {
     key.current = idempotencyKey();
+    setProgress(0);
     mutation.mutate(connectionId!);
   };
   return (

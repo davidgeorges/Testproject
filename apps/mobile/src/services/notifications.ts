@@ -30,3 +30,8 @@ export async function registerForPushNotifications(): Promise<boolean> {
   await api.registerPushDevice(Platform.OS as 'ios' | 'android', token);
   return true;
 }
+
+export async function unregisterPushNotifications(): Promise<void> {
+  const devices = await api.pushDevices();
+  await Promise.all(devices.map((device) => api.removePushDevice(device.id)));
+}

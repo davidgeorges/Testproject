@@ -176,7 +176,22 @@ export function useRecommendations() {
   return useQuery({
     queryKey: ['recommendations', token],
     queryFn: token
-      ? api.recommendations
+      ? async () => {
+          const [recommendations, realized] = await Promise.all([
+            api.recommendations(),
+            api.realizedRecommendations(),
+          ]);
+          const realizedById = new Map(realized.map((event) => [event.recommendationId, event]));
+          return recommendations.map((item) => {
+            const event = realizedById.get(item.id);
+            return {
+              ...item,
+              realized: !!event,
+              realizedAnnualSaving: event?.confirmedAnnualSaving ?? undefined,
+              realizedAt: event?.occurredAt,
+            };
+          });
+        }
       : async () => (PREVIEW_ENABLED ? referenceRecommendations : []),
   });
 }

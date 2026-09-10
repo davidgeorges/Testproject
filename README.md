@@ -43,9 +43,18 @@ Demo__Enabled=false
 RevenueCat__SecretApiKey=<clé secrète RevenueCat v1>
 RevenueCat__EntitlementId=premium
 RevenueCat__WebhookAuthorization=Bearer <secret aléatoire long>
+RevenueCat__WebhookSigningSecret=<secret HMAC RevenueCat>
+RevenueCat__Products__Monthly__0=<identifiant produit mensuel exact>
+RevenueCat__Products__Annual__0=<identifiant produit annuel exact>
+Banking__TokenEncryptionKey=<clé aléatoire indépendante de Tink, 32 caractères minimum>
+Tink__NativeRedirectUri=subscriptionapp://banking/callback
+Tink__WebhookAuthorization=Bearer <secret aléatoire long>
+Offers__AllowedDomains__0=<domaine du premier partenaire autorisé>
 ```
 
 Dans RevenueCat, créer un webhook vers `https://testproject-s3qv.onrender.com/api/v1/webhooks/revenuecat` et lui donner exactement la même valeur dans le champ Authorization. Le backend vérifie l’entitlement directement auprès de RevenueCat après achat ou restauration, puis traite les renouvellements, annulations et expirations envoyés par le webhook. La clé secrète RevenueCat ne doit jamais être ajoutée au fichier `.env` du mobile.
+
+Dans Tink, autoriser aussi `subscriptionapp://banking/callback`. Le Web continue d’utiliser `Tink__RedirectUri`; Android et iOS utilisent la session OAuth native et `Tink__NativeRedirectUri`. La clé `Banking__TokenEncryptionKey` doit être sauvegardée et tournée selon la procédure de sécurité : sa perte rend les consentements bancaires existants illisibles. Les URLs d’offres sont refusées en production tant que leur domaine n’est pas déclaré dans `Offers__AllowedDomains`.
 
 ## PostgreSQL local
 

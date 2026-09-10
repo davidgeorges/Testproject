@@ -90,25 +90,63 @@ public sealed class PushDeliveryTests
             new UserNotification { Title = "Titre", Body = "Corps" },
             default);
 
-        Assert.Equal(expected, result);
+        Assert.Equal(expected, result.Result);
+        if (expected == PushSendResult.Sent) Assert.Equal("ticket", result.ReceiptId);
         Assert.Equal("/--/api/v2/push/send", handler.RequestUri?.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task ReceiptProcessorDeactivatesUnregisteredDevice()
+    {
+        var store = new InMemoryWorkspaceStore();
+        var userId = Guid.NewGuid().ToString();
+        await store.Profile(userId, default);
+        var device = await store.SavePushDevice(
+            new() { UserId = userId, Platform = "ios", Token = new string('z', 32) },
+            default
+        );
+        var notification = new UserNotification { UserId = userId, SourceKey = Guid.NewGuid().ToString() };
+        await store.AddNotification(notification, default);
+        await store.AddPushReceipt(new()
+        {
+            NotificationId = notification.Id,
+            DeviceId = device.Id,
+            TicketId = "receipt",
+            CheckAfter = DateTimeOffset.MinValue,
+        }, default);
+
+        await new PushReceiptProcessor(store, new ReceiptChecker(), TimeProvider.System).RunOnce(default);
+
+        Assert.Empty(await store.PushDevices(userId, default));
     }
 
     private sealed class Sender(PushSendResult result) : IPushSender
     {
         public bool IsConfigured => true;
-        public Task<PushSendResult> Send(PushDevice device, UserNotification notification, CancellationToken ct) => Task.FromResult(result);
+        public Task<PushSendOutcome> Send(PushDevice device, UserNotification notification, CancellationToken ct) =>
+            Task.FromResult(new PushSendOutcome(result));
     }
 
     private sealed class CountingSender : IPushSender
     {
         public int Count { get; private set; }
         public bool IsConfigured => true;
-        public Task<PushSendResult> Send(PushDevice device, UserNotification notification, CancellationToken ct)
+        public Task<PushSendOutcome> Send(PushDevice device, UserNotification notification, CancellationToken ct)
         {
             Count++;
-            return Task.FromResult(PushSendResult.Sent);
+            return Task.FromResult(new PushSendOutcome(PushSendResult.Sent));
         }
+    }
+
+    private sealed class ReceiptChecker : IPushReceiptChecker
+    {
+        public bool IsConfigured => true;
+        public Task<IReadOnlyDictionary<string, PushSendResult>> Check(
+            IReadOnlyList<string> receiptIds,
+            CancellationToken ct
+        ) => Task.FromResult<IReadOnlyDictionary<string, PushSendResult>>(
+            receiptIds.ToDictionary(id => id, _ => PushSendResult.InvalidToken)
+        );
     }
 
     private sealed class StubHandler(string body) : HttpMessageHandler

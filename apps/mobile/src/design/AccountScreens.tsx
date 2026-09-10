@@ -21,6 +21,7 @@ import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import { api, idempotencyKey } from '../services/api';
 import { logOutRevenueCat, purchasePremium, restorePremium } from '../services/revenuecat';
 import { deleteCurrentFirebaseUser, signOutFirebase } from '../services/firebase';
+import { unregisterPushNotifications } from '../services/notifications';
 import type { RootStackParams } from '../app/navigation';
 function Row({
   icon,
@@ -91,6 +92,15 @@ export function ProfileScreen() {
   const cache = useQueryClient();
   const token = useLiveToken();
   const email = useSession((s) => s.email);
+  const logout = async () => {
+    if (token) await unregisterPushNotifications().catch(() => undefined);
+    await logOutRevenueCat().catch(() => undefined);
+    await signOutFirebase();
+    cache.clear();
+    useSession.getState().setToken(null);
+    useSession.getState().setIdentity(null);
+    nav.navigate('Login');
+  };
   return (
     <Page style={{ gap: 12, paddingTop: 4 }}>
       <View style={{ alignItems: 'center', gap: 5, paddingBottom: 11 }}>
@@ -163,18 +173,7 @@ export function ProfileScreen() {
           onPress={() => nav.navigate('Info', { kind: 'support' })}
         />
       </View>
-      <Button
-        title="↪  Déconnexion"
-        danger
-        onPress={() => {
-          cache.clear();
-          useSession.getState().setToken(null);
-          useSession.getState().setIdentity(null);
-          void logOutRevenueCat();
-          void signOutFirebase();
-          nav.navigate('Login');
-        }}
-      />
+      <Button title="↪  Déconnexion" danger onPress={() => void logout()} />
     </Page>
   );
 }
@@ -209,11 +208,7 @@ export function SettingsScreen() {
   const deletion = useMutation({
     mutationFn: async () => {
       if (token) await api.deleteAccount();
-      try {
-        await deleteCurrentFirebaseUser();
-      } catch {
-        await signOutFirebase();
-      }
+      await deleteCurrentFirebaseUser();
     },
     onSuccess: () => {
       cache.clear();
@@ -383,11 +378,10 @@ export function PremiumScreen() {
         </View>
         <View style={{ gap: 18, marginVertical: 12 }}>
           {[
-            'Analyses illimitées',
-            'Recommandations en temps réel',
-            'Alertes sur les hausses de prix',
-            'Rapports mensuels PDF',
-            'Support prioritaire',
+            'Toutes les recommandations détectées',
+            'Alternatives détaillées par abonnement',
+            'Alertes pour les nouvelles économies',
+            'Restauration des achats sur vos appareils',
           ].map((text) => (
             <View key={text} style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
               <Ionicons name="checkmark-circle" color="#00E38D" size={23} />

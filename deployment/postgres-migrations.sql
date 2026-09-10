@@ -836,3 +836,135 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260909233142_RemoveDemoOffers') THEN
+    DELETE FROM offers
+    WHERE "Id" = 'insurance-demo';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260909233142_RemoveDemoOffers') THEN
+    DELETE FROM offers
+    WHERE "Id" = 'internet-demo';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260909233142_RemoveDemoOffers') THEN
+    DELETE FROM offers
+    WHERE "Id" = 'mobile-demo';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260909233142_RemoveDemoOffers') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260909233142_RemoveDemoOffers', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    ALTER TABLE recommendation_events ADD "ConfirmedAnnualSaving" numeric(18,2);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    CREATE TABLE account_deletion_jobs (
+        "Id" uuid NOT NULL,
+        "UserId" text NOT NULL,
+        "Status" text NOT NULL,
+        "Attempts" integer NOT NULL,
+        "LastError" text,
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_account_deletion_jobs" PRIMARY KEY ("Id")
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    CREATE TABLE push_receipts (
+        "Id" uuid NOT NULL,
+        "NotificationId" uuid NOT NULL,
+        "DeviceId" uuid NOT NULL,
+        "TicketId" text NOT NULL,
+        "Status" text NOT NULL,
+        "Attempts" integer NOT NULL,
+        "LastError" text,
+        "CheckAfter" timestamp with time zone NOT NULL,
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_push_receipts" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_push_receipts_notifications_NotificationId" FOREIGN KEY ("NotificationId") REFERENCES notifications ("Id") ON DELETE CASCADE,
+        CONSTRAINT "FK_push_receipts_push_devices_DeviceId" FOREIGN KEY ("DeviceId") REFERENCES push_devices ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    CREATE INDEX "IX_account_deletion_jobs_Status_UpdatedAt" ON account_deletion_jobs ("Status", "UpdatedAt");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    CREATE UNIQUE INDEX "IX_account_deletion_jobs_UserId" ON account_deletion_jobs ("UserId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    CREATE INDEX "IX_push_receipts_DeviceId" ON push_receipts ("DeviceId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    CREATE INDEX "IX_push_receipts_NotificationId" ON push_receipts ("NotificationId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    CREATE INDEX "IX_push_receipts_Status_CheckAfter" ON push_receipts ("Status", "CheckAfter");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    CREATE UNIQUE INDEX "IX_push_receipts_TicketId" ON push_receipts ("TicketId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910054850_AddDurableOperations') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260910054850_AddDurableOperations', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

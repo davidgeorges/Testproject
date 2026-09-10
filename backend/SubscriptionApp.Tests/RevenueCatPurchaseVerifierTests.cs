@@ -32,7 +32,8 @@ public sealed class RevenueCatPurchaseVerifierTests
         var verifier = new RevenueCatPurchaseVerifier(
             new HttpClient(handler) { BaseAddress = new Uri("https://api.revenuecat.com") },
             "secret-key",
-            "premium"
+            "premium",
+            new Dictionary<string, string> { ["premium_annual"] = "annual" }
         );
 
         var purchase = await verifier.Verify(
@@ -62,7 +63,8 @@ public sealed class RevenueCatPurchaseVerifierTests
         var verifier = new RevenueCatPurchaseVerifier(
             new HttpClient(handler) { BaseAddress = new Uri("https://api.revenuecat.com") },
             "secret-key",
-            "premium"
+            "premium",
+            new Dictionary<string, string> { ["premium_monthly"] = "monthly" }
         );
 
         var purchase = await verifier.Verify(

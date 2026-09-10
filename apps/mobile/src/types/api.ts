@@ -43,6 +43,9 @@ export interface Recommendation {
   explanation: string;
   assumptions: string[];
   offer: Offer;
+  realized?: boolean;
+  realizedAnnualSaving?: number;
+  realizedAt?: string;
 }
 export interface Dashboard {
   subscriptionCount: number;

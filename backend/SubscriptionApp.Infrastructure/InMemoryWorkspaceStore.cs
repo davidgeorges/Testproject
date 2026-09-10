@@ -16,6 +16,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     private readonly List<Consent> consents = [];
     private readonly List<UserNotification> notifications = [];
     private readonly List<PushDevice> pushDevices = [];
+    private readonly List<PushReceipt> pushReceipts = [];
     private readonly List<BankSyncJob> syncJobs = [];
     private readonly List<SubscriptionPreference> subscriptionPreferences = [];
     private readonly List<AuditLog> auditLogs = [];
@@ -23,6 +24,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     private readonly List<PremiumWebhookEvent> premiumWebhookEvents = [];
     private readonly List<StoredRecurringPayment> storedPayments = [];
     private readonly List<StoredRecommendation> storedRecommendations = [];
+    private readonly List<AccountDeletionJob> accountDeletionJobs = [];
 
     public Task<UserProfile> Profile(string userId, CancellationToken ct)
     {
@@ -77,6 +79,8 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     {
         lock (gate)
         {
+            if (connections.Count(c => c.UserId == connection.UserId) >= 5)
+                throw new InvalidOperationException("BANK_LIMIT");
             connections.Add(connection);
             consents.Add(new() { UserId = connection.UserId, SubjectId = connection.Id.ToString() });
         }
@@ -188,6 +192,20 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
         lock (gate) return Task.FromResult(events.FirstOrDefault(e => e.Id == id));
     }
 
+    public Task<IReadOnlyList<RecommendationEvent>> RecommendationEvents(
+        string userId,
+        string? eventType,
+        CancellationToken ct
+    )
+    {
+        lock (gate)
+            return Task.FromResult<IReadOnlyList<RecommendationEvent>>(
+                events.Where(e => e.UserId == userId && (eventType is null || e.EventType == eventType))
+                    .OrderByDescending(e => e.OccurredAt)
+                    .ToArray()
+            );
+    }
+
     public Task<bool> SaveAffiliateConversion(AffiliateConversion conversion, CancellationToken ct)
     {
         lock (gate)
@@ -203,6 +221,22 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
             return Task.FromResult<IReadOnlyList<Consent>>(
                 consents.Where(c => c.UserId == userId).ToArray()
             );
+    }
+
+    public Task<Consent> SaveConsent(Consent consent, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var existing = consents.FirstOrDefault(c =>
+                c.UserId == consent.UserId
+                && c.Type == consent.Type
+                && c.Version == consent.Version
+                && c.SubjectId == consent.SubjectId
+                && c.RevokedAt is null);
+            if (existing is not null) return Task.FromResult(existing);
+            consents.Add(consent);
+            return Task.FromResult(consent);
+        }
     }
 
     public Task<bool> RevokeConsent(string userId, Guid id, CancellationToken ct)
@@ -310,6 +344,46 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
         return Task.CompletedTask;
     }
 
+    public Task AddPushReceipt(PushReceipt receipt, CancellationToken ct)
+    {
+        lock (gate)
+            if (!pushReceipts.Any(r => r.TicketId == receipt.TicketId)) pushReceipts.Add(receipt);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<PushReceipt>> ClaimPushReceipts(int limit, DateTimeOffset now, TimeSpan lease, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var rows = pushReceipts
+                .Where(r => r.Attempts < 5 && r.CheckAfter <= now
+                    && (r.Status == "pending" || (r.Status == "processing" && r.UpdatedAt <= now - lease)))
+                .OrderBy(r => r.CheckAfter)
+                .Take(limit)
+                .ToArray();
+            foreach (var row in rows)
+            {
+                row.Status = "processing";
+                row.Attempts++;
+                row.UpdatedAt = now;
+            }
+            return Task.FromResult<IReadOnlyList<PushReceipt>>(rows);
+        }
+    }
+
+    public Task CompletePushReceipt(Guid id, string status, string? error, DateTimeOffset now, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var receipt = pushReceipts.First(r => r.Id == id);
+            receipt.Status = status;
+            receipt.LastError = error;
+            receipt.UpdatedAt = now;
+            if (status == "pending") receipt.CheckAfter = now.AddMinutes(5);
+        }
+        return Task.CompletedTask;
+    }
+
     public Task<BankSyncJob> EnqueueSync(BankSyncJob job, CancellationToken ct)
     {
         lock (gate) { syncJobs.Add(job); return Task.FromResult(job); }
@@ -386,12 +460,16 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
                 new UserDataExport(
                     DateTimeOffset.UtcNow,
                     profile,
-                    connections.Where(c => c.UserId == userId).ToArray(),
+                    connections.Where(c => c.UserId == userId)
+                        .Select(c => new ExportedBankConnection(c.Id, c.BankName, c.Provider, c.Status, c.LastSyncAt, c.ConsentExpiresAt))
+                        .ToArray(),
                     accounts.Where(a => a.UserId == userId).ToArray(),
                     transactions.Where(t => t.UserId == userId).ToArray(),
                     consents.Where(c => c.UserId == userId).ToArray(),
                     notifications.Where(n => n.UserId == userId).ToArray(),
-                    pushDevices.Where(d => d.UserId == userId).ToArray(),
+                    pushDevices.Where(d => d.UserId == userId)
+                        .Select(d => new ExportedPushDevice(d.Id, d.Platform, d.RegisteredAt, d.LastSeenAt, d.Active))
+                        .ToArray(),
                     syncJobs.Where(j => j.UserId == userId).ToArray(),
                     subscriptionPreferences.Where(p => p.UserId == userId).ToArray(),
                     events.Where(e => e.UserId == userId).ToArray(),
@@ -553,6 +631,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
             consents.RemoveAll(c => c.UserId == userId);
             notifications.RemoveAll(n => n.UserId == userId);
             pushDevices.RemoveAll(d => d.UserId == userId);
+            pushReceipts.RemoveAll(r => !notifications.Any(n => n.Id == r.NotificationId));
             syncJobs.RemoveAll(j => j.UserId == userId);
             subscriptionPreferences.RemoveAll(p => p.UserId == userId);
             auditLogs.RemoveAll(a => a.UserId == userId);
@@ -564,6 +643,64 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
         return Task.CompletedTask;
     }
 
+    public Task<AccountDeletionJob> EnqueueAccountDeletion(string userId, DateTimeOffset now, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var existing = accountDeletionJobs.FirstOrDefault(j => j.UserId == userId);
+            if (existing is not null) return Task.FromResult(existing);
+            var job = new AccountDeletionJob { UserId = userId, CreatedAt = now, UpdatedAt = now };
+            accountDeletionJobs.Add(job);
+            return Task.FromResult(job);
+        }
+    }
+
+    public Task<AccountDeletionJob?> AccountDeletion(string userId, CancellationToken ct)
+    {
+        lock (gate) return Task.FromResult(accountDeletionJobs.FirstOrDefault(j => j.UserId == userId));
+    }
+
+    public Task<AccountDeletionJob?> ClaimAccountDeletion(DateTimeOffset now, TimeSpan lease, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var job = accountDeletionJobs.FirstOrDefault(j =>
+                j.Attempts < 10
+                && (j.Status == "pending"
+                    || (j.Status == "failed" && j.UpdatedAt <= now.AddMinutes(-1))
+                    || (j.Status == "processing" && j.UpdatedAt <= now - lease)));
+            if (job is null) return Task.FromResult<AccountDeletionJob?>(null);
+            job.Status = "processing";
+            job.Attempts++;
+            job.UpdatedAt = now;
+            return Task.FromResult<AccountDeletionJob?>(job);
+        }
+    }
+
+    public Task CompleteAccountDeletion(Guid id, string status, DateTimeOffset now, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var job = accountDeletionJobs.First(j => j.Id == id);
+            job.Status = status;
+            job.LastError = null;
+            job.UpdatedAt = now;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task FailAccountDeletion(Guid id, string error, DateTimeOffset now, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var job = accountDeletionJobs.First(j => j.Id == id);
+            job.Status = "failed";
+            job.LastError = error;
+            job.UpdatedAt = now;
+        }
+        return Task.CompletedTask;
+    }
+
     public Task<int> PurgeExpiredData(DateTimeOffset now, CancellationToken ct)
     {
         lock (gate)
@@ -571,6 +708,8 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
             var count = notifications.RemoveAll(n => n.CreatedAt < now.AddYears(-2));
             count += auditLogs.RemoveAll(a => a.CreatedAt < now.AddYears(-2));
             count += syncJobs.RemoveAll(j => j.UpdatedAt < now.AddDays(-90) && j.Status is "completed" or "failed");
+            count += accountDeletionJobs.RemoveAll(j => j.UpdatedAt < now.AddYears(-2)
+                && j.Status is "completed" or "data_deleted");
             return Task.FromResult(count);
         }
     }

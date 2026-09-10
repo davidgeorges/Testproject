@@ -566,21 +566,37 @@ export function SavingsScreen() {
   const d = useOverview();
   const [filter, setFilter] = useState('Toutes');
   const token = useLiveToken();
+  const items = q.data?.filter((item) =>
+    filter === 'Réalisées' ? item.realized : filter === 'Disponibles' ? !item.realized : true,
+  );
+  const realizedTotal =
+    q.data
+      ?.filter((item) => item.realized)
+      .reduce((sum, item) => sum + (item.realizedAnnualSaving ?? 0), 0) ?? 0;
   return (
     <Page style={{ gap: 12 }}>
       <Label style={{ fontSize: 23, lineHeight: 29, fontWeight: '700' }}>Vos économies</Label>
       <Chips items={['Toutes', 'Disponibles', 'Réalisées']} value={filter} onChange={setFilter} />
-      <SavingsHero green amount={d.data?.annualPotentialSaving ?? 0} />
+      <SavingsHero
+        green
+        amount={filter === 'Réalisées' ? realizedTotal : (d.data?.annualPotentialSaving ?? 0)}
+      />
       {q.isPending || q.error ? (
         <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
-      ) : filter === 'Réalisées' ? (
+      ) : items?.length === 0 ? (
         <State
-          title="Pas encore d’économie réalisée"
-          description="Vos économies seront affichées ici après confirmation."
+          title={
+            filter === 'Réalisées' ? 'Pas encore d’économie réalisée' : 'Aucune économie disponible'
+          }
+          description={
+            filter === 'Réalisées'
+              ? 'Confirmez une recommandation après avoir changé d’offre.'
+              : 'De nouvelles offres apparaîtront après la prochaine analyse.'
+          }
         />
       ) : (
         <View style={{ gap: 9 }}>
-          {q.data?.map((item) => (
+          {items?.map((item) => (
             <RecommendationRow
               key={item.id}
               item={item}
@@ -615,6 +631,13 @@ export function RecommendationDetail() {
           ? 'La consultation a été enregistrée. Vérifiez les conditions du partenaire avant toute souscription.'
           : 'Connectez-vous pour ouvrir une offre.',
       ),
+  });
+  const realized = useMutation({
+    mutationFn: () => api.markRecommendationRealized(route.params.id),
+    onSuccess: () => {
+      void q.refetch();
+      setMessage('Cette économie est maintenant classée comme réalisée.');
+    },
   });
   return (
     <Page style={{ gap: 13 }}>
@@ -734,6 +757,14 @@ export function RecommendationDetail() {
               }}
             />
           </View>
+          {token && !r.realized && (
+            <Button
+              title="J’ai changé d’offre"
+              secondary
+              loading={realized.isPending}
+              onPress={() => realized.mutate()}
+            />
+          )}
           {message && (
             <Card>
               <Label style={{ fontSize: 12 }}>{message}</Label>

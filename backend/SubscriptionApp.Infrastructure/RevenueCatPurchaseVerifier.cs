@@ -7,7 +7,8 @@ namespace SubscriptionApp.Infrastructure;
 public sealed class RevenueCatPurchaseVerifier(
     HttpClient http,
     string secretApiKey,
-    string entitlementId
+    string entitlementId,
+    IReadOnlyDictionary<string, string> productPlans
 ) : IPremiumPurchaseVerifier
 {
     public bool IsConfigured => true;
@@ -36,16 +37,13 @@ public sealed class RevenueCatPurchaseVerifier(
         var expiresText = Text(entitlement, "expires_date");
         if (!DateTimeOffset.TryParse(expiresText, out var expiresAt) || expiresAt <= DateTimeOffset.UtcNow) return null;
         var verifiedProduct = Text(entitlement, "product_identifier") ?? productId;
+        if (!productPlans.TryGetValue(verifiedProduct, out var plan)) return null;
         var externalId = verifiedProduct;
         if (subscriber.TryGetProperty("subscriptions", out var subscriptions)
             && subscriptions.TryGetProperty(verifiedProduct, out var subscription))
             externalId = Text(subscription, "original_transaction_id")
                 ?? Text(subscription, "store_transaction_id")
                 ?? $"{userId}:{verifiedProduct}";
-        var plan = verifiedProduct.Contains("annual", StringComparison.OrdinalIgnoreCase)
-            || verifiedProduct.Contains("year", StringComparison.OrdinalIgnoreCase)
-            ? "annual"
-            : "monthly";
         return new("revenuecat", externalId, plan, expiresAt);
     }
 

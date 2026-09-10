@@ -55,6 +55,7 @@ public sealed class RecommendationEvent
     public string UserId { get; set; } = "";
     public string RecommendationId { get; set; } = "";
     public string EventType { get; set; } = "click";
+    public decimal? ConfirmedAnnualSaving { get; set; }
     public DateTimeOffset OccurredAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -108,6 +109,20 @@ public sealed class PushDevice
     public DateTimeOffset RegisteredAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset LastSeenAt { get; set; } = DateTimeOffset.UtcNow;
     public bool Active { get; set; } = true;
+}
+
+public sealed class PushReceipt
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid NotificationId { get; set; }
+    public Guid DeviceId { get; set; }
+    public string TicketId { get; set; } = "";
+    public string Status { get; set; } = "pending";
+    public int Attempts { get; set; }
+    public string? LastError { get; set; }
+    public DateTimeOffset CheckAfter { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class IdempotencyRecord
@@ -176,6 +191,17 @@ public sealed class PremiumWebhookEvent
     public string EventType { get; set; } = "";
     public DateTimeOffset OccurredAt { get; set; }
     public DateTimeOffset ProcessedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class AccountDeletionJob
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string UserId { get; set; } = "";
+    public string Status { get; set; } = "pending";
+    public int Attempts { get; set; }
+    public string? LastError { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class StoredRecurringPayment

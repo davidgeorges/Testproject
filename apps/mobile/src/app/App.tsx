@@ -189,7 +189,7 @@ function Navigator({ onChange }: { onChange: () => void }) {
     <NavigationContainer
       ref={navigation}
       linking={{
-        prefixes: ['http://localhost:8081'],
+        prefixes: ['http://localhost:8081', 'subscriptionapp://'],
         config: { screens: { BankCallback: 'banking/callback' } },
       }}
       onReady={() => {

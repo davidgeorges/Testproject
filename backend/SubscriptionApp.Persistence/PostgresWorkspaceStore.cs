@@ -58,10 +58,18 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
 
     public async Task AddConnection(BankConnection connection, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await Profile(connection.UserId, ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtext({connection.UserId}))",
+            ct
+        );
+        if (await db.Connections.CountAsync(c => c.UserId == connection.UserId, ct) >= 5)
+            throw new InvalidOperationException("BANK_LIMIT");
         db.Connections.Add(connection);
         db.Consents.Add(new() { UserId = connection.UserId, SubjectId = connection.Id.ToString() });
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     public async Task SetConnectionStatus(BankConnection connection, string status, CancellationToken ct)
@@ -152,6 +160,15 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
     public async Task<RecommendationEvent?> RecommendationEvent(Guid id, CancellationToken ct) =>
         await db.Events.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct);
 
+    public async Task<IReadOnlyList<RecommendationEvent>> RecommendationEvents(
+        string userId,
+        string? eventType,
+        CancellationToken ct
+    ) => await db.Events.AsNoTracking()
+        .Where(e => e.UserId == userId && (eventType == null || e.EventType == eventType))
+        .OrderByDescending(e => e.OccurredAt)
+        .ToListAsync(ct);
+
     public async Task<bool> SaveAffiliateConversion(AffiliateConversion conversion, CancellationToken ct)
     {
         if (await db.AffiliateConversions.AnyAsync(c => c.Provider == conversion.Provider && c.ExternalConversionId == conversion.ExternalConversionId, ct)) return false;
@@ -162,6 +179,21 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
 
     public async Task<IReadOnlyList<Consent>> Consents(string userId, CancellationToken ct) =>
         await db.Consents.AsNoTracking().Where(c => c.UserId == userId).ToListAsync(ct);
+
+    public async Task<Consent> SaveConsent(Consent consent, CancellationToken ct)
+    {
+        var existing = await db.Consents.FirstOrDefaultAsync(c =>
+            c.UserId == consent.UserId
+            && c.Type == consent.Type
+            && c.Version == consent.Version
+            && c.SubjectId == consent.SubjectId
+            && c.RevokedAt == null,
+            ct);
+        if (existing is not null) return existing;
+        db.Consents.Add(consent);
+        await db.SaveChangesAsync(ct);
+        return consent;
+    }
 
     public async Task<bool> RevokeConsent(string userId, Guid id, CancellationToken ct)
     {
@@ -259,6 +291,41 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
     public async Task DeactivatePushDevice(Guid id, CancellationToken ct) =>
         _ = await db.PushDevices.Where(d => d.Id == id).ExecuteUpdateAsync(s => s.SetProperty(d => d.Active, false), ct);
 
+    public async Task AddPushReceipt(PushReceipt receipt, CancellationToken ct)
+    {
+        db.PushReceipts.Add(receipt);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<PushReceipt>> ClaimPushReceipts(int limit, DateTimeOffset now, TimeSpan lease, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var stale = now - lease;
+        var rows = await db.PushReceipts
+            .FromSqlInterpolated($"SELECT * FROM push_receipts WHERE \"Attempts\" < 5 AND \"CheckAfter\" <= {now} AND (\"Status\" = 'pending' OR (\"Status\" = 'processing' AND \"UpdatedAt\" <= {stale})) ORDER BY \"CheckAfter\" LIMIT {limit} FOR UPDATE SKIP LOCKED")
+            .ToListAsync(ct);
+        foreach (var row in rows)
+        {
+            row.Status = "processing";
+            row.Attempts++;
+            row.UpdatedAt = now;
+        }
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return rows;
+    }
+
+    public async Task CompletePushReceipt(Guid id, string status, string? error, DateTimeOffset now, CancellationToken ct)
+    {
+        _ = await db.PushReceipts.Where(r => r.Id == id).ExecuteUpdateAsync(s => s
+            .SetProperty(r => r.Status, status)
+            .SetProperty(r => r.LastError, error)
+            .SetProperty(r => r.UpdatedAt, now), ct);
+        if (status == "pending")
+            _ = await db.PushReceipts.Where(r => r.Id == id).ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.CheckAfter, now.AddMinutes(5)), ct);
+    }
+
     public async Task<BankSyncJob> EnqueueSync(BankSyncJob job, CancellationToken ct)
     {
         db.SyncJobs.Add(job);
@@ -326,12 +393,29 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
     public async Task<UserDataExport> ExportData(string userId, CancellationToken ct)
     {
         var profile = await Profile(userId, ct);
-        var connections = await Connections(userId, ct);
+        var connections = (await Connections(userId, ct))
+            .Select(c => new ExportedBankConnection(
+                c.Id,
+                c.BankName,
+                c.Provider,
+                c.Status,
+                c.LastSyncAt,
+                c.ConsentExpiresAt
+            ))
+            .ToArray();
         var accounts = await Accounts(userId, ct);
         var transactions = await Transactions(userId, ct);
         var consents = await Consents(userId, ct);
         var notifications = await Notifications(userId, ct);
-        var pushDevices = await PushDevices(userId, ct);
+        var pushDevices = (await PushDevices(userId, ct))
+            .Select(d => new ExportedPushDevice(
+                d.Id,
+                d.Platform,
+                d.RegisteredAt,
+                d.LastSeenAt,
+                d.Active
+            ))
+            .ToArray();
         var syncJobs = await db.SyncJobs.AsNoTracking().Where(j => j.UserId == userId).ToListAsync(ct);
         var preferences = await SubscriptionPreferences(userId, ct);
         var events = await db.Events.AsNoTracking().Where(e => e.UserId == userId).ToListAsync(ct);
@@ -498,6 +582,50 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         CancellationToken ct
     ) => await db.StoredRecommendations.AsNoTracking().Where(r => r.UserId == userId).ToListAsync(ct);
 
+    public async Task<AccountDeletionJob> EnqueueAccountDeletion(string userId, DateTimeOffset now, CancellationToken ct)
+    {
+        var existing = await db.AccountDeletionJobs.FirstOrDefaultAsync(j => j.UserId == userId, ct);
+        if (existing is not null) return existing;
+        var job = new AccountDeletionJob { UserId = userId, CreatedAt = now, UpdatedAt = now };
+        db.AccountDeletionJobs.Add(job);
+        await db.SaveChangesAsync(ct);
+        return job;
+    }
+
+    public async Task<AccountDeletionJob?> AccountDeletion(string userId, CancellationToken ct) =>
+        await db.AccountDeletionJobs.AsNoTracking().FirstOrDefaultAsync(j => j.UserId == userId, ct);
+
+    public async Task<AccountDeletionJob?> ClaimAccountDeletion(DateTimeOffset now, TimeSpan lease, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var stale = now - lease;
+        var retryAt = now.AddMinutes(-1);
+        var job = await db.AccountDeletionJobs
+            .FromSqlInterpolated($"SELECT * FROM account_deletion_jobs WHERE \"Attempts\" < 10 AND (\"Status\" = 'pending' OR (\"Status\" = 'failed' AND \"UpdatedAt\" <= {retryAt}) OR (\"Status\" = 'processing' AND \"UpdatedAt\" <= {stale})) ORDER BY \"CreatedAt\" LIMIT 1 FOR UPDATE SKIP LOCKED")
+            .FirstOrDefaultAsync(ct);
+        if (job is not null)
+        {
+            job.Status = "processing";
+            job.Attempts++;
+            job.UpdatedAt = now;
+            await db.SaveChangesAsync(ct);
+        }
+        await transaction.CommitAsync(ct);
+        return job;
+    }
+
+    public async Task CompleteAccountDeletion(Guid id, string status, DateTimeOffset now, CancellationToken ct) =>
+        _ = await db.AccountDeletionJobs.Where(j => j.Id == id).ExecuteUpdateAsync(s => s
+            .SetProperty(j => j.Status, status)
+            .SetProperty(j => j.LastError, (string?)null)
+            .SetProperty(j => j.UpdatedAt, now), ct);
+
+    public async Task FailAccountDeletion(Guid id, string error, DateTimeOffset now, CancellationToken ct) =>
+        _ = await db.AccountDeletionJobs.Where(j => j.Id == id).ExecuteUpdateAsync(s => s
+            .SetProperty(j => j.Status, "failed")
+            .SetProperty(j => j.LastError, error.Length > 500 ? error[..500] : error)
+            .SetProperty(j => j.UpdatedAt, now), ct);
+
     public async Task DeleteAccount(string userId, CancellationToken ct) =>
         await db.Profiles.Where(p => p.Id == userId).ExecuteDeleteAsync(ct);
 
@@ -507,6 +635,8 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         count += await db.Notifications.Where(n => n.CreatedAt < now.AddYears(-2)).ExecuteDeleteAsync(ct);
         count += await db.AuditLogs.Where(a => a.CreatedAt < now.AddYears(-2)).ExecuteDeleteAsync(ct);
         count += await db.SyncJobs.Where(j => j.UpdatedAt < now.AddDays(-90) && (j.Status == "completed" || j.Status == "failed")).ExecuteDeleteAsync(ct);
+        count += await db.AccountDeletionJobs.Where(j => j.UpdatedAt < now.AddYears(-2)
+            && (j.Status == "completed" || j.Status == "data_deleted")).ExecuteDeleteAsync(ct);
         return count;
     }
 }

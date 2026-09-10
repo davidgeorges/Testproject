@@ -24,15 +24,28 @@ public sealed class BankSyncWorker(IServiceScopeFactory scopes, TimeProvider tim
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
-                    var retry = job.Attempts < 3;
-                    await store.FailSyncJob(job.Id, exception is InvalidOperationException e ? e.Message : "SYNC_FAILED", retry, time.GetUtcNow(), stoppingToken);
+                    var errorCode = exception switch
+                    {
+                        TinkBankingException tink => tink.Code,
+                        InvalidOperationException invalid => invalid.Message,
+                        _ => "SYNC_FAILED",
+                    };
+                    var reconnectRequired = errorCode is "CONSENT_EXPIRED" or "TINK_TOKEN_MISSING" or "TINK_TOKEN_INVALID"
+                        || errorCode.StartsWith("TINK_TRANSACTIONS_401", StringComparison.Ordinal)
+                        || errorCode.StartsWith("TINK_TRANSACTIONS_403", StringComparison.Ordinal);
+                    if (reconnectRequired)
+                        await store.SetConnectionStatus(bank, "reconnect_required", stoppingToken);
+                    var retry = !reconnectRequired && job.Attempts < 3;
+                    await store.FailSyncJob(job.Id, errorCode, retry, time.GetUtcNow(), stoppingToken);
                     if (!retry)
                         await store.AddNotification(new()
                         {
                             UserId = job.UserId,
                             Type = "sync_failed",
                             Title = "La synchronisation a échoué",
-                            Body = "Nous n’avons pas pu actualiser vos transactions. Réessayez plus tard.",
+                            Body = reconnectRequired
+                                ? "Votre banque demande une nouvelle authentification."
+                                : "Nous n’avons pas pu actualiser vos transactions. Réessayez plus tard.",
                             SourceKey = $"sync-failed:{job.Id}",
                         }, stoppingToken);
                     logger.LogWarning(exception, "Bank sync job {JobId} failed on attempt {Attempt}", job.Id, job.Attempts);

@@ -35,6 +35,8 @@ jobs:
       - run: dotnet restore SubscriptionApp.sln --locked-mode
       - run: dotnet tool restore
       - run: dotnet build SubscriptionApp.sln --no-restore --configuration Release
+      - run: dotnet format SubscriptionApp.sln --no-restore --verify-no-changes
+      - run: dotnet list SubscriptionApp.sln package --vulnerable --include-transitive
       - run: dotnet test SubscriptionApp.sln --no-build --configuration Release --logger trx
       - run: dotnet ef migrations script --idempotent --no-build --configuration Release --project backend/SubscriptionApp.Persistence --startup-project backend/SubscriptionApp.Persistence --output deployment/postgres-migrations.sql
       - run: git diff --exit-code -- deployment/postgres-migrations.sql
@@ -55,6 +57,9 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run format:check
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npx expo-doctor
+        working-directory: apps/mobile
       - run: npm run build:web
       - run: npx expo export --platform android --platform ios
         working-directory: apps/mobile

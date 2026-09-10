@@ -15,6 +15,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
     public DbSet<Consent> Consents => Set<Consent>();
     public DbSet<UserNotification> Notifications => Set<UserNotification>();
     public DbSet<PushDevice> PushDevices => Set<PushDevice>();
+    public DbSet<PushReceipt> PushReceipts => Set<PushReceipt>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<BankSyncJob> SyncJobs => Set<BankSyncJob>();
     public DbSet<SubscriptionPreference> SubscriptionPreferences => Set<SubscriptionPreference>();
@@ -24,6 +25,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
     public DbSet<PremiumWebhookEvent> PremiumWebhookEvents => Set<PremiumWebhookEvent>();
     public DbSet<StoredRecurringPayment> StoredPayments => Set<StoredRecurringPayment>();
     public DbSet<StoredRecommendation> StoredRecommendations => Set<StoredRecommendation>();
+    public DbSet<AccountDeletionJob> AccountDeletionJobs => Set<AccountDeletionJob>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -72,6 +74,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<RecommendationEvent>()
             .ToTable("recommendation_events")
             .HasIndex(e => new { e.UserId, e.OccurredAt });
+        b.Entity<RecommendationEvent>().Property(e => e.ConfirmedAnnualSaving).HasPrecision(18, 2);
         b.Entity<RecommendationEvent>()
             .HasOne<UserProfile>()
             .WithMany()
@@ -106,6 +109,10 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
             .WithMany()
             .HasForeignKey(d => d.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<PushReceipt>().ToTable("push_receipts").HasIndex(r => r.TicketId).IsUnique();
+        b.Entity<PushReceipt>().HasIndex(r => new { r.Status, r.CheckAfter });
+        b.Entity<PushReceipt>().HasOne<UserNotification>().WithMany().HasForeignKey(r => r.NotificationId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<PushReceipt>().HasOne<PushDevice>().WithMany().HasForeignKey(r => r.DeviceId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<IdempotencyRecord>().ToTable("idempotency_records").HasKey(r => r.CacheKey);
         b.Entity<IdempotencyRecord>().HasIndex(r => r.ExpiresAt);
         b.Entity<IdempotencyRecord>().Property(r => r.CacheKey).HasMaxLength(512);
@@ -183,5 +190,8 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
             .WithMany()
             .HasForeignKey(r => r.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<AccountDeletionJob>().ToTable("account_deletion_jobs").HasKey(j => j.Id);
+        b.Entity<AccountDeletionJob>().HasIndex(j => j.UserId).IsUnique();
+        b.Entity<AccountDeletionJob>().HasIndex(j => new { j.Status, j.UpdatedAt });
     }
 }

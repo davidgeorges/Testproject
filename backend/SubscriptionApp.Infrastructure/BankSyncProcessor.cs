@@ -26,7 +26,11 @@ public sealed class BankSyncProcessor(IWorkspaceStore store, IBankingProvider pr
         if (isFirstSync) metrics.FirstBankSync();
         metrics.SubscriptionsDetected(payments.Count);
         await store.SaveAnalysis(bank.UserId, payments, recommendations, ct);
-        if (recommendations.FirstOrDefault() is { } best)
+        var premium = await store.Premium(bank.UserId, ct);
+        var premiumActive = premium is not null
+            && premium.Status is "active" or "cancelled"
+            && premium.RenewsAt > time.GetUtcNow();
+        if (premiumActive && recommendations.FirstOrDefault() is { } best)
             await store.AddNotification(new()
             {
                 UserId = bank.UserId,

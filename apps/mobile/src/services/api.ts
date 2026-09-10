@@ -69,6 +69,14 @@ export const api = {
       body: JSON.stringify({ category, status }),
     }),
   recommendations: () => request<Recommendation[]>('/recommendations'),
+  realizedRecommendations: () =>
+    request<
+      { recommendationId: string; confirmedAnnualSaving: number | null; occurredAt: string }[]
+    >('/recommendations/realized'),
+  markRecommendationRealized: (id: string) =>
+    request<{ realized: boolean }>(`/recommendations/${encodeURIComponent(id)}/realized`, {
+      method: 'POST',
+    }),
   recommendation: (id: string) =>
     request<Recommendation>(`/recommendations/${encodeURIComponent(id)}`),
   connections: () => request<Connection[]>('/bank/connections'),
@@ -77,12 +85,13 @@ export const api = {
     request<{ items: BankTransaction[]; total: number }>(
       `/bank/transactions?limit=${limit}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ''}`,
     ),
-  tinkLink: () => request<{ url: string }>('/bank/tink/link'),
-  completeTink: (code: string, credentialsId: string | null, key: string) =>
+  tinkLink: (native = false) =>
+    request<{ url: string }>(`/bank/tink/link${native ? '?native=true' : ''}`),
+  completeTink: (code: string, credentialsId: string | null, state: string | null, key: string) =>
     request<Connection>('/bank/tink/callback', {
       method: 'POST',
       headers: { 'Idempotency-Key': key },
-      body: JSON.stringify({ code, credentialsId }),
+      body: JSON.stringify({ code, credentialsId, state }),
     }),
   connect: (bankName: string, key: string) =>
     request<Connection>('/bank/connections', {
@@ -95,6 +104,20 @@ export const api = {
       method: 'POST',
       headers: { 'Idempotency-Key': key },
     }),
+  queueSync: (id: string, key: string) =>
+    request<{ id: string; connectionId: string; status: string }>(
+      `/bank/connections/${encodeURIComponent(id)}/sync-jobs`,
+      { method: 'POST', headers: { 'Idempotency-Key': key } },
+    ),
+  syncJob: (id: string) =>
+    request<{
+      id: string;
+      connectionId: string;
+      status: 'queued' | 'processing' | 'completed' | 'failed';
+      attempts: number;
+      transactionCount: number | null;
+      errorCode: string | null;
+    }>(`/bank/sync-jobs/${encodeURIComponent(id)}`),
   disconnect: (id: string) => request(`/bank/connections/${id}`, { method: 'DELETE' }),
   click: (id: string, key: string) =>
     request<{ tracked: boolean; isDemo: boolean; url: string | null }>(
@@ -104,6 +127,8 @@ export const api = {
   profile: () => request<Profile>('/profile'),
   saveProfile: (profile: Pick<Profile, 'firstName' | 'theme' | 'notificationsEnabled'>) =>
     request<Profile>('/profile', { method: 'PATCH', body: JSON.stringify(profile) }),
+  acceptLegal: (version: string) =>
+    request('/consents/legal', { method: 'POST', body: JSON.stringify({ version }) }),
   notifications: () => request<Notification[]>('/notifications'),
   readNotification: (id: string) =>
     request(`/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),

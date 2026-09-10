@@ -108,7 +108,10 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(223.84m, dashboard.MonthlyRecurringCost);
         Assert.Equal(501m, dashboard.AnnualPotentialSaving);
         var rec = dashboard.TopRecommendations[0];
-        Assert.NotEmpty((await c.GetFromJsonAsync<Recommendation[]>($"/api/v1/recommendations/{rec.Id}/alternatives"))!);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await c.GetAsync($"/api/v1/recommendations/{rec.Id}/alternatives")).StatusCode
+        );
         (await Post(c, $"/api/v1/recommendations/{rec.Id}/click")).EnsureSuccessStatusCode();
         Assert.Equal(
             HttpStatusCode.NoContent,
@@ -212,7 +215,7 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         using var c = await Session();
         await Connect(c);
-        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync("/api/v1/account")).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await c.DeleteAsync("/api/v1/account")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.GetAsync("/api/v1/profile")).StatusCode);
     }
 
@@ -227,7 +230,7 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task SyncCreatesNotificationsThatCanBeMarkedAsRead()
+    public async Task SyncCreatesNotificationWithoutPremiumSavingAlert()
     {
         using var c = await Session();
         var bank = await Connect(c);
@@ -236,7 +239,7 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var notifications =
             (await c.GetFromJsonAsync<UserNotification[]>("/api/v1/notifications"))!;
         Assert.Contains(notifications, n => n.Type == "sync_completed");
-        Assert.Contains(notifications, n => n.Type == "saving_found" && n.ResourceId is not null);
+        Assert.DoesNotContain(notifications, n => n.Type == "saving_found");
 
         var selected = notifications[0];
         Assert.Null(selected.ReadAt);
@@ -316,7 +319,16 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         using var c = await Session();
         var bank = await Connect(c);
         (await Post(c, $"/api/v1/bank/connections/{bank.Id}/sync")).EnsureSuccessStatusCode();
-        var export = (await c.GetFromJsonAsync<UserDataExport>("/api/v1/account/export"))!;
+        var exportResponse = await c.GetAsync("/api/v1/account/export");
+        exportResponse.EnsureSuccessStatusCode();
+        var exportJson = await exportResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("providerSecret", exportJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("authorizationUrl", exportJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"token\"", exportJson, StringComparison.OrdinalIgnoreCase);
+        var export = JsonSerializer.Deserialize<UserDataExport>(
+            exportJson,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        )!;
         Assert.Equal(48, export.Transactions.Count);
         Assert.Single(export.Connections);
         var account = Assert.Single(export.Accounts);
@@ -343,6 +355,21 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
             HttpStatusCode.Conflict,
             (await Post(c, $"/api/v1/bank/connections/{bank.Id}/sync")).StatusCode
         );
+    }
+
+    [Fact]
+    public async Task LegalConsentIsVersionedAndIdempotent()
+    {
+        using var c = await Session();
+        var first = await c.PostAsJsonAsync("/api/v1/consents/legal", new { version = "1.0" });
+        var second = await c.PostAsJsonAsync("/api/v1/consents/legal", new { version = "1.0" });
+        first.EnsureSuccessStatusCode();
+        second.EnsureSuccessStatusCode();
+        var legal = (await c.GetFromJsonAsync<Consent[]>("/api/v1/consents"))!
+            .Where(consent => consent.Type == "terms_and_privacy")
+            .ToArray();
+        Assert.Single(legal);
+        Assert.Equal("1.0", legal[0].Version);
     }
 
     [Fact]
@@ -441,6 +468,18 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var status = await c.GetFromJsonAsync<JsonElement>("/api/v1/premium/status");
         Assert.True(status.GetProperty("isPremium").GetBoolean());
         Assert.Equal("monthly", status.GetProperty("plan").GetString());
+        var bank = await Connect(c);
+        (await Post(c, $"/api/v1/bank/connections/{bank.Id}/sync")).EnsureSuccessStatusCode();
+        Assert.Contains(
+            (await c.GetFromJsonAsync<UserNotification[]>("/api/v1/notifications"))!,
+            notification => notification.Type == "saving_found" && notification.ResourceId is not null
+        );
+        var recommendation = (await c.GetFromJsonAsync<Recommendation[]>("/api/v1/recommendations"))![0];
+        Assert.NotEmpty(
+            (await c.GetFromJsonAsync<Recommendation[]>(
+                $"/api/v1/recommendations/{recommendation.Id}/alternatives"
+            ))!
+        );
         Assert.Equal(
             HttpStatusCode.Conflict,
             (
@@ -544,7 +583,8 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
             (await client.GetAsync("/api/v1/profile")).StatusCode
         );
         var health = await client.GetFromJsonAsync<JsonElement>("/health");
-        Assert.Equal("production", health.GetProperty("mode").GetString());
+        Assert.Equal("ok", health.GetProperty("status").GetString());
+        Assert.False(health.TryGetProperty("mode", out _));
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/health/ready")).StatusCode);
     }
 
@@ -608,13 +648,15 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var body = new { provider = "partner-test", conversionId, eventId, amount = 12.5m, currency = "EUR" };
         Assert.Equal(HttpStatusCode.Unauthorized, (await c.PostAsJsonAsync("/api/v1/webhooks/affiliation", body)).StatusCode);
 
-        var canonical = $"partner-test|{conversionId}|{eventId}|12.5|EUR";
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var canonical = $"{timestamp}|partner-test|{conversionId}|{eventId}|12.5|EUR";
         var signature = Convert.ToHexString(HMACSHA256.HashData(
             Encoding.UTF8.GetBytes("local-affiliation-webhook-secret-only"), Encoding.UTF8.GetBytes(canonical)));
         async Task<JsonElement> Send()
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/webhooks/affiliation") { Content = JsonContent.Create(body) };
             request.Headers.Add("X-Webhook-Signature", signature);
+            request.Headers.Add("X-Webhook-Timestamp", timestamp);
             var response = await c.SendAsync(request);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -653,6 +695,44 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var response = await c.SendAsync(request);
         response.EnsureSuccessStatusCode();
         Assert.True((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("ignored").GetBoolean());
+    }
+
+    [Fact]
+    public async Task RevenueCatWebhookVerifiesTimestampedHmacWhenConfigured()
+    {
+        const string signingSecret = "revenuecat-signing-secret-long-enough-for-tests";
+        await using var signedFactory = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("RevenueCat:WebhookSigningSecret", signingSecret));
+        using var c = signedFactory.CreateClient();
+        var body = new
+        {
+            @event = new
+            {
+                id = $"event-{Guid.NewGuid():N}",
+                type = "TEST",
+                app_user_id = "firebase-user",
+                product_id = "premium_monthly",
+                transaction_id = "transaction-id",
+                original_transaction_id = "original-transaction-id",
+                event_timestamp_ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            },
+        };
+        var raw = JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var signature = Convert.ToHexString(HMACSHA256.HashData(
+            Encoding.UTF8.GetBytes(signingSecret),
+            Encoding.UTF8.GetBytes($"{timestamp}.{raw}"))).ToLowerInvariant();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/webhooks/revenuecat")
+        {
+            Content = new StringContent(raw, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer webhook-test-secret");
+        request.Headers.TryAddWithoutValidation(
+            "X-RevenueCat-Webhook-Signature",
+            $"t={timestamp},v1={signature}"
+        );
+        var response = await c.SendAsync(request);
+        response.EnsureSuccessStatusCode();
     }
 
     [Fact]

@@ -25,8 +25,10 @@ public interface IWorkspaceStore
     Task RemoveConnection(string userId, Guid id, CancellationToken ct);
     Task AddEvent(RecommendationEvent evt, CancellationToken ct);
     Task<RecommendationEvent?> RecommendationEvent(Guid id, CancellationToken ct);
+    Task<IReadOnlyList<RecommendationEvent>> RecommendationEvents(string userId, string? eventType, CancellationToken ct);
     Task<bool> SaveAffiliateConversion(AffiliateConversion conversion, CancellationToken ct);
     Task<IReadOnlyList<Consent>> Consents(string userId, CancellationToken ct);
+    Task<Consent> SaveConsent(Consent consent, CancellationToken ct);
     Task<bool> RevokeConsent(string userId, Guid id, CancellationToken ct);
     Task<IReadOnlyList<UserNotification>> Notifications(string userId, CancellationToken ct);
     Task AddNotification(UserNotification notification, CancellationToken ct);
@@ -37,6 +39,9 @@ public interface IWorkspaceStore
     Task<PushDevice> SavePushDevice(PushDevice device, CancellationToken ct);
     Task<bool> RemovePushDevice(string userId, Guid id, CancellationToken ct);
     Task DeactivatePushDevice(Guid id, CancellationToken ct);
+    Task AddPushReceipt(PushReceipt receipt, CancellationToken ct);
+    Task<IReadOnlyList<PushReceipt>> ClaimPushReceipts(int limit, DateTimeOffset now, TimeSpan lease, CancellationToken ct);
+    Task CompletePushReceipt(Guid id, string status, string? error, DateTimeOffset now, CancellationToken ct);
     Task<BankSyncJob> EnqueueSync(BankSyncJob job, CancellationToken ct);
     Task<BankSyncJob?> SyncJob(string userId, Guid id, CancellationToken ct);
     Task<BankSyncJob?> ClaimSyncJob(DateTimeOffset now, TimeSpan lease, CancellationToken ct);
@@ -61,6 +66,11 @@ public interface IWorkspaceStore
     );
     Task<IReadOnlyList<StoredRecurringPayment>> StoredPayments(string userId, CancellationToken ct);
     Task<IReadOnlyList<StoredRecommendation>> StoredRecommendations(string userId, CancellationToken ct);
+    Task<AccountDeletionJob> EnqueueAccountDeletion(string userId, DateTimeOffset now, CancellationToken ct);
+    Task<AccountDeletionJob?> AccountDeletion(string userId, CancellationToken ct);
+    Task<AccountDeletionJob?> ClaimAccountDeletion(DateTimeOffset now, TimeSpan lease, CancellationToken ct);
+    Task CompleteAccountDeletion(Guid id, string status, DateTimeOffset now, CancellationToken ct);
+    Task FailAccountDeletion(Guid id, string error, DateTimeOffset now, CancellationToken ct);
     Task DeleteAccount(string userId, CancellationToken ct);
     Task<int> PurgeExpiredData(DateTimeOffset now, CancellationToken ct);
 }
@@ -155,10 +165,19 @@ public interface IRecommendationExplainer
 }
 
 public enum PushSendResult { Sent, InvalidToken, Retry }
+public sealed record PushSendOutcome(PushSendResult Result, string? ReceiptId = null);
 public interface IPushSender
 {
     bool IsConfigured { get; }
-    Task<PushSendResult> Send(PushDevice device, UserNotification notification, CancellationToken ct);
+    Task<PushSendOutcome> Send(PushDevice device, UserNotification notification, CancellationToken ct);
+}
+public interface IPushReceiptChecker
+{
+    bool IsConfigured { get; }
+    Task<IReadOnlyDictionary<string, PushSendResult>> Check(
+        IReadOnlyList<string> receiptIds,
+        CancellationToken ct
+    );
 }
 
 public interface IIdentityLifecycle
@@ -185,12 +204,12 @@ public sealed record Dashboard(
 public sealed record UserDataExport(
     DateTimeOffset ExportedAt,
     UserProfile Profile,
-    IReadOnlyList<BankConnection> Connections,
+    IReadOnlyList<ExportedBankConnection> Connections,
     IReadOnlyList<BankAccount> Accounts,
     IReadOnlyList<BankTransaction> Transactions,
     IReadOnlyList<Consent> Consents,
     IReadOnlyList<UserNotification> Notifications,
-    IReadOnlyList<PushDevice> PushDevices,
+    IReadOnlyList<ExportedPushDevice> PushDevices,
     IReadOnlyList<BankSyncJob> SyncJobs,
     IReadOnlyList<SubscriptionPreference> SubscriptionPreferences,
     IReadOnlyList<RecommendationEvent> RecommendationEvents,
@@ -200,6 +219,23 @@ public sealed record UserDataExport(
     IReadOnlyList<PremiumWebhookEvent> PremiumWebhookEvents,
     IReadOnlyList<StoredRecurringPayment> StoredPayments,
     IReadOnlyList<StoredRecommendation> StoredRecommendations
+);
+
+public sealed record ExportedBankConnection(
+    Guid Id,
+    string BankName,
+    string Provider,
+    string Status,
+    DateTimeOffset? LastSyncAt,
+    DateTimeOffset ConsentExpiresAt
+);
+
+public sealed record ExportedPushDevice(
+    Guid Id,
+    string Platform,
+    DateTimeOffset RegisteredAt,
+    DateTimeOffset LastSeenAt,
+    bool Active
 );
 
 public sealed class AnalysisService(

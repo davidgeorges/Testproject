@@ -9,9 +9,12 @@ namespace SubscriptionApp.Api;
 
 public sealed class TinkBankingProvider(HttpClient http, IConfiguration configuration, TinkLinkOptions link) : IBankingProvider
 {
+    private const int MaximumTransactionPages = 100;
     private readonly string clientId = configuration["Tink:ClientId"]!;
     private readonly string clientSecret = configuration["Tink:ClientSecret"]!;
+    private readonly string? tokenEncryptionKey = configuration["Banking:TokenEncryptionKey"];
     public string LinkUrl { get; } = link.Url;
+    public string? NativeLinkUrl { get; } = link.NativeUrl;
     public bool IsConfigured => true;
     public IReadOnlySet<string> SupportedBanks { get; } = new HashSet<string> { "Tink" };
 
@@ -24,7 +27,9 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
         {
             using var response = await http.PostAsync("/api/v1/oauth/token", new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["client_id"] = clientId, ["client_secret"] = clientSecret, ["code"] = code,
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret,
+                ["code"] = code,
                 ["grant_type"] = "authorization_code",
             }), ct);
             var body = await response.Content.ReadAsStringAsync(ct);
@@ -36,10 +41,14 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
             var token = accessToken.GetString()!;
             return new BankConnection
             {
-                UserId = userId, BankName = "Banque connectée via Tink", Provider = "tink",
+                UserId = userId,
+                BankName = "Banque connectée via Tink",
+                Provider = "tink",
                 ExternalConnectionId = string.IsNullOrWhiteSpace(credentialsId) ? $"unknown-{Guid.NewGuid():N}" : credentialsId,
-                ProviderSecret = Protect(token), Status = "connected",
-                ConsentExpiresAt = DateTimeOffset.UtcNow.AddDays(90), AuthorizationUrl = null,
+                ProviderSecret = Protect(token),
+                Status = "connected",
+                ConsentExpiresAt = DateTimeOffset.UtcNow.AddDays(90),
+                AuthorizationUrl = null,
             };
         }
         catch (TinkBankingException) { throw; }
@@ -54,7 +63,8 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
         var accessToken = AccessToken(connection);
         var result = new List<BankTransaction>();
         string? pageToken = null;
-        for (var page = 0; page < 5; page++)
+        var seenPageTokens = new HashSet<string>(StringComparer.Ordinal);
+        for (var page = 0; page < MaximumTransactionPages; page++)
         {
             var path = "/data/v2/transactions?pageSize=100"
                 + (string.IsNullOrWhiteSpace(pageToken) ? "" : $"&pageToken={Uri.EscapeDataString(pageToken)}");
@@ -82,16 +92,31 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
                 _ = DateOnly.TryParse(dateText.Length >= 10 ? dateText[..10] : dateText, out var date);
                 result.Add(new BankTransaction
                 {
-                    UserId = connection.UserId, ConnectionId = connection.Id, Provider = "tink", ExternalId = id,
-                    AccountKey = Text(row, "accountId") ?? "tink", BookedAt = date == default ? DateOnly.FromDateTime(DateTime.UtcNow) : date,
-                    Amount = Amount(row), Currency = Text(row, "amount", "currencyCode") ?? Text(row, "currencyDenominatedAmount", "currencyCode") ?? Text(row, "currencyCode") ?? "EUR",
+                    UserId = connection.UserId,
+                    ConnectionId = connection.Id,
+                    Provider = "tink",
+                    ExternalId = id,
+                    AccountKey = Text(row, "accountId") ?? "tink",
+                    BookedAt = date == default ? DateOnly.FromDateTime(DateTime.UtcNow) : date,
+                    Amount = Amount(row),
+                    Currency = Text(row, "amount", "currencyCode") ?? Text(row, "currencyDenominatedAmount", "currencyCode") ?? Text(row, "currencyCode") ?? "EUR",
                     MerchantName = Text(row, "merchantInformation", "merchantName") ?? Text(row, "descriptions", "display") ?? Text(row, "descriptions", "original") ?? Text(row, "description") ?? "Transaction",
                     Category = Text(row, "enrichedData", "categories", "pfm", "id") ?? Text(row, "categoryId") ?? "other",
                 });
             }
             pageToken = Text(json.RootElement, "nextPageToken");
             if (string.IsNullOrWhiteSpace(pageToken)) break;
+            if (!seenPageTokens.Add(pageToken))
+                throw new TinkBankingException(
+                    "TINK_PAGINATION_LOOP",
+                    "Tink a retourné une pagination invalide. La synchronisation a été interrompue sans remplacer vos données."
+                );
         }
+        if (!string.IsNullOrWhiteSpace(pageToken))
+            throw new TinkBankingException(
+                "TINK_TRANSACTION_LIMIT",
+                "Le volume de transactions dépasse la limite de sécurité. Contactez le support pour terminer l’import."
+            );
         return result;
     }
 
@@ -123,16 +148,31 @@ public sealed class TinkBankingProvider(HttpClient http, IConfiguration configur
 
     private string Protect(string value)
     {
-        var key = SHA256.HashData(Encoding.UTF8.GetBytes(clientSecret));
-        var nonce = RandomNumberGenerator.GetBytes(12); var plain = Encoding.UTF8.GetBytes(value); var cipher = new byte[plain.Length]; var tag = new byte[16];
-        using var aes = new AesGcm(key, 16); aes.Encrypt(nonce, plain, cipher, tag);
-        return Convert.ToBase64String([.. nonce, .. tag, .. cipher]);
+        var key = EncryptionKey(tokenEncryptionKey ?? clientSecret);
+        var nonce = RandomNumberGenerator.GetBytes(12);
+        var plain = Encoding.UTF8.GetBytes(value);
+        var cipher = new byte[plain.Length];
+        var tag = new byte[16];
+        using var aes = new AesGcm(key, 16);
+        aes.Encrypt(nonce, plain, cipher, tag);
+        return $"v1:{Convert.ToBase64String([.. nonce, .. tag, .. cipher])}";
     }
+
     private string Unprotect(string value)
     {
-        var bytes = Convert.FromBase64String(value); var key = SHA256.HashData(Encoding.UTF8.GetBytes(clientSecret)); var plain = new byte[bytes.Length - 28];
-        using var aes = new AesGcm(key, 16); aes.Decrypt(bytes[..12], bytes[28..], bytes[12..28], plain); return Encoding.UTF8.GetString(plain);
+        var versioned = value.StartsWith("v1:", StringComparison.Ordinal);
+        var bytes = Convert.FromBase64String(versioned ? value[3..] : value);
+        if (bytes.Length < 29) throw new CryptographicException("Invalid encrypted banking token.");
+        var keyMaterial = versioned ? tokenEncryptionKey ?? clientSecret : clientSecret;
+        var key = EncryptionKey(keyMaterial);
+        var plain = new byte[bytes.Length - 28];
+        using var aes = new AesGcm(key, 16);
+        aes.Decrypt(bytes[..12], bytes[28..], bytes[12..28], plain);
+        return Encoding.UTF8.GetString(plain);
     }
+
+    private static byte[] EncryptionKey(string keyMaterial) =>
+        SHA256.HashData(Encoding.UTF8.GetBytes(keyMaterial));
     private static string? Text(JsonElement value, string property) => value.TryGetProperty(property, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
     private static string? Text(JsonElement value, string parent, string property) => value.TryGetProperty(parent, out var p) ? Text(p, property) : null;
     private static string? Text(JsonElement value, string a, string b, string c, string d) => value.TryGetProperty(a, out var p) && p.TryGetProperty(b, out p) && p.TryGetProperty(c, out p) ? Text(p, d) : null;

@@ -25,9 +25,10 @@ var firebaseProjectId = builder.Configuration["Firebase:ProjectId"];
 if (demo && !builder.Environment.IsDevelopment())
     throw new InvalidOperationException("Demo mode is restricted to Development.");
 builder.Services.AddSingleton<DemoSessions>();
+var dataProtection = builder.Services.AddDataProtection();
 if (demo)
 {
-    builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
+    dataProtection.UseEphemeralDataProtectionProvider();
     builder.Services.Configure<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>(
         o => o.XmlRepository = new EphemeralKeyRepository()
     );
@@ -166,9 +167,11 @@ if (pushProvider == "expo")
         client.BaseAddress = new Uri("https://exp.host/");
         client.Timeout = TimeSpan.FromSeconds(15);
     });
-    builder.Services.AddSingleton<IPushSender>(sp => new ExpoPushSender(
+    builder.Services.AddSingleton<ExpoPushSender>(sp => new ExpoPushSender(
         sp.GetRequiredService<IHttpClientFactory>().CreateClient("expo-push"),
         builder.Configuration["Push:ExpoAccessToken"]));
+    builder.Services.AddSingleton<IPushSender>(sp => sp.GetRequiredService<ExpoPushSender>());
+    builder.Services.AddSingleton<IPushReceiptChecker>(sp => sp.GetRequiredService<ExpoPushSender>());
 }
 else if (!string.IsNullOrWhiteSpace(firebaseServiceAccount) && !string.IsNullOrWhiteSpace(firebaseMessagingProject))
 {
@@ -176,8 +179,13 @@ else if (!string.IsNullOrWhiteSpace(firebaseServiceAccount) && !string.IsNullOrW
     builder.Services.AddSingleton<IPushSender>(sp => FirebasePushSender.Create(
         sp.GetRequiredService<IHttpClientFactory>().CreateClient("firebase-messaging"),
         firebaseServiceAccount, firebaseMessagingProject));
+    builder.Services.AddSingleton<IPushReceiptChecker, UnavailablePushReceiptChecker>();
 }
-else builder.Services.AddSingleton<IPushSender, UnavailablePushSender>();
+else
+{
+    builder.Services.AddSingleton<IPushSender, UnavailablePushSender>();
+    builder.Services.AddSingleton<IPushReceiptChecker, UnavailablePushReceiptChecker>();
+}
 if (demo) builder.Services.AddSingleton<IIdentityLifecycle, DemoIdentityLifecycle>();
 else if (!string.IsNullOrWhiteSpace(firebaseServiceAccount) && !string.IsNullOrWhiteSpace(firebaseMessagingProject))
 {
@@ -189,10 +197,14 @@ else builder.Services.AddSingleton<IIdentityLifecycle, UnavailableIdentityLifecy
 var tinkClientId = builder.Configuration["Tink:ClientId"];
 var tinkClientSecret = builder.Configuration["Tink:ClientSecret"];
 var tinkRedirectUri = builder.Configuration["Tink:RedirectUri"];
+var tinkNativeRedirectUri = builder.Configuration["Tink:NativeRedirectUri"];
+static string? TinkLink(string? clientId, string? redirectUri) =>
+    !string.IsNullOrWhiteSpace(clientId) && !string.IsNullOrWhiteSpace(redirectUri)
+        ? $"https://link.tink.com/1.0/transactions/connect-accounts/?client_id={Uri.EscapeDataString(clientId)}&redirect_uri={Uri.EscapeDataString(redirectUri)}&market=FR&locale=fr_FR"
+        : null;
 var tinkLinkUrl = builder.Configuration["Tink:LinkUrl"] ??
-    (!string.IsNullOrWhiteSpace(tinkClientId) && !string.IsNullOrWhiteSpace(tinkRedirectUri)
-        ? $"https://link.tink.com/1.0/transactions/connect-accounts/?client_id={Uri.EscapeDataString(tinkClientId)}&redirect_uri={Uri.EscapeDataString(tinkRedirectUri)}&market=FR&locale=fr_FR"
-        : null);
+    TinkLink(tinkClientId, tinkRedirectUri);
+var tinkNativeLinkUrl = TinkLink(tinkClientId, tinkNativeRedirectUri);
 if (!string.IsNullOrWhiteSpace(tinkClientId) && !string.IsNullOrWhiteSpace(tinkClientSecret) && !string.IsNullOrWhiteSpace(tinkLinkUrl))
 {
     builder.Services.AddHttpClient<TinkBankingProvider>(client =>
@@ -200,7 +212,7 @@ if (!string.IsNullOrWhiteSpace(tinkClientId) && !string.IsNullOrWhiteSpace(tinkC
         client.BaseAddress = new Uri("https://api.tink.com");
         client.Timeout = TimeSpan.FromSeconds(30);
     });
-    builder.Services.AddSingleton(new TinkLinkOptions(tinkLinkUrl));
+    builder.Services.AddSingleton(new TinkLinkOptions(tinkLinkUrl, tinkNativeLinkUrl));
     builder.Services.AddSingleton<IBankingProvider>(sp => sp.GetRequiredService<TinkBankingProvider>());
 }
 else if (demo) builder.Services.AddSingleton<IBankingProvider, SandboxBankingProvider>();
@@ -209,6 +221,11 @@ var premiumVerificationSecret = builder.Configuration["Premium:VerificationSecre
 if (demo && (string.IsNullOrWhiteSpace(premiumVerificationSecret) || premiumVerificationSecret.Length < 32))
     throw new InvalidOperationException("Premium:VerificationSecret must contain at least 32 characters.");
 var revenueCatSecret = builder.Configuration["RevenueCat:SecretApiKey"];
+var revenueCatProductPlans = new Dictionary<string, string>(StringComparer.Ordinal);
+foreach (var product in builder.Configuration.GetSection("RevenueCat:Products:Monthly").Get<string[]>() ?? [])
+    revenueCatProductPlans[product] = "monthly";
+foreach (var product in builder.Configuration.GetSection("RevenueCat:Products:Annual").Get<string[]>() ?? [])
+    revenueCatProductPlans[product] = "annual";
 if (!string.IsNullOrWhiteSpace(revenueCatSecret))
 {
     var revenueCatEntitlement = builder.Configuration["RevenueCat:EntitlementId"] ?? "premium";
@@ -220,7 +237,8 @@ if (!string.IsNullOrWhiteSpace(revenueCatSecret))
     builder.Services.AddSingleton<IPremiumPurchaseVerifier>(sp => new RevenueCatPurchaseVerifier(
         sp.GetRequiredService<IHttpClientFactory>().CreateClient("RevenueCat"),
         revenueCatSecret,
-        revenueCatEntitlement
+        revenueCatEntitlement,
+        revenueCatProductPlans
     ));
 }
 else if (demo)
@@ -235,10 +253,13 @@ builder.Services.AddScoped<AnalysisService>();
 builder.Services.AddScoped<ConsentExpiryProcessor>();
 builder.Services.AddScoped<BankSyncProcessor>();
 builder.Services.AddScoped<PushDeliveryProcessor>();
+builder.Services.AddScoped<PushReceiptProcessor>();
 builder.Services.AddHostedService<ConsentExpiryWorker>();
 builder.Services.AddHostedService<BankSyncWorker>();
 builder.Services.AddHostedService<PushDeliveryWorker>();
+builder.Services.AddHostedService<PushReceiptWorker>();
 builder.Services.AddHostedService<DataRetentionWorker>();
+builder.Services.AddHostedService<AccountDeletionWorker>();
 var connectionString = builder.Configuration.GetConnectionString("Postgres");
 if (!demo && string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("ConnectionStrings:Postgres is required outside demo mode.");
@@ -263,6 +284,12 @@ if (connectionString is not null && builder.Configuration.GetValue("Database:App
     await migrationScope.ServiceProvider.GetRequiredService<WorkspaceDbContext>().Database.MigrateAsync();
 }
 if (!app.Environment.IsDevelopment()) app.UseHsts();
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.Equals("/api/v1/webhooks/revenuecat", StringComparison.OrdinalIgnoreCase))
+        ctx.Request.EnableBuffering();
+    await next();
+});
 app.Use(
     async (ctx, next) =>
     {
@@ -270,6 +297,7 @@ app.Use(
         ctx.Response.Headers["X-Frame-Options"] = "DENY";
         ctx.Response.Headers["Referrer-Policy"] = "no-referrer";
         ctx.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        ctx.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
         ctx.Response.Headers["X-Correlation-ID"] = ctx.TraceIdentifier;
         ctx.Response.Headers.CacheControl = "no-store";
         try
@@ -302,6 +330,32 @@ app.Use(
 );
 app.UseCors();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var isAccountDeletionRoute = context.Request.Path.Equals("/api/v1/account", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.Equals("/api/v1/account/deletion", StringComparison.OrdinalIgnoreCase);
+    if (!string.IsNullOrWhiteSpace(userId)
+        && context.Request.Path.StartsWithSegments("/api/v1")
+        && !isAccountDeletionRoute)
+    {
+        await using var scope = context.RequestServices.CreateAsyncScope();
+        var deletion = await scope.ServiceProvider.GetRequiredService<IWorkspaceStore>()
+            .AccountDeletion(userId, context.RequestAborted);
+        if (deletion is not null)
+        {
+            context.Response.StatusCode = StatusCodes.Status410Gone;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                code = "ACCOUNT_DELETION_IN_PROGRESS",
+                message = "La suppression de ce compte est en cours.",
+                correlationId = context.TraceIdentifier,
+            }, context.RequestAborted);
+            return;
+        }
+    }
+    await next();
+});
 app.UseRateLimiter();
 app.UseAuthorization();
 app.UseStatusCodePages(async status =>
@@ -320,15 +374,7 @@ app.UseStatusCodePages(async status =>
 });
 app.MapGet(
     "/health",
-    () =>
-        Results.Ok(
-            new
-            {
-                status = "ok",
-                mode = demo ? "demo" : "production",
-                persistence = connectionString is null ? "memory" : "postgres",
-            }
-        )
+    () => Results.Ok(new { status = "ok" })
 );
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok" }));
 app.MapGet("/health/ready", async (IServiceScopeFactory scopeFactory, IBankingProvider banking, IIdentityLifecycle identity, IPushSender push, IPremiumPurchaseVerifier purchase, IPremiumEventVerifier premiumEvents, CancellationToken ct) =>
@@ -339,21 +385,49 @@ app.MapGet("/health/ready", async (IServiceScopeFactory scopeFactory, IBankingPr
         await using var scope = scopeFactory.CreateAsyncScope();
         databaseReady = await scope.ServiceProvider.GetRequiredService<WorkspaceDbContext>().Database.CanConnectAsync(ct);
     }
-    var identityReady = identity.IsConfigured || !string.IsNullOrWhiteSpace(firebaseProjectId);
-    var premiumEventsReady = premiumEvents.IsConfigured || !string.IsNullOrWhiteSpace(builder.Configuration["RevenueCat:WebhookAuthorization"]);
-    var integrationsReady = demo || (banking.IsConfigured && identityReady && push.IsConfigured && purchase.IsConfigured && premiumEventsReady);
+    var identityReady = identity.IsConfigured;
+    var tinkWebhookReady = banking is not TinkBankingProvider
+        || (builder.Configuration["Tink:WebhookAuthorization"]?.Length ?? 0) >= 32;
+    var bankingEncryptionReady = banking is not TinkBankingProvider
+        || (builder.Configuration["Banking:TokenEncryptionKey"]?.Length ?? 0) >= 32;
+    var nativeBankingReady = banking is not TinkBankingProvider
+        || !string.IsNullOrWhiteSpace(tinkNativeLinkUrl);
+    var premiumProductsReady = demo || revenueCatProductPlans.Count > 0;
+    var premiumEventsReady = premiumEvents.IsConfigured
+        || ((builder.Configuration["RevenueCat:WebhookAuthorization"]?.Length ?? 0) >= 32
+            && (builder.Configuration["RevenueCat:WebhookSigningSecret"]?.Length ?? 0) >= 32);
+    var integrationsReady = demo || (banking.IsConfigured && tinkWebhookReady && bankingEncryptionReady
+        && nativeBankingReady && identityReady && push.IsConfigured && purchase.IsConfigured
+        && premiumProductsReady && premiumEventsReady);
     var ready = databaseReady && integrationsReady;
-    return Results.Json(new { status = ready ? "ready" : "not_ready", database = databaseReady, banking = banking.IsConfigured, identity = identityReady, identityAdmin = identity.IsConfigured, push = push.IsConfigured, premiumPurchase = purchase.IsConfigured, premiumEvents = premiumEventsReady }, statusCode: ready ? 200 : 503);
+    return Results.Json(new
+    {
+        status = ready ? "ready" : "not_ready",
+        database = databaseReady,
+        banking = banking.IsConfigured,
+        bankingWebhook = tinkWebhookReady,
+        bankingEncryption = bankingEncryptionReady,
+        bankingNative = nativeBankingReady,
+        identity = identityReady,
+        push = push.IsConfigured,
+        premiumPurchase = purchase.IsConfigured,
+        premiumProducts = premiumProductsReady,
+        premiumEvents = premiumEventsReady
+    }, statusCode: ready ? 200 : 503);
 });
-app.MapOpenApi();
+if (app.Environment.IsDevelopment() || demo) app.MapOpenApi();
 if (demo)
     app.MapPost("/api/v1/demo/sessions", (DemoSessions sessions) => Results.Ok(sessions.Create()));
-app.MapPost("/api/v1/webhooks/affiliation", async (AffiliateConversionRequest request, HttpContext c, IConfiguration configuration, IWorkspaceStore store, CancellationToken ct) =>
+app.MapPost("/api/v1/webhooks/affiliation", async (AffiliateConversionRequest request, HttpContext c, IConfiguration configuration, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
 {
     var secret = configuration["Affiliation:WebhookSecret"];
     if (string.IsNullOrWhiteSpace(secret) || secret.Length < 32) return Unavailable(c, "AFFILIATION_NOT_CONFIGURED", "Le webhook d’affiliation doit être configuré.");
     var supplied = c.Request.Headers["X-Webhook-Signature"].ToString();
-    var canonical = $"{request.Provider}|{request.ConversionId}|{request.EventId}|{request.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)}|{request.Currency.ToUpperInvariant()}";
+    var timestampText = c.Request.Headers["X-Webhook-Timestamp"].ToString();
+    if (!long.TryParse(timestampText, out var timestamp)
+        || Math.Abs(time.GetUtcNow().ToUnixTimeSeconds() - timestamp) > 300)
+        return Results.Unauthorized();
+    var canonical = $"{timestampText}|{request.Provider}|{request.ConversionId}|{request.EventId}|{request.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)}|{request.Currency.ToUpperInvariant()}";
     var expected = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(canonical)));
     if (supplied.Length != expected.Length || !CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(supplied.ToUpperInvariant()), Encoding.ASCII.GetBytes(expected)))
         return Results.Unauthorized();
@@ -389,7 +463,7 @@ app.MapPost("/api/v1/webhooks/premium", async (PremiumWebhookRequest request, Ht
     }, verified.RenewsAt, ct);
     return Results.Ok(new { accepted = true, duplicateOrStale = !applied });
 });
-app.MapPost("/api/v1/webhooks/revenuecat", async (RevenueCatWebhookRequest request, HttpContext c, IConfiguration configuration, IWorkspaceStore store, CancellationToken ct) =>
+app.MapPost("/api/v1/webhooks/revenuecat", async (RevenueCatWebhookRequest request, HttpContext c, IConfiguration configuration, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
 {
     var expected = configuration["RevenueCat:WebhookAuthorization"];
     var supplied = c.Request.Headers.Authorization.ToString();
@@ -397,12 +471,39 @@ app.MapPost("/api/v1/webhooks/revenuecat", async (RevenueCatWebhookRequest reque
         || supplied.Length != expected.Length
         || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes(expected)))
         return Results.Unauthorized();
+    var signingSecret = configuration["RevenueCat:WebhookSigningSecret"];
+    if (!string.IsNullOrWhiteSpace(signingSecret))
+    {
+        c.Request.Body.Position = 0;
+        using var reader = new StreamReader(c.Request.Body, Encoding.UTF8, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync(ct);
+        c.Request.Body.Position = 0;
+        var signature = c.Request.Headers["X-RevenueCat-Webhook-Signature"].ToString();
+        var parts = signature.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Split('=', 2))
+            .Where(part => part.Length == 2)
+            .ToDictionary(part => part[0], part => part[1], StringComparer.Ordinal);
+        if (!parts.TryGetValue("t", out var timestampText)
+            || !long.TryParse(timestampText, out var timestamp)
+            || !parts.TryGetValue("v1", out var suppliedSignature)
+            || Math.Abs(time.GetUtcNow().ToUnixTimeSeconds() - timestamp) > 300)
+            return Results.Unauthorized();
+        var expectedSignature = Convert.ToHexString(HMACSHA256.HashData(
+            Encoding.UTF8.GetBytes(signingSecret),
+            Encoding.UTF8.GetBytes($"{timestampText}.{rawBody}")));
+        if (suppliedSignature.Length != expectedSignature.Length
+            || !CryptographicOperations.FixedTimeEquals(
+                Encoding.ASCII.GetBytes(suppliedSignature.ToUpperInvariant()),
+                Encoding.ASCII.GetBytes(expectedSignature)))
+            return Results.Unauthorized();
+    }
     var source = request.Event;
     var eventType = source.Type.ToUpperInvariant() switch
     {
         "INITIAL_PURCHASE" or "RENEWAL" or "UNCANCELLATION" or "PRODUCT_CHANGE" => "renewed",
-        "CANCELLATION" => "cancelled",
-        "EXPIRATION" => "expired",
+        "CANCELLATION" or "SUBSCRIPTION_PAUSED" => "cancelled",
+        "BILLING_ISSUE" => "renewed",
+        "EXPIRATION" or "REFUND" => "expired",
         _ => null,
     };
     if (eventType is null) return Results.Ok(new { accepted = true, ignored = true });
@@ -534,6 +635,20 @@ static bool HasRecentAuthentication(HttpContext context, TimeProvider time, bool
     return long.TryParse(context.User.FindFirstValue("auth_time"), out var seconds)
         && time.GetUtcNow() - DateTimeOffset.FromUnixTimeSeconds(seconds) <= TimeSpan.FromMinutes(10);
 }
+static bool PremiumActive(PremiumSubscription? premium, TimeProvider time) =>
+    premium is not null
+    && premium.Status is "active" or "cancelled"
+    && premium.RenewsAt > time.GetUtcNow();
+static IResult PremiumRequired(HttpContext context) =>
+    Results.Json(
+        new
+        {
+            code = "PREMIUM_REQUIRED",
+            message = "Cette fonctionnalité est réservée aux membres Premium.",
+            correlationId = context.TraceIdentifier,
+        },
+        statusCode: StatusCodes.Status403Forbidden
+    );
 api.MapGet(
     "/profile",
     async (HttpContext c, IWorkspaceStore s, CancellationToken ct) =>
@@ -578,18 +693,40 @@ api.MapGet(
 );
 api.MapGet(
     "/bank/tink/link",
-    (IBankingProvider provider) => provider is TinkBankingProvider tink
-        ? Results.Ok(new { url = tink.LinkUrl })
-        : Results.Json(new { code = "TINK_NOT_CONFIGURED", message = "Tink doit être configuré." }, statusCode: 503)
+    (bool? native, HttpContext c, IBankingProvider provider, IDataProtectionProvider protection, TimeProvider time) =>
+    {
+        if (provider is not TinkBankingProvider tink)
+            return Results.Json(new { code = "TINK_NOT_CONFIGURED", message = "Tink doit être configuré." }, statusCode: 503);
+        var baseUrl = native == true ? tink.NativeLinkUrl : tink.LinkUrl;
+        if (string.IsNullOrWhiteSpace(baseUrl))
+            return Results.Json(new { code = "TINK_NATIVE_REDIRECT_NOT_CONFIGURED", message = "Le retour Tink natif doit être configuré." }, statusCode: 503);
+        var state = protection.CreateProtector("tink-oauth-state-v1").Protect(
+            $"{User(c)}|{time.GetUtcNow().ToUnixTimeSeconds()}|{Guid.NewGuid():N}"
+        );
+        return Results.Ok(new { url = $"{baseUrl}{(baseUrl.Contains('?') ? '&' : '?')}state={Uri.EscapeDataString(state)}" });
+    }
 );
 api.MapPost(
     "/bank/tink/callback",
-    async (TinkCallbackRequest request, HttpContext c, IWorkspaceStore store, IBankingProvider provider, BankSyncProcessor sync, CancellationToken ct) =>
+    async (TinkCallbackRequest request, HttpContext c, IWorkspaceStore store, IBankingProvider provider, BankSyncProcessor sync, IDataProtectionProvider protection, TimeProvider time, CancellationToken ct) =>
     {
         if (provider is not TinkBankingProvider tink)
             return Unavailable(c, "TINK_NOT_CONFIGURED", "Tink doit être configuré.");
         if (string.IsNullOrWhiteSpace(request.Code))
             return Results.BadRequest(new { code = "TINK_CODE_MISSING", message = "Le code Tink est absent.", correlationId = c.TraceIdentifier });
+        try
+        {
+            var state = protection.CreateProtector("tink-oauth-state-v1").Unprotect(request.State ?? "").Split('|');
+            if (state.Length != 3
+                || state[0] != User(c)
+                || !long.TryParse(state[1], out var timestamp)
+                || Math.Abs(time.GetUtcNow().ToUnixTimeSeconds() - timestamp) > 600)
+                return Results.Unauthorized();
+        }
+        catch (CryptographicException)
+        {
+            return Results.Unauthorized();
+        }
         BankConnection bank;
         try
         {
@@ -696,7 +833,21 @@ api.MapPost(
                     }
                 );
             var bank = await provider.CreateConnection(User(c), request.BankName, ct);
-            await s.AddConnection(bank, ct);
+            try
+            {
+                await s.AddConnection(bank, ct);
+            }
+            catch (InvalidOperationException exception) when (exception.Message == "BANK_LIMIT")
+            {
+                return Results.Conflict(
+                    new
+                    {
+                        code = "BANK_LIMIT",
+                        message = "Le nombre maximal de connexions bancaires est atteint.",
+                        correlationId = c.TraceIdentifier,
+                    }
+                );
+            }
             metrics.BankConnected();
             await Audit(s, c, "bank.connected", "bank_connection", bank.Id.ToString(), ct);
             return Results.Created($"/api/v1/bank/connections/{bank.Id}", SafeBank(bank));
@@ -713,6 +864,7 @@ api.MapPost(
             AnalysisService analysis,
             IProductMetrics metrics,
             ITransactionNormalizer normalizer,
+            TimeProvider time,
             CancellationToken ct
         ) =>
         {
@@ -777,7 +929,7 @@ api.MapPost(
             if (isFirstSync) metrics.FirstBankSync();
             metrics.SubscriptionsDetected(detectedPayments.Count);
             var bestSaving = recommendations.FirstOrDefault();
-            if (bestSaving is not null)
+            if (PremiumActive(await s.Premium(userId, ct), time) && bestSaving is not null)
                 await s.AddNotification(
                     new()
                     {
@@ -936,23 +1088,61 @@ api.MapPatch(
 );
 api.MapGet(
     "/recommendations",
-    async (HttpContext c, AnalysisService s, CancellationToken ct) =>
-        Results.Ok(await s.Recommendations(User(c), ct))
+    async (HttpContext c, AnalysisService analysis, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        var recommendations = await analysis.Recommendations(User(c), ct);
+        var premium = PremiumActive(await store.Premium(User(c), ct), time);
+        return Results.Ok(premium ? recommendations : recommendations.Take(3));
+    }
+);
+api.MapGet(
+    "/recommendations/realized",
+    async (HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+        Results.Ok((await store.RecommendationEvents(User(c), "realized", ct))
+            .GroupBy(e => e.RecommendationId, StringComparer.Ordinal)
+            .Select(group => group.OrderByDescending(e => e.OccurredAt).First())
+            .Select(e => new { e.RecommendationId, e.ConfirmedAnnualSaving, e.OccurredAt }))
 );
 api.MapGet(
     "/recommendations/{id}",
-    async (string id, HttpContext c, AnalysisService s, CancellationToken ct) =>
+    async (string id, HttpContext c, AnalysisService analysis, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
     {
-        var r = (await s.Recommendations(User(c), ct)).FirstOrDefault(r => r.Id == id);
+        var recommendations = await analysis.Recommendations(User(c), ct);
+        if (!PremiumActive(await store.Premium(User(c), ct), time))
+            recommendations = recommendations.Take(3).ToArray();
+        var r = recommendations.FirstOrDefault(r => r.Id == id);
         return r is null ? Missing(c) : Results.Ok(r);
     }
 );
 api.MapGet(
     "/recommendations/{id}/alternatives",
-    async (string id, HttpContext c, AnalysisService analysis, CancellationToken ct) =>
+    async (string id, HttpContext c, AnalysisService analysis, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
     {
+        if (!PremiumActive(await store.Premium(User(c), ct), time)) return PremiumRequired(c);
         var alternatives = await analysis.Alternatives(User(c), id, ct);
         return alternatives.Count == 0 ? Missing(c) : Results.Ok(alternatives);
+    }
+);
+api.MapPost(
+    "/recommendations/{id}/realized",
+    async (string id, HttpContext c, AnalysisService analysis, IWorkspaceStore store, CancellationToken ct) =>
+    {
+        var recommendation = (await analysis.Recommendations(User(c), ct)).FirstOrDefault(r => r.Id == id);
+        if (recommendation is null) return Missing(c);
+        var alreadyRealized = (await store.RecommendationEvents(User(c), "realized", ct))
+            .Any(e => e.RecommendationId == id);
+        if (!alreadyRealized)
+        {
+            await store.AddEvent(new RecommendationEvent
+            {
+                UserId = User(c),
+                RecommendationId = id,
+                EventType = "realized",
+                ConfirmedAnnualSaving = recommendation.AnnualSaving,
+            }, ct);
+            await Audit(store, c, "recommendation.realized", "recommendation", id, ct);
+        }
+        return Results.Ok(new { realized = true });
     }
 );
 api.MapPost(
@@ -1031,11 +1221,19 @@ api.MapPut(
         HttpContext c,
         IConfiguration configuration,
         IOfferCatalog offers,
+        IWorkspaceStore store,
         CancellationToken ct
     ) =>
     {
         if (!IsAdmin(c, configuration)) return Results.NotFound();
         string[] categories = ["mobile", "internet", "insurance", "energy"];
+        var allowedDomains = configuration.GetSection("Offers:AllowedDomains").Get<string[]>() ?? [];
+        var validUrl = request.Url is null
+            || (Uri.TryCreate(request.Url, UriKind.Absolute, out var offerUrl)
+                && offerUrl.Scheme == "https"
+                && (demo || allowedDomains.Any(domain =>
+                    offerUrl.Host.Equals(domain, StringComparison.OrdinalIgnoreCase)
+                    || offerUrl.Host.EndsWith($".{domain}", StringComparison.OrdinalIgnoreCase))));
         if (
             id.Length is < 3 or > 80
             || !id.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_')
@@ -1044,14 +1242,13 @@ api.MapPut(
             || request.ProviderName.Length > 120
             || request.MonthlyPrice < 0
             || request.SetupFee < 0
+            || request.Benefits is null
+            || request.Assumptions is null
             || request.Benefits.Length > 20
             || request.Assumptions.Length > 20
             || request.Benefits.Any(value => value.Length > 300)
             || request.Assumptions.Any(value => value.Length > 500)
-            || (
-                request.Url is not null
-                && (!Uri.TryCreate(request.Url, UriKind.Absolute, out var url) || url.Scheme != "https")
-            )
+            || !validUrl
         )
             return Results.BadRequest(
                 new
@@ -1073,7 +1270,9 @@ api.MapPut(
             request.IsPartner,
             request.Url
         );
-        return Results.Ok(await offers.SaveOffer(offer, ct));
+        var saved = await offers.SaveOffer(offer, ct);
+        await Audit(store, c, "admin.offer_saved", "offer", id, ct);
+        return Results.Ok(saved);
     }
 );
 api.MapDelete(
@@ -1083,17 +1282,42 @@ api.MapDelete(
         HttpContext c,
         IConfiguration configuration,
         IOfferCatalog offers,
+        IWorkspaceStore store,
         CancellationToken ct
     ) =>
     {
         if (!IsAdmin(c, configuration)) return Results.NotFound();
-        return await offers.DeactivateOffer(id, ct) ? Results.NoContent() : Missing(c);
+        if (!await offers.DeactivateOffer(id, ct)) return Missing(c);
+        await Audit(store, c, "admin.offer_deactivated", "offer", id, ct);
+        return Results.NoContent();
     }
 );
 api.MapGet(
     "/consents",
     async (HttpContext c, IWorkspaceStore s, CancellationToken ct) =>
         Results.Ok(await s.Consents(User(c), ct))
+);
+api.MapPost(
+    "/consents/legal",
+    async (LegalConsentRequest request, HttpContext c, IWorkspaceStore s, TimeProvider time, CancellationToken ct) =>
+    {
+        if (request.Version is null || request.Version.Length is < 1 or > 32)
+            return Results.BadRequest(new
+            {
+                code = "INVALID_LEGAL_VERSION",
+                message = "La version du texte légal est invalide.",
+                correlationId = c.TraceIdentifier,
+            });
+        var consent = await s.SaveConsent(new Consent
+        {
+            UserId = User(c),
+            Type = "terms_and_privacy",
+            Version = request.Version,
+            GrantedAt = time.GetUtcNow(),
+        }, ct);
+        await Audit(s, c, "consent.legal_accepted", "consent", consent.Id.ToString(), ct);
+        return Results.Ok(consent);
+    }
 );
 api.MapDelete(
     "/consents/{id:guid}",
@@ -1179,9 +1403,7 @@ api.MapGet(
     async (HttpContext c, IWorkspaceStore s, TimeProvider time, CancellationToken ct) =>
     {
         var premium = await s.Premium(User(c), ct);
-        var active = premium is not null
-            && premium.Status is "active" or "cancelled"
-            && premium.RenewsAt > time.GetUtcNow();
+        var active = PremiumActive(premium, time);
         return Results.Ok(
             new
             {
@@ -1285,9 +1507,19 @@ api.MapDelete(
     async (HttpContext c, IWorkspaceStore s, IIdentityLifecycle identity, TimeProvider time, CancellationToken ct) =>
     {
         if (!HasRecentAuthentication(c, time, demo)) return Results.Json(new { code = "RECENT_AUTH_REQUIRED", message = "Reconnectez-vous avant de supprimer le compte.", correlationId = c.TraceIdentifier }, statusCode: 403);
-        if (identity.IsConfigured) await identity.DeleteIdentity(User(c), ct);
-        await s.DeleteAccount(User(c), ct);
-        return Results.NoContent();
+        var job = await s.EnqueueAccountDeletion(User(c), time.GetUtcNow(), ct);
+        if (demo) await identity.DeleteIdentity(User(c), ct);
+        return Results.Accepted($"/api/v1/account/deletion", new { job.Id, job.Status, job.CreatedAt });
+    }
+);
+api.MapGet(
+    "/account/deletion",
+    async (HttpContext c, IWorkspaceStore s, CancellationToken ct) =>
+    {
+        var job = await s.AccountDeletion(User(c), ct);
+        return job is null
+            ? Missing(c)
+            : Results.Ok(new { job.Id, job.Status, job.Attempts, job.CreatedAt, job.UpdatedAt });
     }
 );
 api.MapGet(
@@ -1302,8 +1534,9 @@ api.MapGet(
 app.Run();
 
 public sealed record CreateConnectionRequest(string BankName, bool ConsentGranted);
-public sealed record TinkCallbackRequest(string Code, string? CredentialsId);
-public sealed record TinkLinkOptions(string Url);
+public sealed record LegalConsentRequest(string? Version);
+public sealed record TinkCallbackRequest(string Code, string? CredentialsId, string? State);
+public sealed record TinkLinkOptions(string Url, string? NativeUrl);
 
 public sealed record ProfileRequest(string FirstName, string Theme, bool NotificationsEnabled);
 
