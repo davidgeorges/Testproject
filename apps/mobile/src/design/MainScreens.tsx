@@ -39,7 +39,11 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
   const glassTheme =
-    active === 'Home' || active === 'Subscriptions' || active === 'Savings' || active === 'Premium';
+    active === 'Home' ||
+    active === 'Subscriptions' ||
+    active === 'Savings' ||
+    active === 'Premium' ||
+    active === 'Profile';
   const items: [keyof TabsParams, string, React.ComponentProps<typeof Ionicons>['name']][] = [
     ['Home', 'Accueil', 'home-outline'],
     ['Subscriptions', 'Abonnements', 'reader-outline'],

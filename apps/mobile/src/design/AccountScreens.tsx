@@ -92,6 +92,7 @@ export function ProfileScreen() {
   const cache = useQueryClient();
   const token = useLiveToken();
   const email = useSession((s) => s.email);
+  const preview = PREVIEW_ENABLED && !token;
   const logout = async () => {
     if (token) await unregisterPushNotifications().catch(() => undefined);
     await logOutRevenueCat().catch(() => undefined);
@@ -101,79 +102,176 @@ export function ProfileScreen() {
     useSession.getState().setIdentity(null);
     nav.navigate('Login');
   };
+  const profileRows: {
+    icon: IconName;
+    title: string;
+    subtitle: string;
+    accent?: string;
+    onPress: () => void;
+  }[] = [
+    {
+      icon: 'home-outline',
+      title: 'Mes banques',
+      subtitle: preview ? '2 banques connectées' : 'Gérer mes connexions',
+      onPress: () => nav.navigate('Bank'),
+    },
+    {
+      icon: 'notifications-outline',
+      title: 'Notifications',
+      subtitle: token ? 'Activées sur cet appareil' : 'Aperçu',
+      accent: '#FF7180',
+      onPress: () => nav.navigate('Notifications'),
+    },
+    {
+      icon: 'shield-checkmark-outline',
+      title: 'Sécurité',
+      subtitle: preview ? 'Face ID activé' : 'Gérer mon accès',
+      onPress: () => nav.navigate('Info', { kind: 'security' }),
+    },
+    {
+      icon: 'lock-closed-outline',
+      title: 'Confidentialité',
+      subtitle: 'Gérer mes données',
+      onPress: () => nav.navigate('Info', { kind: 'privacy' }),
+    },
+    {
+      icon: 'settings-outline',
+      title: 'Paramètres',
+      subtitle: 'Langue, apparence',
+      onPress: () => nav.navigate('Settings'),
+    },
+    {
+      icon: 'help-circle-outline',
+      title: 'Aide & Support',
+      subtitle: 'Une question ?',
+      onPress: () => nav.navigate('Info', { kind: 'support' }),
+    },
+  ];
   return (
-    <Page style={{ gap: 12, paddingTop: 4 }}>
-      <View style={{ alignItems: 'center', gap: 5, paddingBottom: 11 }}>
+    <Page
+      backgroundColor="#020609"
+      style={{ gap: 11, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 }}
+    >
+      <LinearGradient
+        colors={['#151C22', '#090E13']}
+        style={{
+          alignItems: 'center',
+          gap: 5,
+          paddingVertical: 15,
+          borderRadius: 26,
+          borderWidth: 1,
+          borderColor: '#2D3842',
+          overflow: 'hidden',
+        }}
+      >
+        <LinearGradient
+          colors={['#FFFFFF18', '#FFFFFF02', '#00000000']}
+          style={{
+            position: 'absolute',
+            left: 40,
+            right: 40,
+            top: -55,
+            height: 125,
+            borderRadius: 70,
+          }}
+        />
         <ReferenceCrop
           rect={[1411, 435, 45, 45]}
-          width={75}
-          style={{ borderRadius: 50, borderWidth: 2, borderColor: '#3C5068' }}
+          width={72}
+          style={{ borderRadius: 36, borderWidth: 2, borderColor: '#606B76' }}
         />
-        <Label style={{ fontSize: 21, lineHeight: 27, fontWeight: '700' }}>
-          {profile.data?.firstName ?? 'Utilisateur'} {PREVIEW_ENABLED && !token ? 'Dupont' : ''}
+        <Label style={{ fontSize: 21, lineHeight: 27, fontWeight: '800' }}>
+          {preview ? 'Georges' : (profile.data?.firstName ?? 'Utilisateur')}
         </Label>
-        <Label muted style={{ fontSize: 12 }}>
-          {token ? (email ?? 'Compte Firebase') : 'Aperçu de l’interface'}
+        <Label muted style={{ fontSize: 11, color: '#929DAE' }}>
+          {token ? (email ?? 'Compte Firebase') : 'georges@email.com'}
         </Label>
         <View
           style={{
-            backgroundColor: '#163DCD',
+            backgroundColor: '#063E2C',
             borderRadius: 15,
-            paddingVertical: 3,
-            paddingHorizontal: 12,
+            paddingVertical: 4,
+            paddingHorizontal: 11,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 4,
           }}
         >
-          <Ionicons name="diamond" color="white" size={11} />
-          <Label style={{ fontSize: 10, color: 'white', lineHeight: 14 }}>
-            {token ? 'Compte' : 'Aperçu'}
+          <Ionicons name="diamond" color="#20F2A0" size={11} />
+          <Label style={{ fontSize: 10, color: '#20F2A0', lineHeight: 14, fontWeight: '700' }}>
+            {token ? 'Compte' : 'Premium'}
           </Label>
         </View>
-      </View>
-      <View>
-        <Row
-          icon="home-outline"
-          title="Mes banques"
-          subtitle={PREVIEW_ENABLED && !token ? '2 banques connectées' : 'Gérer mes connexions'}
-          onPress={() => nav.navigate('Bank')}
-        />
-        <Row
-          icon="notifications-outline"
-          title="Notifications"
-          subtitle={token ? 'Activées sur cet appareil' : 'Aperçu'}
-          color="#FB375A"
-          onPress={() => nav.navigate('Notifications')}
-        />
-        <Row
-          icon="shield-checkmark-outline"
-          title="Sécurité"
-          subtitle={PREVIEW_ENABLED && !token ? 'Face ID activé' : 'Gérer mon accès'}
-          onPress={() => nav.navigate('Info', { kind: 'security' })}
-        />
-        <Row
-          icon="lock-closed-outline"
-          title="Confidentialité"
-          subtitle="Gérer mes données"
-          color="#8099BC"
-          onPress={() => nav.navigate('Info', { kind: 'privacy' })}
-        />
-        <Row
-          icon="settings-outline"
-          title="Paramètres"
-          subtitle="Langue, apparence"
-          color="#8099BC"
-          onPress={() => nav.navigate('Settings')}
-        />
-        <Row
-          icon="help-circle-outline"
-          title="Aide & Support"
-          subtitle="Une question ?"
-          onPress={() => nav.navigate('Info', { kind: 'support' })}
-        />
-      </View>
-      <Button title="↪  Déconnexion" danger onPress={() => void logout()} />
+      </LinearGradient>
+      <LinearGradient
+        colors={['#111820', '#080D12']}
+        style={{
+          borderRadius: 23,
+          borderWidth: 1,
+          borderColor: '#28333D',
+          paddingHorizontal: 13,
+          overflow: 'hidden',
+        }}
+      >
+        {profileRows.map((item, index) => (
+          <Pressable
+            key={item.title}
+            accessibilityRole="button"
+            onPress={item.onPress}
+            style={({ pressed }) => ({
+              minHeight: 61,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 11,
+              borderBottomWidth: index === profileRows.length - 1 ? 0 : 0.5,
+              borderBottomColor: '#26313B',
+              opacity: pressed ? 0.72 : 1,
+            })}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 14,
+                backgroundColor: item.accent ? '#30161A' : '#18212A',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name={item.icon} color={item.accent ?? '#EEF3F7'} size={20} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Label style={{ fontSize: 13, fontWeight: '700' }}>{item.title}</Label>
+              <Label muted style={{ fontSize: 10, color: '#8F9AAA' }}>
+                {item.subtitle}
+              </Label>
+            </View>
+            <Ionicons name="chevron-forward" size={19} color="#7F8A99" />
+          </Pressable>
+        ))}
+      </LinearGradient>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void logout()}
+        style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+      >
+        <View
+          style={{
+            minHeight: 44,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: '#84323A',
+            backgroundColor: '#2A0D12',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            gap: 8,
+          }}
+        >
+          <Ionicons name="log-out-outline" size={18} color="#FF6B78" />
+          <Label style={{ color: '#FF7A86', fontSize: 13, fontWeight: '700' }}>Déconnexion</Label>
+        </View>
+      </Pressable>
     </Page>
   );
 }

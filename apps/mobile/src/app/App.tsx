@@ -289,7 +289,7 @@ function Experience() {
   const { width, height } = useWindowDimensions();
   const [active, setActive] = useState(9);
   const desktop = Platform.OS === 'web' && width >= 760;
-  const deviceHeight = active >= 9 && active <= 14 ? 864 : 844;
+  const deviceHeight = active >= 9 && active <= 15 ? 864 : 844;
   const scale = desktop ? Math.min(1, (height - 54) / deviceHeight) : 1;
   const c = useColors();
   const [picker, setPicker] = useState(false);
