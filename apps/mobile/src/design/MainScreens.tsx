@@ -185,22 +185,36 @@ export function DashboardScreen() {
         <>
           <SavingsHero amount={d.annualPotentialSaving} />
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Card style={{ flex: 1, padding: 16, minHeight: 104 }}>
-              <Label style={{ fontSize: 29, lineHeight: 35, fontWeight: '700' }}>
-                {d.subscriptionCount}
-              </Label>
-              <Label muted style={{ fontSize: 13, lineHeight: 17 }}>
-                Abonnements{'\n'}détectés
-              </Label>
-            </Card>
-            <Card style={{ flex: 1, padding: 16, minHeight: 104 }}>
-              <Label style={{ fontSize: 29, lineHeight: 35, fontWeight: '700' }}>
-                {money(d.monthlyRecurringCost)}
-              </Label>
-              <Label muted style={{ fontSize: 13 }}>
-                Total mensuel
-              </Label>
-            </Card>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Voir les ${d.subscriptionCount} abonnements détectés`}
+              onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
+              style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}
+            >
+              <Card style={{ padding: 16, minHeight: 104 }}>
+                <Label style={{ fontSize: 29, lineHeight: 35, fontWeight: '700' }}>
+                  {d.subscriptionCount}
+                </Label>
+                <Label muted style={{ fontSize: 13, lineHeight: 17 }}>
+                  Abonnements{'\n'}détectés
+                </Label>
+              </Card>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Voir le détail du total mensuel de ${money(d.monthlyRecurringCost)}`}
+              onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
+              style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}
+            >
+              <Card style={{ padding: 16, minHeight: 104 }}>
+                <Label style={{ fontSize: 29, lineHeight: 35, fontWeight: '700' }}>
+                  {money(d.monthlyRecurringCost)}
+                </Label>
+                <Label muted style={{ fontSize: 13 }}>
+                  Total mensuel
+                </Label>
+              </Card>
+            </Pressable>
           </View>
           <Pressable onPress={() => nav.navigate('Bank')} accessibilityRole="button">
             <Card
