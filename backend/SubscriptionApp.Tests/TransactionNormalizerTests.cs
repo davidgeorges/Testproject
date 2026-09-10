@@ -36,4 +36,26 @@ public sealed class TransactionNormalizerTests
         new TransactionNormalizer().Normalize([transaction]);
         Assert.Equal(expected, transaction.Category);
     }
+
+    [Fact]
+    public void NormalizerMarksOppositeOperationsAcrossAccountsAsInternalTransfers()
+    {
+        var outgoing = new BankTransaction { AccountKey = "checking", BookedAt = new(2026, 9, 4), Amount = -250, MerchantName = "Virement", Category = "transfer", Currency = "EUR" };
+        var incoming = new BankTransaction { AccountKey = "savings", BookedAt = new(2026, 9, 5), Amount = 250, MerchantName = "Virement reçu", Category = "transfer", Currency = "EUR" };
+
+        new TransactionNormalizer().Normalize([outgoing, incoming]);
+
+        Assert.True(outgoing.IsInternalTransfer);
+        Assert.True(incoming.IsInternalTransfer);
+    }
+
+    [Fact]
+    public void NormalizerDoesNotTreatAnUnmatchedTransferAsInternal()
+    {
+        var transaction = new BankTransaction { AccountKey = "checking", BookedAt = new(2026, 9, 4), Amount = -250, MerchantName = "Virement propriétaire", Category = "transfer", Currency = "EUR" };
+
+        new TransactionNormalizer().Normalize([transaction]);
+
+        Assert.False(transaction.IsInternalTransfer);
+    }
 }

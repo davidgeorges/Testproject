@@ -17,6 +17,21 @@ public interface IWorkspaceStore
     Task SetConnectionStatus(BankConnection connection, string status, CancellationToken ct);
     Task<IReadOnlyList<BankAccount>> Accounts(string userId, CancellationToken ct);
     Task<IReadOnlyList<BankTransaction>> Transactions(string userId, CancellationToken ct);
+    Task<IReadOnlyList<BankTransactionCategoryRule>> TransactionCategoryRules(
+        string userId,
+        CancellationToken ct
+    );
+    Task<BankTransactionCategoryRule?> TransactionCategoryRule(
+        string userId,
+        Guid transactionId,
+        CancellationToken ct
+    );
+    Task SaveTransactionCategoryRule(BankTransactionCategoryRule rule, CancellationToken ct);
+    Task<bool> RemoveTransactionCategoryRule(string userId, Guid transactionId, CancellationToken ct);
+    Task<IReadOnlyList<CategoryBudget>> CategoryBudgets(string userId, CancellationToken ct);
+    Task SaveCategoryBudget(CategoryBudget budget, CancellationToken ct);
+    Task<bool> RemoveCategoryBudget(string userId, string category, CancellationToken ct);
+    Task<CategoryBudget?> CategoryBudget(string userId, string category, CancellationToken ct);
     Task Synchronize(
         BankConnection connection,
         IReadOnlyList<BankTransaction> transactions,
@@ -207,6 +222,8 @@ public sealed record UserDataExport(
     IReadOnlyList<ExportedBankConnection> Connections,
     IReadOnlyList<BankAccount> Accounts,
     IReadOnlyList<BankTransaction> Transactions,
+    IReadOnlyList<BankTransactionCategoryRule> TransactionCategoryRules,
+    IReadOnlyList<CategoryBudget> CategoryBudgets,
     IReadOnlyList<Consent> Consents,
     IReadOnlyList<UserNotification> Notifications,
     IReadOnlyList<ExportedPushDevice> PushDevices,

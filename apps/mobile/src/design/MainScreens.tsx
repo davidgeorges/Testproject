@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Pressable,
@@ -56,11 +56,13 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
   const glassTheme =
     active === 'Home' ||
     active === 'Subscriptions' ||
+    active === 'Finances' ||
     active === 'Savings' ||
     active === 'Premium';
   const items: [keyof TabsParams, string, React.ComponentProps<typeof Ionicons>['name']][] = [
     ['Home', 'Accueil', 'home-outline'],
     ['Subscriptions', 'Abonnements', 'reader-outline'],
+    ['Finances', 'Finances', 'wallet-outline'],
     ['Savings', 'Économies', 'water-outline'],
     ['Profile', 'Profil', 'person-outline'],
   ];
@@ -81,6 +83,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         paddingHorizontal: homeLight ? 14 : glassTheme ? 5 : 0,
         marginHorizontal:
           active === 'Subscriptions' ||
+          active === 'Finances' ||
           active === 'Savings'
             ? dashboardScrollY.interpolate({
                 inputRange: [0, 95],
@@ -141,6 +144,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
               opacity: homeLight
                 ? 0
                 : active === 'Subscriptions' ||
+                active === 'Finances' ||
                 active === 'Savings'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 55, 95],
@@ -151,6 +155,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
               maxHeight: homeLight
                 ? 0
                 : active === 'Subscriptions' ||
+                active === 'Finances' ||
                 active === 'Savings'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 95],

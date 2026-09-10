@@ -147,6 +147,41 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task FinanceBudgetsAndCategoryRulesPersistAndDriveServerCalculations()
+    {
+        using var c = await Session();
+        var bank = await Connect(c);
+        (await Post(c, $"/api/v1/bank/connections/{bank.Id}/sync")).EnsureSuccessStatusCode();
+
+        var budgetResponse = await c.PutAsJsonAsync(
+            "/api/v1/finances/budgets/abonnements",
+            new { monthlyLimit = 100m, categoryType = "fixed" }
+        );
+        budgetResponse.EnsureSuccessStatusCode();
+
+        var rows = await c.GetFromJsonAsync<JsonElement>("/api/v1/finances/transactions?limit=10");
+        var first = rows.GetProperty("items")[0];
+        var transactionId = first.GetProperty("id").GetGuid();
+        (await c.PutAsJsonAsync(
+            $"/api/v1/finances/transactions/{transactionId}/category",
+            new { category = "courses" }
+        )).EnsureSuccessStatusCode();
+
+        var updatedRows = await c.GetFromJsonAsync<JsonElement>("/api/v1/finances/transactions?limit=10");
+        var updated = updatedRows.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("id").GetGuid() == transactionId);
+        Assert.Equal("courses", updated.GetProperty("category").GetString());
+        Assert.True(updated.GetProperty("isCustomCategory").GetBoolean());
+
+        var overview = await c.GetFromJsonAsync<JsonElement>("/api/v1/finances/overview");
+        Assert.Equal(100m, overview.GetProperty("monthlyBudget").GetDecimal());
+        Assert.True(overview.GetProperty("transactionCount").GetInt32() > 0);
+
+        var csv = await c.GetStringAsync("/api/v1/finances/export.csv");
+        Assert.Contains("Date;Type;Montant", csv);
+        Assert.Contains("courses", csv, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task UserCannotReadOrSyncAnotherUsersBank()
     {
         using var a = await Session();

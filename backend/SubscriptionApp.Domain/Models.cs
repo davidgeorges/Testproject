@@ -37,6 +37,27 @@ public sealed class BankTransaction
     public string Currency { get; set; } = "EUR";
     public string MerchantName { get; set; } = "";
     public string Category { get; set; } = "other";
+    public bool IsInternalTransfer { get; set; }
+}
+
+public sealed class BankTransactionCategoryRule
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string UserId { get; set; } = "";
+    public Guid TransactionId { get; set; }
+    public string Category { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class CategoryBudget
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string UserId { get; set; } = "";
+    public string Category { get; set; } = "";
+    public decimal MonthlyLimit { get; set; }
+    public string CategoryType { get; set; } = "variable";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class BankAccount

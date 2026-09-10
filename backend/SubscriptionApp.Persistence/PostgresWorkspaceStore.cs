@@ -86,6 +86,68 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         CancellationToken ct
     ) => await db.Transactions.AsNoTracking().Where(t => t.UserId == userId).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<BankTransactionCategoryRule>> TransactionCategoryRules(
+        string userId,
+        CancellationToken ct
+    ) => await db.CategoryRules.AsNoTracking()
+        .Where(r => r.UserId == userId)
+        .OrderBy(r => r.CreatedAt)
+        .ToListAsync(ct);
+
+    public async Task<BankTransactionCategoryRule?> TransactionCategoryRule(
+        string userId,
+        Guid transactionId,
+        CancellationToken ct
+    ) => await db.CategoryRules.AsNoTracking()
+        .SingleOrDefaultAsync(r => r.UserId == userId && r.TransactionId == transactionId, ct);
+
+    public async Task SaveTransactionCategoryRule(BankTransactionCategoryRule rule, CancellationToken ct)
+    {
+        var existing = await db.CategoryRules.SingleOrDefaultAsync(
+            r => r.UserId == rule.UserId && r.TransactionId == rule.TransactionId,
+            ct
+        );
+        if (existing is null) db.CategoryRules.Add(rule);
+        else existing.Category = rule.Category;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> RemoveTransactionCategoryRule(string userId, Guid transactionId, CancellationToken ct) =>
+        await db.CategoryRules
+            .Where(r => r.UserId == userId && r.TransactionId == transactionId)
+            .ExecuteDeleteAsync(ct) > 0;
+
+    public async Task<IReadOnlyList<CategoryBudget>> CategoryBudgets(string userId, CancellationToken ct) =>
+        await db.CategoryBudgets.AsNoTracking()
+            .Where(b => b.UserId == userId)
+            .OrderBy(b => b.Category)
+            .ToListAsync(ct);
+
+    public async Task SaveCategoryBudget(CategoryBudget budget, CancellationToken ct)
+    {
+        var existing = await db.CategoryBudgets.SingleOrDefaultAsync(
+            b => b.UserId == budget.UserId && b.Category == budget.Category,
+            ct
+        );
+        if (existing is null) db.CategoryBudgets.Add(budget);
+        else
+        {
+            existing.MonthlyLimit = budget.MonthlyLimit;
+            existing.CategoryType = budget.CategoryType;
+            existing.UpdatedAt = budget.UpdatedAt;
+        }
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> RemoveCategoryBudget(string userId, string category, CancellationToken ct) =>
+        await db.CategoryBudgets
+            .Where(b => b.UserId == userId && b.Category == category)
+            .ExecuteDeleteAsync(ct) > 0;
+
+    public async Task<CategoryBudget?> CategoryBudget(string userId, string category, CancellationToken ct) =>
+        await db.CategoryBudgets.AsNoTracking()
+            .SingleOrDefaultAsync(b => b.UserId == userId && b.Category == category, ct);
+
     public async Task Synchronize(
         BankConnection connection,
         IReadOnlyList<BankTransaction> rows,
@@ -136,6 +198,7 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             stored.Currency = row.Currency;
             stored.MerchantName = row.MerchantName;
             stored.Category = row.Category;
+            stored.IsInternalTransfer = row.IsInternalTransfer;
         }
         connection.LastSyncAt = DateTimeOffset.UtcNow;
         connection.Status = "connected";
@@ -405,6 +468,8 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             .ToArray();
         var accounts = await Accounts(userId, ct);
         var transactions = await Transactions(userId, ct);
+        var categoryRules = await TransactionCategoryRules(userId, ct);
+        var categoryBudgets = await CategoryBudgets(userId, ct);
         var consents = await Consents(userId, ct);
         var notifications = await Notifications(userId, ct);
         var pushDevices = (await PushDevices(userId, ct))
@@ -431,6 +496,8 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             connections,
             accounts,
             transactions,
+            categoryRules,
+            categoryBudgets,
             consents,
             notifications,
             pushDevices,

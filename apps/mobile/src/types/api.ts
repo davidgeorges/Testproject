@@ -79,6 +79,77 @@ export interface BankTransaction {
   merchantName: string;
   category: string;
 }
+export type FinanceCategoryType = 'fixed' | 'variable';
+export interface FinanceTransaction extends BankTransaction {
+  categoryLabel: string;
+  providerCategory: string;
+  isCustomCategory: boolean;
+  isInternalTransfer: boolean;
+  bankName: string;
+  accountName: string;
+}
+export interface CategoryBudget {
+  id: string;
+  category: string;
+  monthlyLimit: number;
+  categoryType: FinanceCategoryType;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface FinanceCategorySummary {
+  category: string;
+  label: string;
+  income: number;
+  expense: number;
+  count: number;
+  categoryType: FinanceCategoryType;
+  monthlyLimit: number | null;
+  periodLimit: number | null;
+  remaining: number | null;
+  status: 'unset' | 'ok' | 'near' | 'exceeded';
+}
+export interface FinanceCashflow {
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
+  planned: number;
+  delta: number;
+}
+export interface FinanceForecast {
+  available: boolean;
+  planned: number;
+  spent: number;
+  projected: number;
+  remainingDays: number;
+  isOverrun: boolean;
+  overrunAmount: number;
+}
+export interface FinanceOverview {
+  from: string;
+  to: string;
+  income: number;
+  expense: number;
+  net: number;
+  fixedExpense: number;
+  variableExpense: number;
+  monthlyBudget: number;
+  categories: FinanceCategorySummary[];
+  cashflow: FinanceCashflow[];
+  forecast: FinanceForecast;
+  transactionCount: number;
+  internalTransferCount: number;
+}
+export interface FinanceFilters {
+  from?: string;
+  to?: string;
+  connectionId?: string;
+  accountId?: string;
+  category?: string;
+  kind?: 'income' | 'expense';
+  search?: string;
+  excludeInternalTransfers?: boolean;
+}
 export interface Profile {
   id: string;
   firstName: string;

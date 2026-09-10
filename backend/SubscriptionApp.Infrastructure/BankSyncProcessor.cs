@@ -3,7 +3,7 @@ using SubscriptionApp.Domain;
 
 namespace SubscriptionApp.Infrastructure;
 
-public sealed class BankSyncProcessor(IWorkspaceStore store, IBankingProvider provider, AnalysisService analysis, TimeProvider time, IProductMetrics metrics, ITransactionNormalizer normalizer)
+public sealed class BankSyncProcessor(IWorkspaceStore store, IBankingProvider provider, AnalysisService analysis, FinanceService finances, TimeProvider time, IProductMetrics metrics, ITransactionNormalizer normalizer)
 {
     public async Task<int> Synchronize(BankConnection bank, CancellationToken ct)
     {
@@ -26,6 +26,23 @@ public sealed class BankSyncProcessor(IWorkspaceStore store, IBankingProvider pr
         if (isFirstSync) metrics.FirstBankSync();
         metrics.SubscriptionsDetected(payments.Count);
         await store.SaveAnalysis(bank.UserId, payments, recommendations, ct);
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var overview = await finances.Overview(bank.UserId, new(
+            new DateOnly(today.Year, today.Month, 1),
+            new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month))
+        ), ct);
+        foreach (var category in overview.Categories.Where(c => c.Status is "near" or "exceeded"))
+            await store.AddNotification(new()
+            {
+                UserId = bank.UserId,
+                Type = category.Status == "exceeded" ? "budget_exceeded" : "budget_near_limit",
+                Title = category.Status == "exceeded" ? $"Budget {category.Label} dépassé" : $"Budget {category.Label} bientôt atteint",
+                Body = category.Status == "exceeded"
+                    ? $"Vos dépenses dépassent ce budget de {Math.Abs(category.Remaining ?? 0):0.00} €."
+                    : $"Vous avez utilisé au moins 85 % de votre budget {category.Label.ToLowerInvariant()}.",
+                ResourceId = category.Category,
+                SourceKey = $"budget:{today:yyyy-MM}:{category.Category}:{category.Status}",
+            }, ct);
         var premium = await store.Premium(bank.UserId, ct);
         var premiumActive = premium is not null
             && premium.Status is "active" or "cancelled"

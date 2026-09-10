@@ -42,8 +42,45 @@ public sealed class TransactionNormalizer : ITransactionNormalizer
             var supplied = transaction.Category.Trim().ToLowerInvariant();
             transaction.Category = NormalizeCategory(supplied, normalized);
             transaction.Currency = transaction.Currency.Trim().ToUpperInvariant();
+            transaction.IsInternalTransfer = IsExplicitInternalTransfer(supplied, normalized);
         }
+
+        MarkMatchingTransfers(transactions);
         return transactions;
+    }
+
+    private static bool IsExplicitInternalTransfer(string supplied, string merchant)
+    {
+        var category = supplied.Replace('-', '_').Replace(':', '_').ToUpperInvariant();
+        return category.Contains("INTERNAL_TRANSFER", StringComparison.Ordinal)
+            || category.Contains("ACCOUNT_TRANSFER", StringComparison.Ordinal)
+            || merchant.Contains("VIREMENT INTERNE", StringComparison.Ordinal)
+            || merchant.Contains("TRANSFERT INTERNE", StringComparison.Ordinal)
+            || merchant.Contains("TRANSFERT ENTRE COMPTE", StringComparison.Ordinal)
+            || merchant.Contains("VIR COMPTE A COMPTE", StringComparison.Ordinal)
+            || merchant.Contains("INTERNAL TRANSFER", StringComparison.Ordinal);
+    }
+
+    private static void MarkMatchingTransfers(IReadOnlyList<BankTransaction> transactions)
+    {
+        for (var index = 0; index < transactions.Count; index++)
+        {
+            var left = transactions[index];
+            if (left.Amount == 0) continue;
+            for (var candidateIndex = index + 1; candidateIndex < transactions.Count; candidateIndex++)
+            {
+                var right = transactions[candidateIndex];
+                if (left.AccountKey == right.AccountKey
+                    || !left.Currency.Equals(right.Currency, StringComparison.OrdinalIgnoreCase)
+                    || left.Amount != -right.Amount
+                    || Math.Abs(left.BookedAt.DayNumber - right.BookedAt.DayNumber) > 3)
+                    continue;
+
+                left.IsInternalTransfer = true;
+                right.IsInternalTransfer = true;
+                break;
+            }
+        }
     }
 
     private static string NormalizeCategory(string supplied, string merchant)

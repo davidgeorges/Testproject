@@ -156,6 +156,7 @@ builder.Services.AddSingleton(
 );
 builder.Services.AddSingleton<SavingsEngine>();
 builder.Services.AddSingleton<ITransactionNormalizer, TransactionNormalizer>();
+builder.Services.AddScoped<FinanceService>();
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"];
 var openAiModel = builder.Configuration["OpenAI:Model"];
 if (!string.IsNullOrWhiteSpace(openAiApiKey) && !string.IsNullOrWhiteSpace(openAiModel))
@@ -645,6 +646,25 @@ app.MapPost("/api/v1/webhooks/tink", async (HttpContext c, IConfiguration config
 });
 var api = app.MapGroup("/api/v1").RequireAuthorization();
 static string User(HttpContext c) => c.User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+static FinanceQuery ReadFinanceQuery(HttpRequest request)
+{
+    static DateOnly? Date(IQueryCollection query, string key) =>
+        DateOnly.TryParseExact(query[key].ToString(), "yyyy-MM-dd", out var value) ? value : null;
+    static Guid? Id(IQueryCollection query, string key) =>
+        Guid.TryParse(query[key].ToString(), out var value) ? value : null;
+    var excludeInternal = !bool.TryParse(request.Query["excludeInternalTransfers"].ToString(), out var parsed)
+        || parsed;
+    return new FinanceQuery(
+        Date(request.Query, "from"),
+        Date(request.Query, "to"),
+        Id(request.Query, "connectionId"),
+        Id(request.Query, "accountId"),
+        request.Query["category"].FirstOrDefault(),
+        request.Query["kind"].FirstOrDefault(),
+        request.Query["search"].FirstOrDefault(),
+        excludeInternal
+    );
+}
 static bool IsAdmin(HttpContext c, IConfiguration configuration)
 {
     if (!configuration.GetValue<bool>("Demo:Enabled"))
@@ -859,6 +879,99 @@ api.MapGet(
             }),
             Total = transactions.Length,
         });
+    }
+);
+api.MapGet(
+    "/finances/overview",
+    async (HttpContext c, FinanceService finances, CancellationToken ct) =>
+        Results.Ok(await finances.Overview(User(c), ReadFinanceQuery(c.Request), ct))
+);
+api.MapGet(
+    "/finances/transactions",
+    async (int? limit, int? offset, HttpContext c, FinanceService finances, CancellationToken ct) =>
+    {
+        var rows = await finances.Transactions(User(c), ReadFinanceQuery(c.Request), ct);
+        var skip = Math.Max(offset ?? 0, 0);
+        var take = Math.Clamp(limit ?? 100, 1, 500);
+        return Results.Ok(new { Items = rows.Skip(skip).Take(take), Total = rows.Count });
+    }
+);
+api.MapGet(
+    "/finances/budgets",
+    async (HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+        Results.Ok((await store.CategoryBudgets(User(c), ct)).OrderBy(b => b.Category))
+);
+api.MapPut(
+    "/finances/budgets/{category}",
+    async (string category, CategoryBudgetRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        var normalizedCategory = FinanceCategories.Normalize(category);
+        if (normalizedCategory == "other" && !category.Equals("other", StringComparison.OrdinalIgnoreCase))
+            return Results.BadRequest(new { code = "INVALID_CATEGORY", message = "Cette catégorie n’est pas reconnue.", correlationId = c.TraceIdentifier });
+        if (request.MonthlyLimit <= 0 || request.MonthlyLimit > 1_000_000)
+            return Results.BadRequest(new { code = "INVALID_BUDGET", message = "Le budget mensuel doit être supérieur à zéro.", correlationId = c.TraceIdentifier });
+        var categoryType = request.CategoryType?.Trim().ToLowerInvariant();
+        if (categoryType is not ("fixed" or "variable")) categoryType = FinanceCategories.DefaultType(normalizedCategory);
+        var now = time.GetUtcNow();
+        var existing = await store.CategoryBudget(User(c), normalizedCategory, ct);
+        var budget = new CategoryBudget
+        {
+            Id = existing?.Id ?? Guid.NewGuid(),
+            UserId = User(c),
+            Category = normalizedCategory,
+            MonthlyLimit = decimal.Round(request.MonthlyLimit, 2),
+            CategoryType = categoryType,
+            CreatedAt = existing?.CreatedAt ?? now,
+            UpdatedAt = now,
+        };
+        await store.SaveCategoryBudget(budget, ct);
+        return Results.Ok(budget);
+    }
+);
+api.MapDelete(
+    "/finances/budgets/{category}",
+    async (string category, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+        await store.RemoveCategoryBudget(User(c), FinanceCategories.Normalize(category), ct)
+            ? Results.NoContent()
+            : Results.NotFound()
+);
+api.MapPut(
+    "/finances/transactions/{id:guid}/category",
+    async (Guid id, TransactionCategoryRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        var transaction = (await store.Transactions(User(c), ct)).FirstOrDefault(t => t.Id == id);
+        if (transaction is null) return Results.NotFound();
+        if (string.IsNullOrWhiteSpace(request.Category))
+            return Results.BadRequest(new { code = "INVALID_CATEGORY", message = "Sélectionnez une catégorie.", correlationId = c.TraceIdentifier });
+        var category = FinanceCategories.Normalize(request.Category);
+        if (category == "other" && !request.Category.Equals("other", StringComparison.OrdinalIgnoreCase))
+            return Results.BadRequest(new { code = "INVALID_CATEGORY", message = "Cette catégorie n’est pas reconnue.", correlationId = c.TraceIdentifier });
+        var existing = await store.TransactionCategoryRule(User(c), id, ct);
+        var rule = new BankTransactionCategoryRule
+        {
+            Id = existing?.Id ?? Guid.NewGuid(),
+            UserId = User(c),
+            TransactionId = id,
+            Category = category,
+            CreatedAt = existing?.CreatedAt ?? time.GetUtcNow(),
+        };
+        await store.SaveTransactionCategoryRule(rule, ct);
+        return Results.Ok(rule);
+    }
+);
+api.MapDelete(
+    "/finances/transactions/{id:guid}/category",
+    async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+        await store.RemoveTransactionCategoryRule(User(c), id, ct)
+            ? Results.NoContent()
+            : Results.NotFound()
+);
+api.MapGet(
+    "/finances/export.csv",
+    async (HttpContext c, FinanceService finances, CancellationToken ct) =>
+    {
+        var csv = await finances.ExportCsv(User(c), ReadFinanceQuery(c.Request), ct);
+        return Results.Text(csv, "text/csv; charset=utf-8", Encoding.UTF8, 200);
     }
 );
 api.MapPost(
@@ -1605,6 +1718,8 @@ public sealed record TinkLinkOptions(string Url, string? NativeUrl);
 public sealed record ProfileRequest(string FirstName, string Theme, bool NotificationsEnabled);
 
 public sealed record SubscriptionPreferenceRequest(string? Category, string Status);
+public sealed record CategoryBudgetRequest(decimal MonthlyLimit, string? CategoryType);
+public sealed record TransactionCategoryRequest(string Category);
 
 public sealed record OfferRequest(
     string Category,

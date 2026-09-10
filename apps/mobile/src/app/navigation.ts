@@ -2,6 +2,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type TabsParams = {
   Home: undefined;
   Subscriptions: undefined;
+  Finances: undefined;
   Savings: undefined;
   Premium: undefined;
   Profile: undefined;

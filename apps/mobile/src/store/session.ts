@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-export const PREVIEW_ENABLED = process.env.EXPO_PUBLIC_ENABLE_PREVIEW === 'true';
+// Production data is always authoritative. Visual fixtures are never enabled in the app.
+export const PREVIEW_ENABLED = false;
 type Session = {
   token: string | null;
   userId: string | null;

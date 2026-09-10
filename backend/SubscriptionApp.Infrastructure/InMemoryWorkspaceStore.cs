@@ -24,6 +24,8 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     private readonly List<PremiumWebhookEvent> premiumWebhookEvents = [];
     private readonly List<StoredRecurringPayment> storedPayments = [];
     private readonly List<StoredRecommendation> storedRecommendations = [];
+    private readonly List<BankTransactionCategoryRule> categoryRules = [];
+    private readonly List<CategoryBudget> categoryBudgets = [];
     private readonly List<AccountDeletionJob> accountDeletionJobs = [];
 
     public Task<UserProfile> Profile(string userId, CancellationToken ct)
@@ -109,6 +111,104 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
             );
     }
 
+    public Task<IReadOnlyList<BankTransactionCategoryRule>> TransactionCategoryRules(
+        string userId,
+        CancellationToken ct
+    )
+    {
+        lock (gate)
+            return Task.FromResult<IReadOnlyList<BankTransactionCategoryRule>>(
+                categoryRules.Where(r => r.UserId == userId).ToArray()
+            );
+    }
+
+    public Task<BankTransactionCategoryRule?> TransactionCategoryRule(
+        string userId,
+        Guid transactionId,
+        CancellationToken ct
+    )
+    {
+        lock (gate)
+            return Task.FromResult(categoryRules.FirstOrDefault(r =>
+                r.UserId == userId && r.TransactionId == transactionId
+            ));
+    }
+
+    public Task SaveTransactionCategoryRule(BankTransactionCategoryRule rule, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var existing = categoryRules.FirstOrDefault(r =>
+                r.UserId == rule.UserId && r.TransactionId == rule.TransactionId
+            );
+            if (existing is null)
+            {
+                categoryRules.Add(rule);
+                return Task.CompletedTask;
+            }
+
+            existing.Category = rule.Category;
+            existing.CreatedAt = rule.CreatedAt;
+            return Task.CompletedTask;
+        }
+    }
+
+    public Task<bool> RemoveTransactionCategoryRule(string userId, Guid transactionId, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var removed = categoryRules.RemoveAll(r =>
+                r.UserId == userId && r.TransactionId == transactionId
+            );
+            return Task.FromResult(removed > 0);
+        }
+    }
+
+    public Task<IReadOnlyList<CategoryBudget>> CategoryBudgets(string userId, CancellationToken ct)
+    {
+        lock (gate)
+            return Task.FromResult<IReadOnlyList<CategoryBudget>>(
+                categoryBudgets.Where(b => b.UserId == userId).ToArray()
+            );
+    }
+
+    public Task SaveCategoryBudget(CategoryBudget budget, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var existing = categoryBudgets.FirstOrDefault(b =>
+                b.UserId == budget.UserId && string.Equals(b.Category, budget.Category, StringComparison.Ordinal)
+            );
+            if (existing is null)
+            {
+                categoryBudgets.Add(budget);
+                return Task.CompletedTask;
+            }
+
+            existing.MonthlyLimit = budget.MonthlyLimit;
+            existing.CategoryType = budget.CategoryType;
+            existing.UpdatedAt = budget.UpdatedAt;
+            return Task.CompletedTask;
+        }
+    }
+
+    public Task<bool> RemoveCategoryBudget(string userId, string category, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var removed = categoryBudgets.RemoveAll(b => b.UserId == userId && b.Category == category);
+            return Task.FromResult(removed > 0);
+        }
+    }
+
+    public Task<CategoryBudget?> CategoryBudget(string userId, string category, CancellationToken ct)
+    {
+        lock (gate)
+            return Task.FromResult(categoryBudgets.FirstOrDefault(b =>
+                b.UserId == userId && b.Category == category
+            ));
+    }
+
     public Task Synchronize(
         BankConnection connection,
         IReadOnlyList<BankTransaction> rows,
@@ -156,6 +256,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
                 stored.Currency = row.Currency;
                 stored.MerchantName = row.MerchantName;
                 stored.Category = row.Category;
+                stored.IsInternalTransfer = row.IsInternalTransfer;
             }
             connection.LastSyncAt = DateTimeOffset.UtcNow;
             connection.Status = "connected";
@@ -167,9 +268,14 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     {
         lock (gate)
         {
+            var transactionIds = transactions
+                .Where(t => t.UserId == userId && t.ConnectionId == id)
+                .Select(t => t.Id)
+                .ToHashSet();
             connections.RemoveAll(c => c.UserId == userId && c.Id == id);
             accounts.RemoveAll(a => a.UserId == userId && a.ConnectionId == id);
             transactions.RemoveAll(t => t.UserId == userId && t.ConnectionId == id);
+            categoryRules.RemoveAll(r => r.UserId == userId && transactionIds.Contains(r.TransactionId));
             foreach (
                 var consent in consents.Where(c =>
                     c.UserId == userId && c.SubjectId == id.ToString() && c.RevokedAt is null
@@ -465,6 +571,8 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
                         .ToArray(),
                     accounts.Where(a => a.UserId == userId).ToArray(),
                     transactions.Where(t => t.UserId == userId).ToArray(),
+                    categoryRules.Where(r => r.UserId == userId).ToArray(),
+                    categoryBudgets.Where(b => b.UserId == userId).ToArray(),
                     consents.Where(c => c.UserId == userId).ToArray(),
                     notifications.Where(n => n.UserId == userId).ToArray(),
                     pushDevices.Where(d => d.UserId == userId)
@@ -626,6 +734,8 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
             connections.RemoveAll(c => c.UserId == userId);
             accounts.RemoveAll(a => a.UserId == userId);
             transactions.RemoveAll(t => t.UserId == userId);
+            categoryRules.RemoveAll(r => r.UserId == userId);
+            categoryBudgets.RemoveAll(b => b.UserId == userId);
             events.RemoveAll(e => e.UserId == userId);
             affiliateConversions.RemoveAll(c => c.UserId == userId);
             consents.RemoveAll(c => c.UserId == userId);

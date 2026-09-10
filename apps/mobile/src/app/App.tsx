@@ -33,6 +33,7 @@ import {
   RecommendationDetail,
   BottomBar,
 } from '../design/MainScreens';
+import { FinancesScreen } from '../features/finances/Finances';
 import {
   Welcome,
   Login,
@@ -71,6 +72,7 @@ const scenes = [
   'Synchronisation',
   'Accueil',
   'Abonnements',
+  'Finances',
   'Détail abonnement',
   'Économies',
   'Recommandation',
@@ -114,39 +116,42 @@ function selectScene(i: number) {
       navigation.navigate('Main', { screen: 'Subscriptions' });
       break;
     case 11:
-      navigation.navigate('Subscription', { id: 'netflix' });
+      navigation.navigate('Main', { screen: 'Finances' });
       break;
     case 12:
-      navigation.navigate('Main', { screen: 'Savings' });
+      navigation.navigate('Subscription', { id: 'netflix' });
       break;
     case 13:
-      navigation.navigate('Recommendation', { id: 'mobile' });
+      navigation.navigate('Main', { screen: 'Savings' });
       break;
     case 14:
-      navigation.navigate('Main', { screen: 'Premium' });
+      navigation.navigate('Recommendation', { id: 'mobile' });
       break;
     case 15:
-      navigation.navigate('Main', { screen: 'Profile' });
+      navigation.navigate('Main', { screen: 'Premium' });
       break;
     case 16:
-      navigation.navigate('Notifications');
+      navigation.navigate('Main', { screen: 'Profile' });
       break;
     case 17:
-      navigation.navigate('Settings');
+      navigation.navigate('Notifications');
       break;
     case 18:
-      navigation.navigate('System', { kind: 'error' });
+      navigation.navigate('Settings');
       break;
     case 19:
-      navigation.navigate('System', { kind: 'empty' });
+      navigation.navigate('System', { kind: 'error' });
       break;
     case 20:
-      navigation.navigate('System', { kind: 'success' });
+      navigation.navigate('System', { kind: 'empty' });
       break;
     case 21:
-      navigation.navigate('Menu');
+      navigation.navigate('System', { kind: 'success' });
       break;
     case 22:
+      navigation.navigate('Menu');
+      break;
+    case 23:
       useSession.getState().setTheme('dark');
       navigation.navigate('Main', { screen: 'Home' });
       break;
@@ -166,6 +171,7 @@ function MainTabs() {
         component={SubscriptionsScreen}
         options={{ title: 'Abonnements' }}
       />
+      <Tabs.Screen name="Finances" component={FinancesScreen} options={{ title: 'Finances' }} />
       <Tabs.Screen name="Savings" component={SavingsScreen} options={{ title: 'Économies' }} />
       <Tabs.Screen name="Premium" component={PremiumScreen} />
       <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profil' }} />
@@ -334,7 +340,13 @@ function Experience() {
   const dark = useSession((s) => s.theme) === 'dark';
   const homePreview = active === 9;
   const onChange = () => {
-    const route = navigation.getCurrentRoute();
+    const route = navigation.getCurrentRoute() as
+      | ({
+          name: keyof RootStackParams | keyof TabsParams;
+          state?: { routes: Array<{ name: string }>; index: number };
+          params?: unknown;
+        } & object)
+      | undefined;
     const names: Record<string, number> = {
       Welcome: 0,
       Login: 1,
@@ -343,21 +355,31 @@ function Experience() {
       Sync: 8,
       Home: 9,
       Subscriptions: 10,
-      Subscription: 11,
-      Savings: 12,
-      Recommendation: 13,
-      Premium: 14,
-      Profile: 15,
-      Notifications: 16,
-      Settings: 17,
-      Menu: 21,
+      Finances: 11,
+      Subscription: 12,
+      Savings: 13,
+      Recommendation: 14,
+      Premium: 15,
+      Profile: 16,
+      Notifications: 17,
+      Settings: 18,
+      Menu: 22,
+      Main: 9,
+      System: 19,
     };
     if (route) {
+      if (route.name === 'Main') {
+        const tab = route.state?.routes[route.state.index]?.name;
+        if (tab && typeof tab === 'string' && Object.hasOwn(names, tab)) {
+          setActive(names[tab] ?? 9);
+          return;
+        }
+      }
       if (route.name === 'Onboarding') {
         setActive(3 + ((route.params as { step?: number })?.step ?? 0));
       } else if (route.name === 'System') {
         const kind = (route.params as { kind: string }).kind;
-        setActive(kind === 'error' ? 18 : kind === 'empty' ? 19 : 20);
+        setActive(kind === 'error' ? 19 : kind === 'empty' ? 20 : 21);
       } else setActive(names[route.name] ?? 9);
     }
   };
@@ -483,7 +505,7 @@ function Experience() {
                 Interface V1
               </Text>
               <Text style={{ fontSize: 12, lineHeight: 18, color: '#8CA2BB' }}>
-                Les 23 vues de votre maquette.{'\n'}Sélectionnez un écran pour l’explorer.
+                Les 24 vues de votre maquette.{'\n'}Sélectionnez un écran pour l’explorer.
               </Text>
             </View>
             {list}

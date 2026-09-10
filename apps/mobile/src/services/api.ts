@@ -4,7 +4,11 @@ import type {
   BankAccount,
   BankTransaction,
   Connection,
+  CategoryBudget,
   Dashboard,
+  FinanceFilters,
+  FinanceOverview,
+  FinanceTransaction,
   Notification,
   Payment,
   Profile,
@@ -59,6 +63,29 @@ async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
     clearTimeout(timeout);
   }
 }
+async function requestText(path: string, init: ApiRequestInit = {}): Promise<string> {
+  const token = useSession.getState().token;
+  const response = await fetch(`${API_URL}/api/v1${path}`, {
+    ...init,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init.headers,
+    },
+  });
+  if (!response.ok) {
+    if (response.status === 401) useSession.getState().setToken(null);
+    throw new ApiError(response.status, 'EXPORT_FAILED', 'L’export des transactions a échoué.');
+  }
+  return response.text();
+}
+const financeQuery = (filters: FinanceFilters = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  });
+  const encoded = query.toString();
+  return encoded ? `?${encoded}` : '';
+};
 export const api = {
   session: () => request<{ token: string }>('/demo/sessions', { method: 'POST' }),
   dashboard: () => request<Dashboard>('/dashboard'),
@@ -86,6 +113,31 @@ export const api = {
     request<{ items: BankTransaction[]; total: number }>(
       `/bank/transactions?limit=${limit}${connectionId ? `&connectionId=${encodeURIComponent(connectionId)}` : ''}`,
     ),
+  financeOverview: (filters: FinanceFilters = {}) =>
+    request<FinanceOverview>(`/finances/overview${financeQuery(filters)}`),
+  financeTransactions: (filters: FinanceFilters = {}, limit = 500) =>
+    request<{ items: FinanceTransaction[]; total: number }>(
+      `/finances/transactions${financeQuery({ ...filters })}${financeQuery(filters) ? '&' : '?'}limit=${limit}`,
+    ),
+  financeBudgets: () => request<CategoryBudget[]>('/finances/budgets'),
+  saveFinanceBudget: (category: string, monthlyLimit: number, categoryType: 'fixed' | 'variable') =>
+    request<CategoryBudget>(`/finances/budgets/${encodeURIComponent(category)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ monthlyLimit, categoryType }),
+    }),
+  deleteFinanceBudget: (category: string) =>
+    request(`/finances/budgets/${encodeURIComponent(category)}`, { method: 'DELETE' }),
+  saveTransactionCategory: (transactionId: string, category: string) =>
+    request(`/finances/transactions/${encodeURIComponent(transactionId)}/category`, {
+      method: 'PUT',
+      body: JSON.stringify({ category }),
+    }),
+  deleteTransactionCategory: (transactionId: string) =>
+    request(`/finances/transactions/${encodeURIComponent(transactionId)}/category`, {
+      method: 'DELETE',
+    }),
+  exportFinanceCsv: (filters: FinanceFilters = {}) =>
+    requestText(`/finances/export.csv${financeQuery(filters)}`),
   tinkLink: (native = false) =>
     request<{ url: string }>(`/bank/tink/link${native ? '?native=true' : ''}`),
   completeTink: (code: string, credentialsId: string | null, state: string | null, key: string) =>

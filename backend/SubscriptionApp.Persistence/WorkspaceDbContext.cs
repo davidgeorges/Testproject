@@ -22,6 +22,8 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
     public DbSet<BankSyncJob> SyncJobs => Set<BankSyncJob>();
     public DbSet<SubscriptionPreference> SubscriptionPreferences => Set<SubscriptionPreference>();
     public DbSet<PartnerOffer> Offers => Set<PartnerOffer>();
+    public DbSet<BankTransactionCategoryRule> CategoryRules => Set<BankTransactionCategoryRule>();
+    public DbSet<CategoryBudget> CategoryBudgets => Set<CategoryBudget>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<PremiumSubscription> PremiumSubscriptions => Set<PremiumSubscription>();
     public DbSet<PremiumWebhookEvent> PremiumWebhookEvents => Set<PremiumWebhookEvent>();
@@ -144,6 +146,37 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<PartnerOffer>().HasIndex(o => new { o.Category, o.Active });
         b.Entity<PartnerOffer>().Property(o => o.MonthlyPrice).HasPrecision(18, 2);
         b.Entity<PartnerOffer>().Property(o => o.SetupFee).HasPrecision(18, 2);
+        b.Entity<BankTransaction>()
+            .Property(t => t.IsInternalTransfer)
+            .HasDefaultValue(false);
+        b.Entity<BankTransactionCategoryRule>()
+            .ToTable("transaction_category_rules")
+            .HasIndex(r => new { r.UserId, r.TransactionId })
+            .IsUnique();
+        b.Entity<BankTransactionCategoryRule>()
+            .HasIndex(r => new { r.UserId, r.Category });
+        b.Entity<BankTransactionCategoryRule>()
+            .HasOne<UserProfile>()
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<BankTransactionCategoryRule>()
+            .HasOne<BankTransaction>()
+            .WithMany()
+            .HasForeignKey(r => r.TransactionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<CategoryBudget>()
+            .ToTable("category_budgets")
+            .HasIndex(budget => new { budget.UserId, budget.Category })
+            .IsUnique();
+        b.Entity<CategoryBudget>()
+            .Property(budget => budget.MonthlyLimit)
+            .HasPrecision(18, 2);
+        b.Entity<CategoryBudget>()
+            .HasOne<UserProfile>()
+            .WithMany()
+            .HasForeignKey(budget => budget.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
         b.Entity<AuditLog>().ToTable("audit_logs").HasIndex(a => new { a.UserId, a.CreatedAt });
         b.Entity<AuditLog>()
             .HasOne<UserProfile>()
