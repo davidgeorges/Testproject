@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Pressable, Share, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Pressable, Share, Modal, Text } from 'react-native';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,7 +23,13 @@ import {
   ReferenceCrop,
   useColors,
 } from './ui';
-import { useOverview, usePayments, useRecommendations, useProfile } from './reference';
+import {
+  referencePayments,
+  useOverview,
+  usePayments,
+  useRecommendations,
+  useProfile,
+} from './reference';
 import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import { api, idempotencyKey } from '../services/api';
 import { money, cadence, date } from '../utils/format';
@@ -51,8 +57,8 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         backgroundColor: homeTheme ? '#05090D' : c.background,
         borderTopWidth: 1,
         borderColor: homeTheme ? '#202A33' : c.border,
-        paddingTop: homeTheme ? 9 : 6,
-        paddingBottom: homeTheme ? 10 : 7,
+        paddingTop: homeTheme ? 6 : 6,
+        paddingBottom: homeTheme ? 4 : 7,
         paddingHorizontal: homeTheme ? 8 : 0,
       }}
     >
@@ -65,7 +71,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           onPress={() => nav.navigate('Main', { screen: key })}
           style={({ pressed }) => ({
             flex: 1,
-            minHeight: homeTheme ? 54 : 46,
+            minHeight: 46,
             alignItems: 'center',
             justifyContent: 'center',
             gap: 3,
@@ -76,7 +82,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         >
           <Ionicons
             name={active === key && key === 'Home' ? 'home' : icon}
-            size={21}
+            size={homeTheme ? 23 : 21}
             color={
               homeTheme
                 ? key === active
@@ -171,26 +177,36 @@ export function DashboardScreen() {
   const nav = useNav();
   const c = useColors();
   const q = useOverview();
+  const payments = usePayments();
   const profile = useProfile();
   const d = q.data;
+  const showReference = PREVIEW_ENABLED && !useSession.getState().token;
+  const featuredPayments = (
+    PREVIEW_ENABLED
+      ? ['Netflix', 'Spotify', 'Adobe'].map((merchant, index) => ({
+          ...referencePayments.find((item) => item.merchant === merchant)!,
+          monthlyCost: [13.99, 10.99, 52.99][index]!,
+        }))
+      : (payments.data?.items ?? []).slice(0, 3)
+  ).filter(Boolean);
   return (
     <Page
-      backgroundColor="#03070B"
-      style={{ gap: 18, paddingHorizontal: 16, paddingTop: 22, paddingBottom: 30 }}
+      backgroundColor="#020609"
+      style={{ gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}
     >
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 1,
+          marginBottom: 0,
         }}
       >
-        <View style={{ gap: 4 }}>
-          <Label style={{ fontSize: 30, lineHeight: 37, fontWeight: '800', letterSpacing: -0.8 }}>
-            Bonjour {profile.data?.firstName ?? 'Utilisateur'} 👋
+        <View style={{ gap: 1 }}>
+          <Label style={{ fontSize: 27, lineHeight: 33, fontWeight: '800', letterSpacing: -0.8 }}>
+            Bonjour {showReference ? 'Georges' : (profile.data?.firstName ?? 'Utilisateur')} 👋
           </Label>
-          <Label muted style={{ fontSize: 16, lineHeight: 22, color: '#8E98A9' }}>
+          <Label muted style={{ fontSize: 14, lineHeight: 19, color: '#8E98A9' }}>
             Voici votre résumé aujourd’hui.
           </Label>
         </View>
@@ -218,45 +234,112 @@ export function DashboardScreen() {
         <>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Voir mes abonnements"
-            onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
+            accessibilityLabel="Voir mes comptes"
+            onPress={() => nav.navigate('Bank')}
             style={({ pressed }) => ({ opacity: pressed ? 0.88 : 1 })}
           >
             <LinearGradient
-              colors={['#26313B', '#111820', '#070C11']}
+              colors={['#252E37', '#11171D', '#070B0F']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
-                minHeight: 245,
-                borderRadius: 30,
+                minHeight: 210,
+                borderRadius: 29,
                 borderWidth: 1,
-                borderColor: '#7F8C993D',
-                padding: 24,
+                borderColor: '#AAB5C260',
+                padding: 20,
                 overflow: 'hidden',
                 shadowColor: '#B9C7D5',
                 shadowOffset: { width: 0, height: 10 },
-                shadowRadius: 26,
-                shadowOpacity: 0.16,
+                shadowRadius: 24,
+                shadowOpacity: 0.22,
               }}
             >
               <LinearGradient
-                colors={['#FFFFFF42', '#FFFFFF08']}
+                colors={['#FFFFFF4A', '#FFFFFF0A', '#00000000']}
                 style={{
                   position: 'absolute',
-                  left: -30,
-                  top: -55,
-                  width: 270,
-                  height: 120,
+                  left: -45,
+                  top: -68,
+                  width: 330,
+                  height: 145,
                   borderRadius: 80,
                   transform: [{ rotate: '-7deg' }],
+                }}
+              />
+              <LinearGradient
+                colors={['#FFFFFF00', '#B8C5D535', '#FFFFFF08']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  position: 'absolute',
+                  left: -18,
+                  right: -18,
+                  bottom: -35,
+                  height: 82,
+                  borderRadius: 44,
+                  transform: [{ rotate: '-2deg' }],
+                }}
+              />
+              <View
+                accessible={false}
+                style={{
+                  position: 'absolute',
+                  left: 6,
+                  right: 6,
+                  top: 7,
+                  bottom: 7,
+                  borderRadius: 25,
+                  borderWidth: 1,
+                  borderColor: '#F2F7FB2E',
+                  transform: [{ rotate: '-0.7deg' }],
+                }}
+              />
+              <LinearGradient
+                colors={['#FFFFFF10', '#EAF3FCB8', '#FFFFFF18']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  position: 'absolute',
+                  left: 20,
+                  right: 22,
+                  top: 3,
+                  height: 2,
+                  borderRadius: 4,
+                  transform: [{ rotate: '-1.5deg' }],
+                }}
+              />
+              <LinearGradient
+                colors={['#FFFFFF1A', '#DCE9F6C0', '#FFFFFF16']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  position: 'absolute',
+                  left: 18,
+                  right: 14,
+                  bottom: 5,
+                  height: 3,
+                  borderRadius: 5,
+                  transform: [{ rotate: '-1deg' }],
+                }}
+              />
+              <LinearGradient
+                colors={['#FFFFFF18', '#EEF6FF9C', '#FFFFFF12']}
+                style={{
+                  position: 'absolute',
+                  left: 3,
+                  top: 24,
+                  bottom: 24,
+                  width: 3,
+                  borderRadius: 5,
                 }}
               />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                 <View
                   style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 26,
+                    width: 46,
+                    height: 46,
+                    borderRadius: 23,
                     alignItems: 'center',
                     justifyContent: 'center',
                     backgroundColor: '#DDE7F01A',
@@ -264,61 +347,61 @@ export function DashboardScreen() {
                     borderColor: '#FFFFFF24',
                   }}
                 >
-                  <Ionicons name="wallet-outline" size={27} color="#F8FAFC" />
+                  <Ionicons name="card-outline" size={25} color="#F8FAFC" />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Label style={{ fontSize: 17, fontWeight: '700' }}>Votre budget</Label>
-                  <Label muted style={{ fontSize: 14, color: '#9BA6B7' }}>
-                    Dépenses récurrentes
+                  <Label style={{ fontSize: 15, fontWeight: '700' }}>Votre compte</Label>
+                  <Label muted style={{ fontSize: 13, color: '#9BA6B7' }}>
+                    Solde disponible
                   </Label>
                 </View>
-                <Ionicons name="chevron-forward" size={25} color="#8E99A8" />
+                <Ionicons name="chevron-forward" size={23} color="#8E99A8" />
               </View>
               <Label
                 style={{
-                  marginTop: 32,
-                  fontSize: 42,
-                  lineHeight: 50,
+                  marginTop: 22,
+                  fontSize: 38,
+                  lineHeight: 44,
                   fontWeight: '800',
                   letterSpacing: -1.2,
                 }}
               >
-                {money(d.monthlyRecurringCost)}
+                {money(showReference ? 145.81 : d.monthlyRecurringCost)}
               </Label>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 22 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 14 }}>
                 <View
                   style={{
                     borderWidth: 1,
                     borderColor: '#AAB7C550',
                     borderRadius: 22,
-                    paddingHorizontal: 17,
-                    minHeight: 42,
+                    paddingHorizontal: 14,
+                    minHeight: 36,
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 8,
                   }}
                 >
-                  <Label style={{ fontSize: 13, fontWeight: '700' }}>Voir mes abonnements</Label>
-                  <Ionicons name="arrow-forward" size={18} color="#F8FAFC" />
+                  <Label style={{ fontSize: 12, fontWeight: '700' }}>Voir mes comptes</Label>
+                  <Ionicons name="arrow-forward" size={17} color="#F8FAFC" />
                 </View>
                 <View
                   accessible={false}
                   style={{
                     flex: 1,
-                    height: 55,
-                    marginLeft: 18,
+                    height: 45,
+                    marginLeft: 16,
                     flexDirection: 'row',
                     alignItems: 'flex-end',
                     gap: 5,
                   }}
                 >
-                  {[12, 18, 24, 33, 28, 38, 31, 45, 52, 68, 82, 57].map((height, index) => (
+                  {[8, 12, 16, 22, 18, 25, 21, 29, 34, 42, 48, 36].map((height, index) => (
                     <View
                       key={`${height}-${index}`}
                       style={{
                         flex: 1,
                         height,
-                        maxHeight: 52,
+                        maxHeight: 45,
                         borderRadius: 4,
                         backgroundColor: index > 8 ? '#F3F6F9' : '#46515F',
                       }}
@@ -328,78 +411,78 @@ export function DashboardScreen() {
               </View>
             </LinearGradient>
           </Pressable>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 11 }}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Voir les ${d.subscriptionCount} abonnements détectés`}
+              accessibilityLabel={`Voir les ${showReference ? 6 : d.subscriptionCount} abonnements détectés`}
               onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
               style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}
             >
               <LinearGradient
                 colors={['#111820', '#080D12']}
                 style={{
-                  padding: 18,
-                  minHeight: 142,
-                  borderRadius: 24,
+                  padding: 13,
+                  minHeight: 129,
+                  borderRadius: 22,
                   borderWidth: 1,
                   borderColor: '#27323C',
                 }}
               >
                 <View
                   style={{
-                    width: 43,
-                    height: 43,
-                    borderRadius: 22,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
                     backgroundColor: '#18212B',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: 14,
+                    marginBottom: 4,
                   }}
                 >
-                  <Ionicons name="people-outline" size={23} color="#F4F7FA" />
+                  <Ionicons name="people-outline" size={21} color="#F4F7FA" />
                 </View>
-                <Label style={{ fontSize: 31, lineHeight: 36, fontWeight: '800' }}>
-                  {d.subscriptionCount}
+                <Label style={{ fontSize: 27, lineHeight: 31, fontWeight: '800' }}>
+                  {showReference ? 6 : d.subscriptionCount}
                 </Label>
-                <Label muted style={{ fontSize: 14, lineHeight: 19, color: '#929DAE' }}>
+                <Label muted style={{ fontSize: 13, lineHeight: 17, color: '#929DAE' }}>
                   Abonnements{'\n'}détectés
                 </Label>
               </LinearGradient>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Voir le détail des économies possibles de ${money(d.annualPotentialSaving)} par an`}
-              onPress={() => nav.navigate('Main', { screen: 'Savings' })}
+              accessibilityLabel={`Voir le détail du total mensuel de ${money(showReference ? 145.81 : d.monthlyRecurringCost)}`}
+              onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
               style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}
             >
               <LinearGradient
                 colors={['#111820', '#080D12']}
                 style={{
-                  padding: 18,
-                  minHeight: 142,
-                  borderRadius: 24,
+                  padding: 13,
+                  minHeight: 129,
+                  borderRadius: 22,
                   borderWidth: 1,
                   borderColor: '#27323C',
                 }}
               >
                 <View
                   style={{
-                    width: 43,
-                    height: 43,
-                    borderRadius: 22,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
                     backgroundColor: '#18212B',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: 14,
+                    marginBottom: 4,
                   }}
                 >
-                  <Ionicons name="trending-up-outline" size={23} color="#F4F7FA" />
+                  <Ionicons name="card-outline" size={21} color="#F4F7FA" />
                 </View>
-                <Label style={{ fontSize: 27, lineHeight: 36, fontWeight: '800' }}>
-                  {money(d.annualPotentialSaving)}
+                <Label style={{ fontSize: 25, lineHeight: 31, fontWeight: '800' }}>
+                  {money(showReference ? 145.81 : d.monthlyRecurringCost)}
                 </Label>
-                <Label muted style={{ fontSize: 14, lineHeight: 19, color: '#929DAE' }}>
-                  Économies{'\n'}possibles / an
+                <Label muted style={{ fontSize: 13, lineHeight: 17, color: '#929DAE' }}>
+                  Total mensuel
                 </Label>
               </LinearGradient>
             </Pressable>
@@ -411,35 +494,37 @@ export function DashboardScreen() {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
-                paddingHorizontal: 18,
-                paddingVertical: 16,
-                minHeight: 76,
-                borderRadius: 23,
+                paddingHorizontal: 17,
+                paddingVertical: 10,
+                minHeight: 61,
+                borderRadius: 21,
                 borderWidth: 1,
                 borderColor: '#27323C',
               }}
             >
-              <Ionicons name="timer-outline" size={31} color="#F4F7FA" />
+              <Ionicons name="timer-outline" size={29} color="#F4F7FA" />
               <View style={{ flex: 1 }}>
-                <Label muted style={{ fontSize: 11, lineHeight: 16 }}>
+                <Label muted style={{ fontSize: 11, lineHeight: 14 }}>
                   Dernière synchronisation
                 </Label>
-                <Label style={{ fontSize: 12, lineHeight: 17 }}>
+                <Label style={{ fontSize: 12, lineHeight: 15 }}>
                   Aujourd’hui à{' '}
                   {!useSession.getState().preview && d.lastSyncAt
                     ? new Date(d.lastSyncAt).toLocaleTimeString('fr-FR', {
                         hour: '2-digit',
                         minute: '2-digit',
                       })
-                    : '08:41'}
+                    : showReference
+                      ? '10:28'
+                      : '08:41'}
                 </Label>
               </View>
               <View
                 style={{
                   backgroundColor: '#063E2C',
                   borderRadius: 22,
-                  paddingHorizontal: 13,
-                  paddingVertical: 9,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 7,
@@ -454,12 +539,19 @@ export function DashboardScreen() {
               </View>
             </LinearGradient>
           </Pressable>
-          <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 42 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              minHeight: 35,
+              marginTop: 3,
+            }}
+          >
             <Label
               style={{
                 flex: 1,
-                fontSize: 21,
-                lineHeight: 28,
+                fontSize: 20,
+                lineHeight: 25,
                 fontWeight: '800',
                 letterSpacing: -0.35,
               }}
@@ -470,24 +562,24 @@ export function DashboardScreen() {
               accessibilityRole="button"
               onPress={() => nav.navigate('Main', { screen: 'Savings' })}
               style={{
-                minHeight: 44,
+                minHeight: 35,
                 paddingLeft: 12,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
               }}
             >
-              <Label muted style={{ fontSize: 14, fontWeight: '600', color: '#9AA5B5' }}>
+              <Label muted style={{ fontSize: 13, fontWeight: '600', color: '#9AA5B5' }}>
                 Voir tout
               </Label>
               <Ionicons name="chevron-forward" size={18} color="#8792A2" />
             </Pressable>
           </View>
-          <View style={{ gap: 8 }}>
-            {d.topRecommendations.map((item) => (
+          <View style={{ gap: 6 }}>
+            {featuredPayments.map((item) => (
               <Pressable
                 key={item.id}
-                onPress={() => nav.navigate('Recommendation', { id: item.id })}
+                onPress={() => nav.navigate('Subscription', { id: item.id })}
                 accessibilityRole="button"
                 style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}
               >
@@ -497,47 +589,77 @@ export function DashboardScreen() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 13,
-                    padding: 13,
-                    minHeight: 76,
-                    borderRadius: 22,
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    minHeight: 52,
+                    borderRadius: 19,
                     borderWidth: 1,
                     borderColor: '#27323C',
                   }}
                 >
                   <View
                     style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 15,
-                      backgroundColor: '#18212A',
+                      width: 38,
+                      height: 38,
+                      borderRadius: 11,
+                      backgroundColor: item.merchant.toLowerCase().includes('netflix')
+                        ? '#05070A'
+                        : 'transparent',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons
-                      name={
-                        item.category === 'mobile'
-                          ? 'phone-portrait-outline'
-                          : item.category === 'insurance'
-                            ? 'shield-checkmark-outline'
-                            : 'sparkles-outline'
-                      }
-                      size={24}
-                      color="#E9EEF3"
-                    />
+                    {item.merchant.toLowerCase().includes('adobe') ? (
+                      <LinearGradient
+                        colors={['#FF3264', '#FF9A26', '#35D264', '#237CFF', '#BA43FF']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 11,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text style={{ color: 'white', fontSize: 25, lineHeight: 28 }}>∞</Text>
+                      </LinearGradient>
+                    ) : item.merchant.toLowerCase().includes('spotify') ? (
+                      <View
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 19,
+                          backgroundColor: '#1ED760',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#1ED760',
+                          shadowOpacity: 0.38,
+                          shadowRadius: 7,
+                        }}
+                      >
+                        <FontAwesome5 name="spotify" size={30} color="#07120B" />
+                      </View>
+                    ) : (
+                      <BrandIcon name={item.merchant} size={38} />
+                    )}
                   </View>
                   <View style={{ flex: 1, gap: 3 }}>
-                    <Label style={{ fontWeight: '700', fontSize: 15 }}>{item.title}</Label>
-                    <Label muted style={{ fontSize: 12 }}>
-                      Économie estimée
+                    <Label style={{ fontWeight: '700', fontSize: 14 }}>{item.merchant}</Label>
+                    <Label muted style={{ fontSize: 12, color: '#929DAE' }}>
+                      {item.category === 'streaming'
+                        ? item.merchant.toLowerCase().includes('spotify')
+                          ? 'Musique'
+                          : 'Divertissement'
+                        : fr.categories[item.category]}
                     </Label>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 2 }}>
                     <Label style={{ fontSize: 15, fontWeight: '700' }}>
-                      {money(item.annualSaving)}
+                      {money(item.monthlyCost)}
                     </Label>
                     <Label muted style={{ fontSize: 11 }}>
-                      par an
+                      par mois
                     </Label>
                   </View>
                   <Ionicons name="chevron-forward" size={21} color="#8792A2" />

@@ -279,10 +279,11 @@ function Navigator({ onChange }: { onChange: () => void }) {
 }
 function Experience() {
   const { width, height } = useWindowDimensions();
-  const desktop = Platform.OS === 'web' && width >= 760;
-  const scale = desktop ? Math.min(1, (height - 54) / 844) : 1;
-  const c = useColors();
   const [active, setActive] = useState(9);
+  const desktop = Platform.OS === 'web' && width >= 760;
+  const deviceHeight = active === 9 ? 864 : 844;
+  const scale = desktop ? Math.min(1, (height - 54) / deviceHeight) : 1;
+  const c = useColors();
   const [picker, setPicker] = useState(false);
   const token = useLiveToken();
   const dark = useSession((s) => s.theme) === 'dark';
@@ -423,7 +424,7 @@ function Experience() {
         }}
       >
         {PREVIEW_ENABLED && desktop && (
-          <View style={{ width: 240, height: '100%', maxHeight: 844, gap: 12 }}>
+          <View style={{ width: 240, height: '100%', maxHeight: deviceHeight, gap: 12 }}>
             <View style={{ paddingVertical: 10, gap: 8 }}>
               <Text
                 style={{ fontSize: 10, letterSpacing: 2.5, color: '#6482A5', fontWeight: '700' }}
@@ -454,7 +455,9 @@ function Experience() {
         )}
         <View
           style={
-            desktop ? { width: 390 * scale, height: 844 * scale } : { flex: 1, height: '100%' }
+            desktop
+              ? { width: 390 * scale, height: deviceHeight * scale }
+              : { flex: 1, height: '100%' }
           }
         >
           <View
@@ -462,7 +465,7 @@ function Experience() {
               desktop
                 ? {
                     width: 390,
-                    height: 844,
+                    height: deviceHeight,
                     transform: [{ scale }],
                     transformOrigin: 'top left',
                     borderWidth: 2,
