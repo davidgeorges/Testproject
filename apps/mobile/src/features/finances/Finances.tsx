@@ -139,6 +139,15 @@ export function FinancesScreen() {
       queryClient.invalidateQueries({ queryKey: ['finance-budgets'] }),
     ]);
   };
+  const retryAll = async () => {
+    await Promise.all([
+      connections.refetch(),
+      accounts.refetch(),
+      overview.refetch(),
+      transactions.refetch(),
+      budgets.refetch(),
+    ]);
+  };
   const saveBudget = useMutation({
     mutationFn: ({ categoryId, amount, type }: { categoryId: string; amount: number; type: FinanceCategoryType }) => api.saveFinanceBudget(categoryId, amount, type),
     onSuccess: async () => { setEditingBudget(null); await refreshFinance(); },
@@ -174,7 +183,7 @@ export function FinancesScreen() {
   if (!token) return <ScreenWithTabs active="Finances"><Page><State error={new Error('Connectez-vous pour accéder à vos données financières réelles.')} /></Page></ScreenWithTabs>;
   if (overview.isPending || transactions.isPending || budgets.isPending) return <ScreenWithTabs active="Finances"><Page><State loading /></Page></ScreenWithTabs>;
   const error = overview.error || transactions.error || budgets.error || connections.error || accounts.error;
-  if (error && !overview.data) return <ScreenWithTabs active="Finances"><Page><State error={error as Error} retry={() => { void refreshFinance(); }} /></Page></ScreenWithTabs>;
+  if (error && !overview.data) return <ScreenWithTabs active="Finances"><Page><State error={error as Error} retry={() => { void retryAll(); }} /></Page></ScreenWithTabs>;
 
   const data = overview.data!;
   const period = fromMonth === toMonth ? monthLabel(fromMonth) : `${monthLabel(fromMonth)} → ${monthLabel(toMonth)}`;
@@ -223,7 +232,7 @@ export function FinancesScreen() {
           {(transactions.data?.items ?? []).map((item, index) => <View key={item.id} style={{ borderBottomWidth: index === (transactions.data?.items.length ?? 0) - 1 ? 0 : 1, borderBottomColor: '#2D3B47' }}><View style={{ minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11 }}><View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#293A49', alignItems: 'center', justifyContent: 'center' }}><Ionicons name={item.amount >= 0 ? 'trending-up-outline' : 'trending-down-outline'} size={17} color={item.amount >= 0 ? '#4DE3A8' : '#F0B078'} /></View><View style={{ flex: 1 }}><Label style={{ fontWeight: '800' }}>{item.merchantName || 'Transaction'}</Label><Label style={{ color: '#92A6B8', fontSize: 11 }}>{date(item.bookedAt)} · {item.categoryLabel}{item.isCustomCategory ? ' · personnalisée' : ''}</Label><Label style={{ color: '#71879B', fontSize: 10 }}>{item.bankName} · {item.accountName}{item.isInternalTransfer ? ' · virement interne' : ''}</Label></View><View style={{ alignItems: 'flex-end', gap: 5 }}><Label style={{ color: item.amount >= 0 ? '#4DE3A8' : colors.text, fontWeight: '800' }}>{item.amount > 0 ? '+' : ''}{money(item.amount)}</Label><Pressable onPress={() => setEditingTransaction(editingTransaction === item.id ? null : item.id)} style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: '#2B3C4D', alignItems: 'center', justifyContent: 'center' }}><Ionicons name="swap-horizontal" size={14} color="#DCE9F5" /></Pressable></View></View>{editingTransaction === item.id ? <View style={{ paddingHorizontal: 11, paddingBottom: 11, gap: 7 }}><ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={{ flexDirection: 'row', gap: 7 }}>{categories.map((entry) => <Chip key={entry.id} label={entry.label} selected={item.category === entry.id} onPress={() => saveCategory.mutate({ id: item.id, categoryId: entry.id })} />)}</View></ScrollView>{item.isCustomCategory ? <Pressable onPress={() => resetCategory.mutate(item.id)}><Label style={{ color: '#8CCBFF', fontSize: 11 }}>Revenir à la catégorie automatique</Label></Pressable> : null}</View> : null}</View>)}
           {!transactions.data?.items.length ? <View style={{ padding: 20, alignItems: 'center', gap: 7 }}><Ionicons name="search-outline" size={22} color="#8498AC" /><Label style={{ color: '#96A8BA' }}>Aucune transaction trouvée.</Label></View> : null}
         </Card>
-        {error ? <State error={error as Error} retry={() => { void refreshFinance(); }} /> : null}
+        {error && (!(connections.data?.length) || !(accounts.data?.length)) ? <State error={error as Error} retry={() => { void retryAll(); }} /> : null}
       </Page>
     </ScreenWithTabs>
   );

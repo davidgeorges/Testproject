@@ -33,7 +33,8 @@ type ApiRequestInit = RequestInit & { timeoutMs?: number };
 async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
   const token = useSession.getState().token;
   const controller = new AbortController();
-  const { timeoutMs = 15000, ...requestInit } = init;
+  // Render Free can need up to 50 seconds to wake after inactivity.
+  const { timeoutMs = 60000, ...requestInit } = init;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${API_URL}/api/v1${path}`, {
