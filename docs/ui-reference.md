@@ -1,5 +1,9 @@
 # Interface de référence
 
+> La charte active de l’interface claire validée est décrite dans
+> [`charte-graphique-mobile.md`](./charte-graphique-mobile.md). Ce document historique décrit la
+> première planche sombre et ne doit plus servir de référence pour créer de nouveaux écrans.
+
 La refonte reprend la planche sombre fournie par l’utilisateur. L’application reste en React Native / Expo : les textes, champs, cartes, listes, boutons, graphiques et la navigation sont des composants interactifs. L’ancien tableau de bord large est remplacé par une composition mobile à une colonne.
 
 Sur ordinateur, un cadre de 390 × 844 points, adapté à la hauteur disponible, permet d’explorer les 23 vues depuis le sélecteur latéral. Sur petit écran, l’interface occupe la largeur disponible et le sélecteur est accessible par le bouton grille. Le nom commercial reste à définir ; le logo et le libellé du splash sont provisoires.
