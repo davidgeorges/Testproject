@@ -896,14 +896,14 @@ export function SubscriptionDetail() {
         ) : (
           <>
             <LinearGradient
-              colors={['#121A22', '#070C11']}
+              colors={['#4B5966D4', '#354451D4', '#202B35D9']}
               style={{
                 alignItems: 'center',
                 gap: 5,
                 paddingVertical: 14,
                 borderRadius: 25,
                 borderWidth: 1,
-                borderColor: '#28333D',
+                borderColor: '#E9EFF238',
               }}
             >
               <GlassBrandIcon name={p.merchant} size={58} />
@@ -984,7 +984,7 @@ export function SubscriptionDetail() {
                       width: 29,
                       height: 29,
                       borderRadius: 15,
-                      backgroundColor: '#18212A',
+                      backgroundColor: '#34424FCE',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -1078,10 +1078,10 @@ export function SubscriptionDetail() {
                     borderRadius: 19,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: '#063E2C',
+                    backgroundColor: '#34424FCE',
                   }}
                 >
-                  <Ionicons name="sparkles-outline" size={20} color="#20F2A0" />
+                  <Ionicons name="sparkles-outline" size={20} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Label style={{ fontSize: 13, fontWeight: '700' }}>Voir les alternatives</Label>
