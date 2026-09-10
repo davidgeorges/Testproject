@@ -220,18 +220,10 @@ function Navigator({ onChange }: { onChange: () => void }) {
               : c.background,
           },
           animation: 'fade',
-          header: ({ options }) => (
-            <LinearGradient
-              colors={['#344451F2', '#263541F2']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                height: 52,
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 10,
-              }}
-            >
+          headerTransparent: route.name === 'Bank',
+          header: ({ options }) => {
+            const controls = (
+              <>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Retour"
@@ -254,8 +246,28 @@ function Navigator({ onChange }: { onChange: () => void }) {
                 {options.title ?? ''}
               </Label>
               <View style={{ width: 34 }} />
+              </>
+            );
+            const style = {
+              height: 52,
+              flexDirection: 'row' as const,
+              alignItems: 'center' as const,
+              paddingHorizontal: 10,
+            };
+            if (route.name === 'Bank') {
+              return <View style={style}>{controls}</View>;
+            }
+            return (
+              <LinearGradient
+                colors={['#344451F2', '#263541F2']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={style}
+              >
+                {controls}
             </LinearGradient>
-          ),
+            );
+          },
         })}
       >
         <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />

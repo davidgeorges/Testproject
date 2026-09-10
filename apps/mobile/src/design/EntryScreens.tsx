@@ -914,7 +914,7 @@ export function BankScreen() {
   };
   const queryError = connections.error ?? accounts.error ?? transactions.error;
   return (
-    <Page style={{ gap: 15, paddingTop: 6 }}>
+    <Page style={{ gap: 15, paddingTop: 62 }}>
       {!!connections.data?.length && (
         <>
           <Label style={{ fontSize: 23, lineHeight: 30, fontWeight: '700' }}>Mes banques</Label>
