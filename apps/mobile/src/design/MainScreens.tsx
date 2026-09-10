@@ -404,6 +404,18 @@ export function DashboardScreen() {
       : financeData.net
     : 0;
   const remainingLabel = (financeData?.monthlyBudget ?? 0) > 0 ? 'Reste du budget' : 'Solde du mois';
+  const hasMonthlyBudget = (financeData?.monthlyBudget ?? 0) > 0;
+  const progressBase = hasMonthlyBudget ? financeData?.monthlyBudget ?? 0 : financeData?.income ?? 0;
+  const progressRatio = progressBase > 0 ? Math.min(spent / progressBase, 1) : 0;
+  const progressPercent = Math.round(progressRatio * 100);
+  const progressLabel = hasMonthlyBudget
+    ? `${progressPercent} % du budget utilisé`
+    : progressBase > 0
+      ? `${progressPercent} % des revenus dépensés`
+      : 'Définir un budget mensuel';
+  const monthLabel = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' })
+    .format(new Date())
+    .replace(/^./, (letter) => letter.toLocaleUpperCase('fr'));
   const firstName = profile.data?.firstName?.trim() || 'Vous';
   const initial = firstName.charAt(0).toLocaleUpperCase('fr');
   const actions: {
@@ -523,50 +535,21 @@ export function DashboardScreen() {
               </Pressable>
             </View>
 
-            <View style={{ height: 277, marginTop: 3 }}>
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 8,
-                  left: 74,
-                  right: 0,
-                  height: 201,
-                  borderRadius: 16,
-                  backgroundColor: '#3518B9',
-                  transform: [{ rotate: '-1.5deg' }],
-                }}
-              />
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 27,
-                  left: 39,
-                  right: 17,
-                  height: 205,
-                  borderRadius: 16,
-                  backgroundColor: '#D8A9EF',
-                }}
-              />
+            <View style={{ marginTop: 13 }}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Voir le détail de mes finances"
                 onPress={() => nav.navigate('Main', { screen: 'Finances' })}
-                style={({ pressed }) => ({
-                  position: 'absolute',
-                  top: 49,
-                  left: 0,
-                  right: 33,
-                  opacity: pressed ? 0.9 : 1,
-                })}
+                style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
               >
                 <LinearGradient
                   colors={['#FFE839', '#FFD900']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{
-                    height: 205,
-                    borderRadius: 16,
-                    padding: 17,
+                    minHeight: 215,
+                    borderRadius: 24,
+                    padding: 19,
                     overflow: 'hidden',
                     shadowColor: '#B79B00',
                     shadowOpacity: 0.2,
@@ -577,52 +560,70 @@ export function DashboardScreen() {
                   <View
                     style={{
                       position: 'absolute',
-                      width: 160,
-                      height: 160,
-                      borderRadius: 80,
-                      right: -50,
-                      top: -50,
-                      backgroundColor: '#FFF26A80',
+                      width: 190,
+                      height: 190,
+                      borderRadius: 95,
+                      right: -68,
+                      top: -72,
+                      backgroundColor: '#FFF26A99',
+                    }}
+                  />
+                  <View
+                    style={{
+                      position: 'absolute',
+                      width: 86,
+                      height: 86,
+                      borderRadius: 43,
+                      right: 24,
+                      bottom: -51,
+                      backgroundColor: '#3518B91C',
                     }}
                   />
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ width: 22, height: 26, borderRadius: 6, backgroundColor: '#19191B', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="pie-chart" size={14} color="#FFE429" />
+                    <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: '#19191B', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="calendar-outline" size={17} color="#FFE429" />
                     </View>
-                    <Label style={{ marginLeft: 8, flex: 1, color: '#19191B', fontSize: 19, fontWeight: '900' }}>
-                      Mon budget
+                    <Label style={{ marginLeft: 10, flex: 1, color: '#19191B', fontSize: 19, fontWeight: '900' }}>
+                      Ce mois
                     </Label>
-                    <Ionicons name="radio-outline" size={28} color="#19191B" style={{ transform: [{ rotate: '90deg' }] }} />
+                    <Label style={{ color: '#625900', fontSize: 11, fontWeight: '700' }}>{monthLabel}</Label>
                   </View>
-                  <View style={{ width: 34, height: 28, borderRadius: 6, backgroundColor: '#D4C54B', marginTop: 18, padding: 4 }}>
-                    <View style={{ flex: 1, borderWidth: 1, borderColor: '#B2A53B', borderRadius: 3 }} />
+                  <View style={{ marginTop: 23 }}>
+                    <Label style={{ color: '#5F5700', fontSize: 10, fontWeight: '700', letterSpacing: 0.7 }}>
+                      DÉPENSÉ
+                    </Label>
+                    <Label style={{ color: '#171719', fontSize: 31, lineHeight: 38, fontWeight: '900', letterSpacing: -0.9 }}>
+                      {finance.isPending ? '—' : money(spent)}
+                    </Label>
                   </View>
-                  <View style={{ marginTop: 'auto', flexDirection: 'row', alignItems: 'flex-end' }}>
-                    <View style={{ flex: 1 }}>
-                      <Label style={{ color: '#5F5700', fontSize: 10, fontWeight: '700', letterSpacing: 0.7 }}>
-                        DÉPENSÉ CE MOIS
-                      </Label>
-                      <Label style={{ color: '#171719', fontSize: 27, lineHeight: 34, fontWeight: '900', letterSpacing: -0.8 }}>
-                        {finance.isPending ? '—' : money(spent)}
-                      </Label>
+                  <View style={{ marginTop: 15 }}>
+                    <View style={{ height: 7, borderRadius: 4, backgroundColor: '#FFFFFF73', overflow: 'hidden' }}>
+                      <View
+                        style={{
+                          width: `${progressRatio * 100}%`,
+                          height: 7,
+                          borderRadius: 4,
+                          backgroundColor: hasMonthlyBudget && spent > (financeData?.monthlyBudget ?? 0) ? '#B21D1D' : '#19191B',
+                        }}
+                      />
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Label style={{ color: '#5F5700', fontSize: 9, fontWeight: '700' }}>{remainingLabel}</Label>
-                      <Label style={{ color: remaining < 0 ? '#B21D1D' : '#171719', fontSize: 15, fontWeight: '900' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 7 }}>
+                      <Label style={{ flex: 1, color: '#625900', fontSize: 10, fontWeight: '700' }}>
+                        {finance.isPending ? 'Calcul en cours…' : progressLabel}
+                      </Label>
+                      <Label style={{ color: '#625900', fontSize: 10, fontWeight: '700' }}>
+                        {remainingLabel}
+                      </Label>
+                      <Label style={{ color: remaining < 0 ? '#B21D1D' : '#171719', fontSize: 13, fontWeight: '900', marginLeft: 5 }}>
                         {finance.isPending ? '—' : money(remaining)}
                       </Label>
                     </View>
                   </View>
                 </LinearGradient>
               </Pressable>
-              <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7 }}>
-                <View style={{ width: 26, height: 7, borderRadius: 4, backgroundColor: '#8A898E' }} />
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#DAD9DE' }} />
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#DAD9DE' }} />
-              </View>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 7, marginTop: 18 }}>
+            <View style={{ flexDirection: 'row', gap: 7, marginTop: 25 }}>
               {actions.map((action) => (
                 <Pressable
                   key={action.label}

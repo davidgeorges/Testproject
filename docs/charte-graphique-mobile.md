@@ -9,7 +9,7 @@ Cette charte décrit l’interface validée de l’accueil. Elle est la source d
 
 ## 1. Intention visuelle
 
-L’interface doit évoquer un assistant budget simple, moderne et accessible. Elle utilise un fond gris très clair, des surfaces blanches, une encre presque noire et un jaune vif comme accent principal. Le violet sert uniquement à donner de la profondeur ou à distinguer une information secondaire.
+L’interface doit évoquer un assistant budget simple, moderne et accessible. Elle utilise un fond gris très clair, des surfaces blanches, une encre presque noire et un jaune vif comme accent principal. Le violet sert aux graphiques, comparaisons et détails décoratifs discrets.
 
 Les écrans doivent rester aérés malgré une densité d’information élevée. L’utilisateur doit identifier en quelques secondes :
 
@@ -34,8 +34,8 @@ Les composants ne doivent jamais simuler une donnée. Les montants, compteurs, d
 | Jaune principal | `#FFD900` | Accent, carte principale et action centrale |
 | Jaune lumineux | `#FFE839` | Départ du dégradé principal |
 | Jaune pâle | `#FFF26A80` | Halo décoratif à l’intérieur d’une carte jaune |
-| Violet profond | `#3518B9` | Carte arrière ou série secondaire |
-| Violet clair | `#D8A9EF` | Carte intermédiaire ou comparaison |
+| Violet profond | `#3518B9` | Série secondaire ou détail décoratif |
+| Violet clair | `#D8A9EF` | Comparaison ou état secondaire |
 | Vert positif | `#10A330` | Revenus, économies confirmées et succès |
 | Rouge négatif | `#B21D1D` | Dépassement de budget ou erreur bloquante |
 | Avatar neutre | `#E8D6C8` | Avatar sans photo |
@@ -87,7 +87,7 @@ Sur une largeur différente de 390 pt, les marges restent fixes et les cartes ut
 
 | Élément | Rayon |
 |---|---:|
-| Carte principale colorée | 16 pt |
+| Carte principale colorée | 24 pt |
 | Carte de contenu blanche | 17 pt |
 | Bouton rapide | 19 pt |
 | Champ de recherche | 23 pt |
@@ -141,15 +141,18 @@ Le titre est à gauche en 18/800. L’action est à droite en 12–13 et en gris
 
 ### 6.3 Résumé principal
 
-La grande carte de l’accueil mesure **205 pt** de haut. Elle est précédée de deux cartes décoratives :
+Le résumé est un **panneau mensuel unique** afin de ne pas évoquer un portefeuille de cartes bancaires. Il mesure au minimum **215 pt** de haut, occupe toute la largeur utile et utilise un rayon de **24 pt**.
 
-- carte arrière violette : `top: 8`, `left: 74`, `right: 0`, `height: 201`, rotation `-1.5deg` ;
-- carte intermédiaire mauve : `top: 27`, `left: 39`, `right: 17`, `height: 205` ;
-- carte principale : `top: 49`, `left: 0`, `right: 33`, `height: 205`.
+Le panneau jaune utilise le dégradé `#FFE839 → #FFD900`. Un halo circulaire jaune pâle peut dépasser dans l’angle supérieur droit et une forme violette très transparente peut décorer le bas du panneau. Aucun élément ne doit ressembler à une carte de paiement : pas de pile de cartes, puce, symbole sans-contact, numéro ou réseau de paiement.
 
-Le conteneur complet mesure **277 pt**. La carte jaune utilise le dégradé `#FFE839 → #FFD900`. Un halo circulaire jaune pâle peut dépasser dans l’angle supérieur droit. Toute la carte est pressable et ouvre le détail correspondant.
+Sa hiérarchie est fixe :
 
-Sur les autres écrans, la pile peut représenter plusieurs comptes, périodes ou catégories. Si cette notion n’existe pas, afficher une seule carte jaune et conserver sa hauteur, son rayon et sa hiérarchie.
+1. icône calendrier, libellé `Ce mois` et période réelle ;
+2. montant dépensé principal ;
+3. jauge calculée depuis le budget mensuel ou, à défaut, depuis les revenus ;
+4. libellé de progression et montant disponible.
+
+Si aucun budget ni revenu n’est disponible, la jauge reste vide et propose de définir un budget. Toute la surface ouvre le détail Finances. Les autres écrans reprennent ce panneau avec leur propre indicateur principal, sans réintroduire la métaphore bancaire.
 
 ### 6.4 Actions rapides
 
