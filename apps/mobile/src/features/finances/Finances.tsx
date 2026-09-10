@@ -1507,7 +1507,7 @@ export function FinancesScreen() {
                             opacity: pressed ? 0.6 : 1,
                           })}
                         >
-                          <Ionicons name="trash-outline" size={16} color="#E86D67" />
+                          <Ionicons name="close" size={15} color="#E86D67" />
                         </Pressable>
                       </View>
                     </View>
