@@ -15,7 +15,7 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Page,
   Label,
@@ -66,6 +66,87 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
     ['Savings', 'Économies', 'water-outline'],
     ['Profile', 'Profil', 'person-outline'],
   ];
+  if (homeLight) {
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 30,
+          height: 82,
+          paddingHorizontal: 12,
+          paddingBottom: 7,
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: '#FFFFFFFA',
+          borderTopLeftRadius: 25,
+          borderTopRightRadius: 25,
+          shadowColor: '#25233A',
+          shadowOpacity: 0.1,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: -5 },
+        }}
+      >
+        {items.map(([key, title, icon]) => {
+          const center = key === 'Finances';
+          const selected = key === active;
+          return (
+            <Pressable
+              key={key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              accessibilityLabel={title}
+              onPress={() => nav.navigate('Main', { screen: key })}
+              style={({ pressed }) => ({
+                flex: 1,
+                height: 68,
+                alignItems: 'center',
+                justifyContent: center ? 'flex-start' : 'center',
+                gap: 4,
+                opacity: pressed ? 0.66 : 1,
+              })}
+            >
+              <View
+                style={{
+                  width: center ? 55 : 30,
+                  height: center ? 55 : 30,
+                  marginTop: center ? -18 : 0,
+                  borderRadius: center ? 28 : 15,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: center ? '#FFD900' : 'transparent',
+                  borderWidth: center ? 5 : 0,
+                  borderColor: center ? '#F7F6F8' : 'transparent',
+                  shadowColor: center ? '#E6C400' : 'transparent',
+                  shadowOpacity: center ? 0.28 : 0,
+                  shadowRadius: 9,
+                  shadowOffset: { width: 0, height: 5 },
+                }}
+              >
+                <Ionicons
+                  name={selected && key === 'Home' ? 'home' : icon}
+                  size={center ? 22 : 22}
+                  color={center ? '#171719' : selected ? '#171719' : '#929295'}
+                />
+              </View>
+              <Label
+                style={{
+                  color: selected ? '#171719' : '#929295',
+                  fontSize: 10,
+                  lineHeight: 12,
+                  fontWeight: selected ? '800' : '500',
+                }}
+              >
+                {title}
+              </Label>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
   return (
     <Animated.View
       style={{
@@ -122,7 +203,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           })}
         >
           <Ionicons
-            name={active === key && key === 'Home' ? 'home' : icon}
+            name={icon}
             size={homeLight ? 25 : glassTheme ? 18 : 20}
             color={
               homeLight
@@ -291,106 +372,137 @@ function GlassBrandIcon({ name, size = 38 }: { name: string; size?: number }) {
 
 export function DashboardScreen() {
   const nav = useNav();
-  const q = useOverview();
-  const payments = usePayments();
-  const d = q.data;
-  const showReference = PREVIEW_ENABLED && !useSession.getState().token;
-  const allPayments = (
-    showReference
-      ? referencePayments.map((item) => ({
-          ...item,
-          monthlyCost:
-            item.merchant === 'Netflix'
-              ? 13.99
-              : item.merchant === 'Spotify'
-                ? 10.99
-                : item.merchant === 'Adobe'
-                  ? 52.99
-                  : item.monthlyCost,
-        }))
-      : (payments.data?.items ?? [])
-  ).filter(Boolean);
-  const upcomingPayments = allPayments.slice(0, 3);
-  const annualSaving = showReference ? 420 : (d?.annualPotentialSaving ?? 0);
-  const subscriptionCount = showReference ? 6 : (d?.subscriptionCount ?? 0);
-  const monthlyCost = showReference ? 145.81 : (d?.monthlyRecurringCost ?? 0);
-  const categoryCards = [
-    {
-      title: 'Streaming',
-      tint: '#EEF8FF',
-      border: '#D7EDF8',
-      items: allPayments.filter((item) =>
-        ['Netflix', 'Amazon Prime', 'Canal+'].some((name) => item.merchant.includes(name)),
-      ),
-    },
-    {
-      title: 'Musique',
-      tint: '#FFF2F0',
-      border: '#F8DDD8',
-      items: allPayments.filter((item) => item.merchant.toLowerCase().includes('spotify')),
-    },
-    {
-      title: 'Travail',
-      tint: '#F4F1FF',
-      border: '#E4DCF9',
-      items: allPayments.filter((item) =>
-        ['Adobe', 'Microsoft', 'Notion'].some((name) => item.merchant.includes(name)),
-      ),
-    },
+  const token = useLiveToken();
+  const dashboard = useOverview();
+  const profile = useProfile();
+  const finance = useQuery({
+    queryKey: ['finance-overview', token, 'home'],
+    queryFn: () => api.financeOverview({ excludeInternalTransfers: true }),
+    enabled: Boolean(token),
+  });
+  const transactions = useQuery({
+    queryKey: ['finance-transactions', token, 'home'],
+    queryFn: () => api.financeTransactions({ excludeInternalTransfers: true }, 40),
+    enabled: Boolean(token),
+  });
+  const [search, setSearch] = useState('');
+  const d = dashboard.data;
+  const financeData = finance.data;
+  const normalizedSearch = search.trim().toLocaleLowerCase('fr');
+  const recentTransactions = (transactions.data?.items ?? [])
+    .filter((item) =>
+      !normalizedSearch ||
+      item.merchantName.toLocaleLowerCase('fr').includes(normalizedSearch) ||
+      item.categoryLabel.toLocaleLowerCase('fr').includes(normalizedSearch) ||
+      item.bankName.toLocaleLowerCase('fr').includes(normalizedSearch),
+    )
+    .slice(0, 3);
+  const spent = financeData?.expense ?? 0;
+  const remaining = financeData
+    ? financeData.monthlyBudget > 0
+      ? financeData.monthlyBudget - financeData.expense
+      : financeData.net
+    : 0;
+  const remainingLabel = (financeData?.monthlyBudget ?? 0) > 0 ? 'Reste du budget' : 'Solde du mois';
+  const firstName = profile.data?.firstName?.trim() || 'Vous';
+  const initial = firstName.charAt(0).toLocaleUpperCase('fr');
+  const actions: {
+    label: string;
+    icon: React.ComponentProps<typeof Ionicons>['name'];
+    onPress: () => void;
+  }[] = [
+    { label: 'Transactions', icon: 'swap-vertical', onPress: () => nav.navigate('Main', { screen: 'Finances' }) },
+    { label: 'Abonnements', icon: 'repeat', onPress: () => nav.navigate('Main', { screen: 'Subscriptions' }) },
+    { label: 'Budgets', icon: 'wallet', onPress: () => nav.navigate('Main', { screen: 'Finances' }) },
+    { label: 'Économies', icon: 'stats-chart', onPress: () => nav.navigate('Main', { screen: 'Savings' }) },
   ];
 
   return (
     <ScreenWithTabs active="Home">
-      <View style={{ flex: 1, backgroundColor: '#F7F7F8' }}>
+      <View style={{ flex: 1, backgroundColor: '#F4F3F7' }}>
         <StatusBar barStyle="dark-content" />
         <Page
           fill
           transparent
-          style={{ gap: 0, paddingHorizontal: 21, paddingTop: 8, paddingBottom: 105 }}
+          style={{ gap: 0, paddingHorizontal: 14, paddingTop: 7, paddingBottom: 108 }}
         >
-        <View
-          style={{
-            minHeight: 54,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Label style={{ color: '#111114', fontSize: 23, fontWeight: '800' }}>
-            Mes abonnements
-          </Label>
+        <View style={{ minHeight: 57, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            onPress={() => nav.navigate('Notifications')}
+            accessibilityLabel="Ouvrir le profil"
+            onPress={() => nav.navigate('Main', { screen: 'Profile' })}
             style={({ pressed }) => ({
-              position: 'absolute',
-              right: 0,
-              width: 38,
-              height: 38,
+              width: 43,
+              height: 43,
+              borderRadius: 22,
+              backgroundColor: '#E8D6C8',
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.65 : 1,
             })}
           >
-            <Ionicons name="notifications" size={25} color="#050A20" />
+            <Label style={{ color: '#2B2420', fontSize: 17, fontWeight: '900' }}>{initial}</Label>
             <View
               style={{
                 position: 'absolute',
-                right: 5,
-                top: 4,
-                width: 7,
-                height: 7,
-                borderRadius: 4,
-                backgroundColor: '#FF3B30',
+                right: -3,
+                bottom: -2,
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                backgroundColor: '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#DAD9DE',
               }}
+            >
+              <Ionicons name="settings-outline" size={12} color="#76757A" />
+            </View>
+          </Pressable>
+          <View
+            style={{
+              flex: 1,
+              height: 46,
+              paddingHorizontal: 16,
+              borderRadius: 23,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              backgroundColor: '#FFFFFF',
+            }}
+          >
+            <Ionicons name="search-outline" size={20} color="#A4A3A9" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Rechercher"
+              placeholderTextColor="#A4A3A9"
+              accessibilityLabel="Rechercher une transaction"
+              style={{ flex: 1, color: '#1B1B1E', fontSize: 15, outlineStyle: 'none' } as never}
             />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            onPress={() => nav.navigate('Notifications')}
+            style={({ pressed }) => ({
+              width: 43,
+              height: 43,
+              borderRadius: 22,
+              backgroundColor: '#FFFFFF',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.65 : 1,
+            })}
+          >
+            <Ionicons name="notifications-outline" size={23} color="#1B1B1E" />
           </Pressable>
         </View>
 
         {!d ? (
           <View style={{ marginTop: 100 }}>
-            <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
+            <State loading={dashboard.isPending} error={dashboard.error} retry={() => dashboard.refetch()} />
           </View>
         ) : !d.hasConnectedBank && !d.lastSyncAt ? (
           <View style={{ marginTop: 80 }}>
@@ -400,200 +512,218 @@ export function DashboardScreen() {
               action={<Button title="Connecter une banque" onPress={() => nav.navigate('Bank')} />}
             />
           </View>
-        ) : d.subscriptionCount === 0 ? (
-          <View style={{ marginTop: 80 }}>
-            <State
-              title="Aucun abonnement détecté"
-              description="Votre banque est bien connectée et vos transactions ont été analysées."
-              action={<Button title="Voir mes banques" onPress={() => nav.navigate('Bank')} />}
-            />
-          </View>
         ) : (
           <>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Voir les ${subscriptionCount} abonnements`}
-              onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
-              style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, marginTop: 12 })}
-            >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18, paddingHorizontal: 4 }}>
+              <Label style={{ flex: 1, color: '#202024', fontSize: 18, fontWeight: '800' }}>
+                Aperçu
+              </Label>
+              <Pressable onPress={() => nav.navigate('Main', { screen: 'Finances' })}>
+                <Label style={{ color: '#828187', fontSize: 13 }}>Voir tout</Label>
+              </Pressable>
+            </View>
+
+            <View style={{ height: 277, marginTop: 3 }}>
               <View
                 style={{
-                  minHeight: 181,
-                  borderRadius: 20,
-                  backgroundColor: '#02071D',
-                  paddingHorizontal: 24,
-                  paddingVertical: 24,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  shadowColor: '#0B1020',
-                  shadowOpacity: 0.16,
-                  shadowRadius: 12,
-                  shadowOffset: { width: 0, height: 7 },
+                  position: 'absolute',
+                  top: 8,
+                  left: 74,
+                  right: 0,
+                  height: 201,
+                  borderRadius: 16,
+                  backgroundColor: '#3518B9',
+                  transform: [{ rotate: '-1.5deg' }],
                 }}
+              />
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 27,
+                  left: 39,
+                  right: 17,
+                  height: 205,
+                  borderRadius: 16,
+                  backgroundColor: '#D8A9EF',
+                }}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Voir le détail de mes finances"
+                onPress={() => nav.navigate('Main', { screen: 'Finances' })}
+                style={({ pressed }) => ({
+                  position: 'absolute',
+                  top: 49,
+                  left: 0,
+                  right: 33,
+                  opacity: pressed ? 0.9 : 1,
+                })}
               >
-                <Label style={{ color: '#AEB2BE', fontSize: 22, fontWeight: '500' }}>
-                  Dépenses récurrentes
-                </Label>
-                <Label style={{ color: '#FFFFFF', fontSize: 27, fontWeight: '800', marginTop: 4 }}>
-                  {money(monthlyCost)}
-                  <Label style={{ color: '#AEB2BE', fontSize: 13 }}> / mois</Label>
-                </Label>
-                <View
+                <LinearGradient
+                  colors={['#FFE839', '#FFD900']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
                   style={{
-                    marginTop: 23,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    alignSelf: 'stretch',
+                    height: 205,
+                    borderRadius: 16,
+                    padding: 17,
+                    overflow: 'hidden',
+                    shadowColor: '#B79B00',
+                    shadowOpacity: 0.2,
+                    shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 9 },
                   }}
                 >
-                  <View style={{ flex: 1, alignItems: 'center', gap: 5 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="sparkles-outline" size={18} color="#E7E9F0" />
-                      <Label style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
-                        Économies
-                      </Label>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      width: 160,
+                      height: 160,
+                      borderRadius: 80,
+                      right: -50,
+                      top: -50,
+                      backgroundColor: '#FFF26A80',
+                    }}
+                  />
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ width: 22, height: 26, borderRadius: 6, backgroundColor: '#19191B', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="pie-chart" size={14} color="#FFE429" />
                     </View>
-                    <Label style={{ color: '#D9DCE5', fontSize: 13 }}>{money(annualSaving)} /an</Label>
-                  </View>
-                  <View style={{ height: 40, width: 1, backgroundColor: '#62697A' }} />
-                  <View style={{ flex: 1, alignItems: 'center', gap: 5 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="albums-outline" size={18} color="#E7E9F0" />
-                      <Label style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
-                        Abonnements
-                      </Label>
-                    </View>
-                    <Label style={{ color: '#D9DCE5', fontSize: 13 }}>
-                      {subscriptionCount} détectés
+                    <Label style={{ marginLeft: 8, flex: 1, color: '#19191B', fontSize: 19, fontWeight: '900' }}>
+                      Mon budget
                     </Label>
+                    <Ionicons name="radio-outline" size={28} color="#19191B" style={{ transform: [{ rotate: '90deg' }] }} />
                   </View>
-                </View>
+                  <View style={{ width: 34, height: 28, borderRadius: 6, backgroundColor: '#D4C54B', marginTop: 18, padding: 4 }}>
+                    <View style={{ flex: 1, borderWidth: 1, borderColor: '#B2A53B', borderRadius: 3 }} />
+                  </View>
+                  <View style={{ marginTop: 'auto', flexDirection: 'row', alignItems: 'flex-end' }}>
+                    <View style={{ flex: 1 }}>
+                      <Label style={{ color: '#5F5700', fontSize: 10, fontWeight: '700', letterSpacing: 0.7 }}>
+                        DÉPENSÉ CE MOIS
+                      </Label>
+                      <Label style={{ color: '#171719', fontSize: 27, lineHeight: 34, fontWeight: '900', letterSpacing: -0.8 }}>
+                        {finance.isPending ? '—' : money(spent)}
+                      </Label>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Label style={{ color: '#5F5700', fontSize: 9, fontWeight: '700' }}>{remainingLabel}</Label>
+                      <Label style={{ color: remaining < 0 ? '#B21D1D' : '#171719', fontSize: 15, fontWeight: '900' }}>
+                        {finance.isPending ? '—' : money(remaining)}
+                      </Label>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </Pressable>
+              <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7 }}>
+                <View style={{ width: 26, height: 7, borderRadius: 4, backgroundColor: '#8A898E' }} />
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#DAD9DE' }} />
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#DAD9DE' }} />
               </View>
-            </Pressable>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 26 }}>
-              <Label style={{ flex: 1, color: '#17171A', fontSize: 19, fontWeight: '800' }}>
-                Catégories
-              </Label>
-              <Pressable onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}>
-                <Label style={{ color: '#26262A', fontSize: 13, textDecorationLine: 'underline' }}>
-                  Voir tout
-                </Label>
-              </Pressable>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 11, paddingVertical: 14 }}
-            >
-              {categoryCards.map((category) => {
-                const icons = category.items.slice(0, 3);
-                return (
-                  <Pressable
-                    key={category.title}
-                    onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}
-                    style={({ pressed }) => ({
-                      width: 142,
-                      minHeight: 103,
-                      borderRadius: 14,
-                      padding: 13,
-                      backgroundColor: category.tint,
-                      borderWidth: 1,
-                      borderColor: category.border,
-                      opacity: pressed ? 0.75 : 1,
-                    })}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Label style={{ flex: 1, color: '#17171A', fontSize: 16, fontWeight: '700' }}>
-                        {category.title}
-                      </Label>
-                      <Label style={{ color: '#89898F', fontSize: 12 }}>
-                        {category.items.length} app{category.items.length > 1 ? 's' : ''}
-                      </Label>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 18 }}>
-                      {icons.length ? (
-                        icons.map((item) => <GlassBrandIcon key={item.id} name={item.merchant} size={29} />)
-                      ) : (
-                        <View
-                          style={{
-                            width: 29,
-                            height: 29,
-                            borderRadius: 8,
-                            backgroundColor: '#FFFFFF',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Ionicons name="apps-outline" size={17} color="#72727A" />
-                        </View>
-                      )}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 7, marginBottom: 12 }}>
-              <Label style={{ flex: 1, color: '#17171A', fontSize: 19, fontWeight: '800' }}>
-                Prochains abonnements
-              </Label>
-              <Pressable onPress={() => nav.navigate('Main', { screen: 'Subscriptions' })}>
-                <Label style={{ color: '#26262A', fontSize: 13, textDecorationLine: 'underline' }}>
-                  Voir tout
-                </Label>
-              </Pressable>
-            </View>
-            <View style={{ gap: 12 }}>
-              {upcomingPayments.map((item) => (
+            <View style={{ flexDirection: 'row', gap: 7, marginTop: 18 }}>
+              {actions.map((action) => (
                 <Pressable
-                  key={item.id}
+                  key={action.label}
                   accessibilityRole="button"
-                  onPress={() => nav.navigate('Subscription', { id: item.id })}
-                  style={({ pressed }) => ({
-                    minHeight: 87,
-                    borderRadius: 17,
-                    backgroundColor: '#FFFFFF',
-                    paddingHorizontal: 15,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 13,
-                    shadowColor: '#121827',
-                    shadowOpacity: 0.06,
-                    shadowRadius: 10,
-                    shadowOffset: { width: 0, height: 4 },
-                    opacity: pressed ? 0.72 : 1,
-                  })}
+                  onPress={action.onPress}
+                  style={({ pressed }) => ({ flex: 1, alignItems: 'center', opacity: pressed ? 0.65 : 1 })}
                 >
-                  <GlassBrandIcon name={item.merchant} size={48} />
-                  <View style={{ flex: 1 }}>
-                    <Label style={{ color: '#18181B', fontSize: 18, fontWeight: '700' }}>
-                      {item.merchant}
-                    </Label>
-                    <Label style={{ color: '#8B8B92', fontSize: 13, marginTop: 4 }}>
-                      {date(item.nextPaymentAt)}
-                    </Label>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', gap: 8 }}>
-                    <Label style={{ color: '#242429', fontSize: 13, fontWeight: '600' }}>
-                      {money(item.monthlyCost)}
-                      <Label style={{ color: '#8B8B92', fontSize: 10 }}> / mois</Label>
-                    </Label>
-                    <View
-                      style={{
-                        minWidth: 54,
-                        minHeight: 29,
-                        borderRadius: 6,
-                        backgroundColor: '#17171B',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Label style={{ color: '#FFFFFF', fontSize: 12 }}>Voir</Label>
+                  <View
+                    style={{
+                      width: 57,
+                      height: 63,
+                      borderRadius: 19,
+                      backgroundColor: '#FFFFFF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      shadowColor: '#34313D',
+                      shadowOpacity: 0.06,
+                      shadowRadius: 7,
+                      shadowOffset: { width: 0, height: 3 },
+                    }}
+                  >
+                    <View style={{ width: 24, height: 28, borderRadius: 7, backgroundColor: '#1D1D20', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={action.icon} size={15} color="#FFFFFF" />
                     </View>
                   </View>
+                  <Label style={{ color: '#252429', fontSize: 10, fontWeight: '700', marginTop: 8, textAlign: 'center' }}>
+                    {action.label}
+                  </Label>
                 </Pressable>
               ))}
+            </View>
+
+            <View
+              style={{
+                marginTop: 24,
+                borderRadius: 17,
+                paddingHorizontal: 15,
+                paddingTop: 17,
+                paddingBottom: 7,
+                backgroundColor: '#FFFFFF',
+                shadowColor: '#34313D',
+                shadowOpacity: 0.07,
+                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 5 },
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 9 }}>
+                <Label style={{ flex: 1, color: '#202024', fontSize: 18, fontWeight: '800' }}>Historique</Label>
+                <Pressable onPress={() => nav.navigate('Main', { screen: 'Finances' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                  <Label style={{ color: '#858489', fontSize: 12 }}>Voir plus</Label>
+                  <Ionicons name="chevron-forward" size={15} color="#858489" />
+                </Pressable>
+              </View>
+              {transactions.isPending ? (
+                <View style={{ minHeight: 116, alignItems: 'center', justifyContent: 'center' }}>
+                  <Label style={{ color: '#8B8A90' }}>Chargement des transactions…</Label>
+                </View>
+              ) : transactions.error ? (
+                <Pressable onPress={() => transactions.refetch()} style={{ minHeight: 95, alignItems: 'center', justifyContent: 'center' }}>
+                  <Label style={{ color: '#B14B4B', textAlign: 'center' }}>Impossible de charger l’historique. Appuyez pour réessayer.</Label>
+                </Pressable>
+              ) : recentTransactions.length === 0 ? (
+                <View style={{ minHeight: 95, alignItems: 'center', justifyContent: 'center' }}>
+                  <Label style={{ color: '#8B8A90', textAlign: 'center' }}>
+                    {search ? 'Aucune transaction ne correspond à cette recherche.' : 'Aucune transaction disponible.'}
+                  </Label>
+                </View>
+              ) : (
+                recentTransactions.map((item, index) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => nav.navigate('Main', { screen: 'Finances' })}
+                    style={({ pressed }) => ({
+                      minHeight: 62,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 11,
+                      borderBottomWidth: index === recentTransactions.length - 1 ? 0 : 1,
+                      borderBottomColor: '#F0EFF2',
+                      opacity: pressed ? 0.68 : 1,
+                    })}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: item.amount >= 0 ? '#F4F5A2' : '#171719', alignItems: 'center', justifyContent: 'center' }}>
+                      <Label style={{ color: item.amount >= 0 ? '#6D7100' : '#FFFFFF', fontSize: 13, fontWeight: '900' }}>
+                        {(item.merchantName || '?').charAt(0).toLocaleUpperCase('fr')}
+                      </Label>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Label numberOfLines={1} style={{ color: '#242328', fontSize: 15, fontWeight: '700' }}>
+                        {item.merchantName || 'Transaction'}
+                      </Label>
+                      <Label numberOfLines={1} style={{ color: '#929196', fontSize: 11, marginTop: 2 }}>
+                        {item.categoryLabel} · {item.bankName}
+                      </Label>
+                    </View>
+                    <Label style={{ color: item.amount >= 0 ? '#10A330' : '#242328', fontSize: 14, fontWeight: '800' }}>
+                      {item.amount > 0 ? '+' : ''}{money(item.amount)}
+                    </Label>
+                  </Pressable>
+                ))
+              )}
             </View>
           </>
         )}
