@@ -23,6 +23,11 @@ import { logOutRevenueCat, purchasePremium, restorePremium } from '../services/r
 import { deleteCurrentFirebaseUser, signOutFirebase } from '../services/firebase';
 import { unregisterPushNotifications } from '../services/notifications';
 import type { RootStackParams } from '../app/navigation';
+import {
+  accentTextColor,
+  DEFAULT_ACCENT_COLOR,
+  normalizeAccentColor,
+} from '../theme/accent';
 function Row({
   icon,
   title,
@@ -385,10 +390,22 @@ export function ProfileScreen() {
     </ImageBackground>
   );
 }
+const accentChoices = [
+  '#70737A',
+  '#6D5CE7',
+  '#2F76D2',
+  '#168C9E',
+  '#2E8B57',
+  '#C56A32',
+  '#C45C7A',
+  '#B84C4C',
+];
+
 export function SettingsScreen() {
   const nav = useNav();
   const c = useColors();
   const theme = useSession((s) => s.theme);
+  const accentColor = useSession((s) => s.accentColor);
   const token = useLiveToken();
   const q = useProfile();
   const cache = useQueryClient();
@@ -396,6 +413,7 @@ export function SettingsScreen() {
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [confirm, setConfirm] = useState(false);
+  const [customAccent, setCustomAccent] = useState(accentColor);
   const save = useMutation({
     mutationFn: async () => {
       if (!name.trim()) throw new Error('Indiquez votre prénom.');
@@ -403,6 +421,9 @@ export function SettingsScreen() {
         ? api.saveProfile({
             firstName: name.trim(),
             theme,
+            accentColor:
+              normalizeAccentColor(q.data?.accentColor ?? useSession.getState().accentColor) ??
+              DEFAULT_ACCENT_COLOR,
             notificationsEnabled: q.data?.notificationsEnabled ?? true,
           })
         : { ...q.data, firstName: name.trim() };
@@ -430,10 +451,47 @@ export function SettingsScreen() {
     useSession.getState().setTheme(next);
     if (token && q.data)
       try {
-        await api.saveProfile({ ...q.data, theme: next });
+        await api.saveProfile({
+          ...q.data,
+          theme: next,
+          accentColor: normalizeAccentColor(q.data.accentColor) ?? DEFAULT_ACCENT_COLOR,
+        });
       } catch {
         setMessage('Le thème est appliqué localement. La sauvegarde serveur a échoué.');
       }
+  };
+  const saveAccent = useMutation({
+    mutationFn: async (nextColor: string) => {
+      const normalized = normalizeAccentColor(nextColor);
+      if (!normalized) throw new Error('Utilisez une couleur au format #RRGGBB.');
+      if (!token || !q.data) throw new Error('Votre profil doit être chargé avant la modification.');
+      return api.saveProfile({ ...q.data, theme, accentColor: normalized });
+    },
+    onMutate: (nextColor) => {
+      const previous = useSession.getState().accentColor;
+      const normalized = normalizeAccentColor(nextColor);
+      if (normalized) useSession.getState().setAccentColor(normalized);
+      return { previous };
+    },
+    onSuccess: (profile) => {
+      const normalized = normalizeAccentColor(profile.accentColor) ?? DEFAULT_ACCENT_COLOR;
+      useSession.getState().setAccentColor(normalized);
+      setCustomAccent(normalized);
+      cache.setQueryData(['profile', token], profile);
+      setMessage('Couleur enregistrée sur votre profil.');
+    },
+    onError: (error, _nextColor, context) => {
+      if (context?.previous) useSession.getState().setAccentColor(context.previous);
+      setMessage(error.message);
+    },
+  });
+  const applyCustomAccent = () => {
+    const normalized = normalizeAccentColor(customAccent);
+    if (!normalized) {
+      setMessage('Utilisez une couleur au format #RRGGBB.');
+      return;
+    }
+    saveAccent.mutate(normalized);
   };
   return (
     <Page style={{ gap: 24, paddingTop: 64 }}>
@@ -458,6 +516,65 @@ export function SettingsScreen() {
               onValueChange={(v) => void switchTheme(v)}
               trackColor={{ true: '#126AFF', false: '#65748A' }}
             />
+          </View>
+          <View style={{ paddingVertical: 14, borderBottomWidth: 0.5, borderColor: c.border, gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="color-palette-outline" color={c.muted} size={21} />
+              <Label style={{ flex: 1, marginLeft: 12, fontSize: 13 }}>Couleur d’accent</Label>
+              <Label muted style={{ fontSize: 11 }}>{accentColor}</Label>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 11 }}>
+              {accentChoices.map((color) => {
+                const selected = color === accentColor;
+                return (
+                  <Pressable
+                    key={color}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Choisir la couleur ${color}`}
+                    accessibilityState={{ selected }}
+                    disabled={saveAccent.isPending}
+                    onPress={() => saveAccent.mutate(color)}
+                    style={({ pressed }) => ({
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: color,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: selected ? 3 : 1,
+                      borderColor: selected ? c.text : c.border,
+                      opacity: pressed || saveAccent.isPending ? 0.65 : 1,
+                    })}
+                  >
+                    {selected ? <Ionicons name="checkmark" size={18} color={accentTextColor(color)} /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Field
+              label="Couleur personnalisée"
+              placeholder="#70737A"
+              value={customAccent}
+              onChangeText={(value) => setCustomAccent(value.toUpperCase().slice(0, 7))}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Appliquer la couleur personnalisée"
+              disabled={saveAccent.isPending}
+              onPress={applyCustomAccent}
+              style={({ pressed }) => ({
+                minHeight: 42,
+                borderRadius: 15,
+                backgroundColor: accentColor,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed || saveAccent.isPending ? 0.68 : 1,
+              })}
+            >
+              <Label style={{ color: accentTextColor(accentColor), fontSize: 13, fontWeight: '800' }}>
+                {saveAccent.isPending ? 'Enregistrement…' : 'Appliquer'}
+              </Label>
+            </Pressable>
           </View>
           <Pressable
             accessibilityRole="button"

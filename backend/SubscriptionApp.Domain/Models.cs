@@ -5,6 +5,7 @@ public sealed class UserProfile
     public string Id { get; set; } = "";
     public string FirstName { get; set; } = "";
     public string Theme { get; set; } = "dark";
+    public string AccentColor { get; set; } = "#70737A";
     public bool NotificationsEnabled { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

@@ -87,6 +87,49 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task ProfileAccentColorIsValidatedNormalizedAndPersisted()
+    {
+        using var c = await Session();
+        var initial = (await c.GetFromJsonAsync<UserProfile>("/api/v1/profile"))!;
+        Assert.Equal("#70737A", initial.AccentColor);
+
+        using var validRequest = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/profile")
+        {
+            Content = JsonContent.Create(
+                new
+                {
+                    firstName = "Camille",
+                    theme = "light",
+                    notificationsEnabled = true,
+                    accentColor = "#aBc123",
+                }
+            ),
+        };
+        var validResponse = await c.SendAsync(validRequest);
+        validResponse.EnsureSuccessStatusCode();
+        var updated = (await validResponse.Content.ReadFromJsonAsync<UserProfile>())!;
+        Assert.Equal("#ABC123", updated.AccentColor);
+
+        using var invalidRequest = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/profile")
+        {
+            Content = JsonContent.Create(
+                new
+                {
+                    firstName = "Camille",
+                    theme = "light",
+                    notificationsEnabled = true,
+                    accentColor = "javascript:alert(1)",
+                }
+            ),
+        };
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.SendAsync(invalidRequest)).StatusCode);
+        Assert.Equal(
+            "#ABC123",
+            (await c.GetFromJsonAsync<UserProfile>("/api/v1/profile"))!.AccentColor
+        );
+    }
+
+    [Fact]
     public async Task OpenApiDocumentsBearerSecurityAndPublicWebhook()
     {
         using var c = factory.CreateClient();

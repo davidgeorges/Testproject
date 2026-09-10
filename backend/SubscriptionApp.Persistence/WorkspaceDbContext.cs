@@ -35,6 +35,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
     {
         b.Entity<DataProtectionKey>().ToTable("data_protection_keys");
         b.Entity<UserProfile>().ToTable("user_profiles").HasKey(p => p.Id);
+        b.Entity<UserProfile>().Property(p => p.AccentColor).HasMaxLength(7);
         b.Entity<BankConnection>()
             .ToTable("bank_connections")
             .HasIndex(c => new { c.UserId, c.Status });

@@ -746,6 +746,12 @@ api.MapPatch(
             string.IsNullOrWhiteSpace(request.FirstName)
             || request.FirstName.Length > 60
             || request.Theme is not ("dark" or "light")
+            || request.AccentColor is not null
+                && (
+                    request.AccentColor.Length != 7
+                    || request.AccentColor[0] != '#'
+                    || !request.AccentColor.AsSpan(1).ToString().All(Uri.IsHexDigit)
+                )
         )
             return Results.BadRequest(
                 new
@@ -758,6 +764,8 @@ api.MapPatch(
         var p = await s.Profile(User(c), ct);
         p.FirstName = request.FirstName.Trim();
         p.Theme = request.Theme;
+        if (request.AccentColor is not null)
+            p.AccentColor = request.AccentColor.ToUpperInvariant();
         p.NotificationsEnabled = request.NotificationsEnabled;
         await s.SaveProfile(p, ct);
         await Audit(s, c, "profile.updated", "profile", p.Id, ct);
@@ -1715,7 +1723,12 @@ public sealed record LegalConsentRequest(string? Version);
 public sealed record TinkCallbackRequest(string Code, string? CredentialsId, string? State);
 public sealed record TinkLinkOptions(string Url, string? NativeUrl);
 
-public sealed record ProfileRequest(string FirstName, string Theme, bool NotificationsEnabled);
+public sealed record ProfileRequest(
+    string FirstName,
+    string Theme,
+    bool NotificationsEnabled,
+    string? AccentColor = null
+);
 
 public sealed record SubscriptionPreferenceRequest(string? Category, string Status);
 public sealed record CategoryBudgetRequest(decimal MonthlyLimit, string? CategoryType);

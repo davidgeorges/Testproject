@@ -39,6 +39,7 @@ import {
   type FirebaseSession,
 } from '../services/firebase';
 import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
+import { DEFAULT_ACCENT_COLOR, normalizeAccentColor } from '../theme/accent';
 import type { RootStackParams } from '../app/navigation';
 import { date, money } from '../utils/format';
 export function Welcome() {
@@ -411,8 +412,16 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
     const existing = await api.profile();
     const profile =
       existing.firstName === 'Utilisateur'
-        ? await api.saveProfile({ ...existing, firstName })
+        ? await api.saveProfile({
+            ...existing,
+            firstName,
+            accentColor: normalizeAccentColor(existing.accentColor) ?? DEFAULT_ACCENT_COLOR,
+          })
         : existing;
+    useSession.getState().setTheme(profile.theme);
+    useSession
+      .getState()
+      .setAccentColor(normalizeAccentColor(profile.accentColor) ?? DEFAULT_ACCENT_COLOR);
     if (register && accept) await api.acceptLegal('1.0');
     queryClient.setQueryData(['profile', firebase.token], profile);
   }

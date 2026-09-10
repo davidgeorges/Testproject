@@ -383,6 +383,7 @@ export function useProfile() {
           id: 'anonymous',
           firstName: PREVIEW_ENABLED ? 'Thomas' : 'Utilisateur',
           theme: useSession.getState().theme,
+          accentColor: useSession.getState().accentColor,
           notificationsEnabled: true,
         }),
   });

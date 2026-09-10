@@ -21,6 +21,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
+import { DEFAULT_ACCENT_COLOR, normalizeAccentColor } from '../theme/accent';
 import { api } from '../services/api';
 import { watchFirebaseToken } from '../services/firebase';
 import { registerForPushNotifications } from '../services/notifications';
@@ -625,11 +626,21 @@ export default function App() {
             'Utilisateur';
           void api
             .profile()
-            .then((profile) =>
+            .then(async (profile) =>
               profile.firstName === 'Utilisateur'
-                ? api.saveProfile({ ...profile, firstName })
+                ? api.saveProfile({
+                    ...profile,
+                    firstName,
+                    accentColor: normalizeAccentColor(profile.accentColor) ?? DEFAULT_ACCENT_COLOR,
+                  })
                 : profile,
             )
+            .then((profile) => {
+              useSession.getState().setTheme(profile.theme);
+              useSession
+                .getState()
+                .setAccentColor(normalizeAccentColor(profile.accentColor) ?? DEFAULT_ACCENT_COLOR);
+            })
             .catch(() => undefined);
           void registerForPushNotifications().catch(() => undefined);
         }

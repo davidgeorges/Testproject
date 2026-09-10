@@ -59,6 +59,19 @@ Le mode sombre conserve le panneau gris et la même hiérarchie. Il remplace les
 
 Les actions rapides utilisent une surface sombre avec un noyau gris moyen et une icône blanche. La barre inférieure utilise `#17171CFA`. Le panneau principal utilise `#73767D → #55585F`. La zone système supérieure et l’indicateur inférieur adoptent également le fond sombre ; aucune bande blanche ne doit rester autour de l’écran.
 
+### Accent personnalisable
+
+La couleur grise `#70737A` est la valeur par défaut. L’utilisateur peut la remplacer dans **Profil → Paramètres → Couleur d’accent** avec une teinte proposée ou une couleur hexadécimale `#RRGGBB`. Le choix est validé et enregistré dans le profil serveur.
+
+L’application calcule automatiquement :
+
+- les deux extrémités du dégradé du panneau mensuel ;
+- la couleur de texte noire ou blanche selon la luminance ;
+- le halo et l’ombre ;
+- le bouton central, les noyaux d’actions et les indicateurs positifs.
+
+Un nouvel écran doit lire l’accent depuis `useSession((state) => state.accentColor)` et employer les fonctions de `src/theme/accent.ts`. Il ne doit pas recopier une couleur d’accent en dur.
+
 ### Règles de couleur
 
 - Une page utilise au maximum un grand composant gris accentué.

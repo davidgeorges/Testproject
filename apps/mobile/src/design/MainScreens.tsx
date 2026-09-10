@@ -43,6 +43,13 @@ import { money, cadence, date } from '../utils/format';
 import type { RootStackParams, TabsParams } from '../app/navigation';
 import { fr } from '../i18n/fr';
 import type { Category } from '../types/api';
+import {
+  accentTextColor,
+  accentWithAlpha,
+  mixAccentColor,
+  normalizeAccentColor,
+  DEFAULT_ACCENT_COLOR,
+} from '../theme/accent';
 export function useNav() {
   return useNavigation<NativeStackNavigationProp<RootStackParams>>();
 }
@@ -52,6 +59,9 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
   const isDark = useSession((s) => s.theme) === 'dark';
+  const accentColor = useSession((s) => s.accentColor);
+  const normalizedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR;
+  const accentForeground = accentTextColor(normalizedAccent);
   if (active === 'Profile') return null;
   const homeLight = active === 'Home';
   const glassTheme =
@@ -117,10 +127,10 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                   borderRadius: center ? 28 : 15,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: center ? (isDark ? '#666A72' : '#7A7D84') : 'transparent',
+                  backgroundColor: center ? normalizedAccent : 'transparent',
                   borderWidth: center ? 5 : 0,
                   borderColor: center ? (isDark ? '#0B0B0F' : '#F7F6F8') : 'transparent',
-                  shadowColor: center ? (isDark ? '#000000' : '#555860') : 'transparent',
+                  shadowColor: center ? mixAccentColor(normalizedAccent, '#000000', 0.45) : 'transparent',
                   shadowOpacity: center ? 0.28 : 0,
                   shadowRadius: 9,
                   shadowOffset: { width: 0, height: 5 },
@@ -129,7 +139,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                 <Ionicons
                   name={selected && key === 'Home' ? 'home' : icon}
                   size={center ? 22 : 22}
-                  color={center ? '#FFFFFF' : selected ? (isDark ? '#FFFFFF' : '#171719') : isDark ? '#777780' : '#929295'}
+                  color={center ? accentForeground : selected ? (isDark ? '#FFFFFF' : '#171719') : isDark ? '#777780' : '#929295'}
                 />
               </View>
               <Label
@@ -375,6 +385,9 @@ export function DashboardScreen() {
   const nav = useNav();
   const token = useLiveToken();
   const isDark = useSession((s) => s.theme) === 'dark';
+  const accentColor = useSession((s) => s.accentColor);
+  const normalizedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR;
+  const accentForeground = accentTextColor(normalizedAccent);
   const homeColors = isDark
     ? {
         background: '#0B0B0F',
@@ -402,11 +415,21 @@ export function DashboardScreen() {
         avatarText: '#2B2420',
         shadow: '#34313D',
       };
-  const summaryGradient = isDark ? (['#73767D', '#55585F'] as const) : (['#92959C', '#70737A'] as const);
-  const summaryText = '#FFFFFF';
-  const summaryMuted = isDark ? '#E1E2E5' : '#F1F2F4';
-  const summaryProgress = '#FFFFFF';
-  const summaryTrack = '#FFFFFF42';
+  const summaryGradient = [
+    mixAccentColor(normalizedAccent, '#FFFFFF', isDark ? 0.1 : 0.2),
+    mixAccentColor(normalizedAccent, '#000000', isDark ? 0.16 : 0.06),
+  ] as const;
+  const summaryText = accentTextColor(normalizedAccent);
+  const summaryMuted = mixAccentColor(
+    normalizedAccent,
+    summaryText === '#FFFFFF' ? '#FFFFFF' : '#000000',
+    0.72,
+  );
+  const summaryProgress = summaryText;
+  const summaryTrack = accentWithAlpha(summaryText, 0.26);
+  const accentShadow = mixAccentColor(normalizedAccent, '#000000', 0.48);
+  const accentCore = mixAccentColor(normalizedAccent, '#000000', summaryText === '#FFFFFF' ? 0.36 : 0.14);
+  const accentHalo = accentWithAlpha(mixAccentColor(normalizedAccent, '#FFFFFF', 0.58), 0.34);
   const dashboard = useOverview();
   const profile = useProfile();
   const finance = useQuery({
@@ -585,7 +608,7 @@ export function DashboardScreen() {
                     borderRadius: 24,
                     padding: 19,
                     overflow: 'hidden',
-                    shadowColor: isDark ? '#000000' : '#454850',
+                    shadowColor: isDark ? '#000000' : accentShadow,
                     shadowOpacity: isDark ? 0.34 : 0.22,
                     shadowRadius: 14,
                     shadowOffset: { width: 0, height: 9 },
@@ -599,7 +622,7 @@ export function DashboardScreen() {
                       borderRadius: 95,
                       right: -68,
                       top: -72,
-                      backgroundColor: isDark ? '#92959C66' : '#BFC1C666',
+                      backgroundColor: accentHalo,
                     }}
                   />
                   <View
@@ -614,8 +637,8 @@ export function DashboardScreen() {
                     }}
                   />
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: isDark ? '#41434A' : '#19191B', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="calendar-outline" size={17} color="#FFFFFF" />
+                    <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: accentCore, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="calendar-outline" size={17} color={accentTextColor(accentCore)} />
                     </View>
                     <Label style={{ marginLeft: 10, flex: 1, color: summaryText, fontSize: 19, fontWeight: '900' }}>
                       Ce mois
@@ -679,8 +702,8 @@ export function DashboardScreen() {
                       shadowOffset: { width: 0, height: 3 },
                     }}
                   >
-                    <View style={{ width: 24, height: 28, borderRadius: 7, backgroundColor: isDark ? '#666A72' : '#1D1D20', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name={action.icon} size={15} color="#FFFFFF" />
+                    <View style={{ width: 24, height: 28, borderRadius: 7, backgroundColor: normalizedAccent, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={action.icon} size={15} color={accentForeground} />
                     </View>
                   </View>
                   <Label style={{ color: homeColors.body, fontSize: 10, fontWeight: '700', marginTop: 8, textAlign: 'center' }}>
@@ -740,8 +763,8 @@ export function DashboardScreen() {
                       opacity: pressed ? 0.68 : 1,
                     })}
                   >
-                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: item.amount >= 0 ? (isDark ? '#41434A' : '#E4E5E8') : (isDark ? '#2B2B32' : '#171719'), alignItems: 'center', justifyContent: 'center' }}>
-                      <Label style={{ color: item.amount >= 0 ? (isDark ? '#FFFFFF' : '#555860') : '#FFFFFF', fontSize: 13, fontWeight: '900' }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: item.amount >= 0 ? accentWithAlpha(normalizedAccent, isDark ? 0.55 : 0.2) : (isDark ? '#2B2B32' : '#171719'), alignItems: 'center', justifyContent: 'center' }}>
+                      <Label style={{ color: item.amount >= 0 ? (isDark ? '#FFFFFF' : mixAccentColor(normalizedAccent, '#000000', 0.38)) : '#FFFFFF', fontSize: 13, fontWeight: '900' }}>
                         {(item.merchantName || '?').charAt(0).toLocaleUpperCase('fr')}
                       </Label>
                     </View>
