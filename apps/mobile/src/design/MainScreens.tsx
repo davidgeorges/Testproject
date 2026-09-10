@@ -13,10 +13,8 @@ import {
   Badge,
   Section,
   IconButton,
-  Chips,
   BrandIcon,
   CategoryIcon,
-  RecommendationRow,
   State,
   ReferenceCrop,
   useColors,
@@ -40,7 +38,7 @@ export function useNav() {
 export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
-  const glassTheme = active === 'Home' || active === 'Subscriptions';
+  const glassTheme = active === 'Home' || active === 'Subscriptions' || active === 'Savings';
   const items: [keyof TabsParams, string, React.ComponentProps<typeof Ionicons>['name']][] = [
     ['Home', 'Accueil', 'home-outline'],
     ['Subscriptions', 'Abonnements', 'reader-outline'],
@@ -1191,26 +1189,53 @@ export function PremiumBanner() {
   const nav = useNav();
   return (
     <LinearGradient
-      colors={['#192557', '#101B39']}
-      style={{ padding: 14, borderRadius: 14, borderColor: '#354A8B', borderWidth: 1, gap: 13 }}
+      colors={['#191D22', '#090E13']}
+      style={{
+        padding: 13,
+        borderRadius: 21,
+        borderColor: '#353E47',
+        borderWidth: 1,
+        gap: 11,
+      }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ backgroundColor: '#FFB400', borderRadius: 30, padding: 8 }}>
-          <Ionicons name="star-outline" color="white" size={22} />
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: '#32280D',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="star" color="#FFD35A" size={21} />
         </View>
         <View style={{ flex: 1 }}>
-          <Label style={{ fontSize: 13, fontWeight: '600', color: 'white' }}>
+          <Label style={{ fontSize: 13, fontWeight: '700', color: 'white' }}>
             Passez au Premium
           </Label>
-          <Label style={{ fontSize: 11, lineHeight: 16, color: '#CDD7F6' }}>
+          <Label style={{ fontSize: 10, lineHeight: 14, color: '#9BA6B5' }}>
             Recevez des alertes et des recommandations en temps réel.
           </Label>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Découvrir Premium"
+          onPress={() => nav.navigate('Main', { screen: 'Premium' })}
+          style={{
+            paddingHorizontal: 12,
+            minHeight: 34,
+            borderRadius: 17,
+            borderWidth: 1,
+            borderColor: '#6B5A25',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Label style={{ color: '#FFD35A', fontSize: 10, fontWeight: '700' }}>Découvrir</Label>
+        </Pressable>
       </View>
-      <Button
-        title="Découvrir Premium"
-        onPress={() => nav.navigate('Main', { screen: 'Premium' })}
-      />
     </LinearGradient>
   );
 }
@@ -1227,14 +1252,134 @@ export function SavingsScreen() {
     q.data
       ?.filter((item) => item.realized)
       .reduce((sum, item) => sum + (item.realizedAnnualSaving ?? 0), 0) ?? 0;
+  const showReference = PREVIEW_ENABLED && !token;
+  const displayedTotal =
+    filter === 'Réalisées'
+      ? realizedTotal
+      : showReference
+        ? 496
+        : (d.data?.annualPotentialSaving ?? 0);
   return (
-    <Page style={{ gap: 12 }}>
-      <Label style={{ fontSize: 23, lineHeight: 29, fontWeight: '700' }}>Vos économies</Label>
-      <Chips items={['Toutes', 'Disponibles', 'Réalisées']} value={filter} onChange={setFilter} />
-      <SavingsHero
-        green
-        amount={filter === 'Réalisées' ? realizedTotal : (d.data?.annualPotentialSaving ?? 0)}
-      />
+    <Page
+      backgroundColor="#020609"
+      style={{ gap: 11, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 }}
+    >
+      <Label style={{ fontSize: 27, lineHeight: 33, fontWeight: '800', letterSpacing: -0.7 }}>
+        Vos économies
+      </Label>
+      <View style={{ flexDirection: 'row', gap: 7 }}>
+        {['Toutes', 'Disponibles', 'Réalisées'].map((item) => {
+          const selected = filter === item;
+          return (
+            <Pressable
+              key={item}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => setFilter(item)}
+              style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.75 : 1 })}
+            >
+              <View
+                style={{
+                  minHeight: 35,
+                  borderRadius: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: selected ? '#65717E' : '#232D36',
+                  backgroundColor: selected ? '#202A34' : '#0D1319',
+                }}
+              >
+                <Label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: selected ? '700' : '500',
+                    color: selected ? '#FFFFFF' : '#8D98A8',
+                  }}
+                >
+                  {item}
+                </Label>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+      <LinearGradient
+        colors={['#12352F', '#0C2527', '#081116']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          minHeight: 143,
+          borderRadius: 26,
+          borderWidth: 1,
+          borderColor: '#3A74685C',
+          padding: 18,
+          overflow: 'hidden',
+          shadowColor: '#20F2A0',
+          shadowOpacity: 0.12,
+          shadowRadius: 20,
+        }}
+      >
+        <LinearGradient
+          colors={['#41F5BD2B', '#FFFFFF08', '#00000000']}
+          style={{
+            position: 'absolute',
+            left: -35,
+            right: 80,
+            top: -50,
+            height: 110,
+            borderRadius: 60,
+            transform: [{ rotate: '-5deg' }],
+          }}
+        />
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Label style={{ color: '#9EAAA9', fontSize: 12 }}>Économies potentielles</Label>
+            <Label
+              style={{
+                color: '#FFFFFF',
+                fontSize: 38,
+                lineHeight: 46,
+                fontWeight: '800',
+                letterSpacing: -0.8,
+              }}
+            >
+              {money(displayedTotal)}
+              <Label style={{ color: '#20F2A0', fontSize: 18 }}> /an</Label>
+            </Label>
+          </View>
+          <View
+            style={{
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              backgroundColor: '#0A4735',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="trending-up" size={27} color="#20F2A0" />
+          </View>
+        </View>
+        <View
+          style={{
+            marginTop: 13,
+            height: 5,
+            borderRadius: 4,
+            backgroundColor: '#FFFFFF12',
+            overflow: 'hidden',
+          }}
+        >
+          <LinearGradient
+            colors={['#20F2A0', '#4EE4E8']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ width: '72%', height: 5, borderRadius: 4 }}
+          />
+        </View>
+        <Label muted style={{ marginTop: 8, fontSize: 10, color: '#8D9A9C' }}>
+          Des économies accessibles dès maintenant
+        </Label>
+      </LinearGradient>
       {q.isPending || q.error ? (
         <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
       ) : items?.length === 0 ? (
@@ -1249,20 +1394,77 @@ export function SavingsScreen() {
           }
         />
       ) : (
-        <View style={{ gap: 9 }}>
+        <View style={{ gap: 7 }}>
           {items?.map((item) => (
-            <RecommendationRow
+            <Pressable
               key={item.id}
-              item={item}
-              available
               onPress={() => nav.navigate('Recommendation', { id: item.id })}
-            />
+              accessibilityRole="button"
+              style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
+            >
+              <LinearGradient
+                colors={['#111820', '#080D12']}
+                style={{
+                  minHeight: 64,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 11,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: '#26313B',
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
+                    backgroundColor: '#18212A',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name={
+                      item.category === 'mobile'
+                        ? 'phone-portrait-outline'
+                        : item.category === 'insurance'
+                          ? 'shield-checkmark-outline'
+                          : item.category === 'internet'
+                            ? 'wifi-outline'
+                            : 'heart-outline'
+                    }
+                    size={21}
+                    color="#E7EDF3"
+                  />
+                </View>
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Label style={{ fontSize: 14, fontWeight: '700' }}>{item.title}</Label>
+                  <Label muted style={{ fontSize: 11, color: '#8D98A8' }}>
+                    Économie possible
+                  </Label>
+                </View>
+                <View
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 15,
+                    backgroundColor: '#063E2C',
+                  }}
+                >
+                  <Label style={{ fontSize: 11, color: '#20F2A0', fontWeight: '700' }}>
+                    {money(item.annualSaving)} /an
+                  </Label>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#8792A2" />
+              </LinearGradient>
+            </Pressable>
           ))}
         </View>
       )}
-      <View style={{ marginTop: 14 }}>
-        <PremiumBanner />
-      </View>
+      <PremiumBanner />
     </Page>
   );
 }
