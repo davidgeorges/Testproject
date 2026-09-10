@@ -44,7 +44,7 @@ import type { Category } from '../types/api';
 export function useNav() {
   return useNavigation<NativeStackNavigationProp<RootStackParams>>();
 }
-const dashboardScrollY = new Animated.Value(0);
+export const dashboardScrollY = new Animated.Value(0);
 
 export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
@@ -77,7 +77,10 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         paddingVertical: glassTheme ? 2 : 6,
         paddingHorizontal: glassTheme ? 5 : 0,
         marginHorizontal:
-          active === 'Home' || active === 'Subscriptions' || active === 'Savings'
+          active === 'Home' ||
+          active === 'Subscriptions' ||
+          active === 'Savings' ||
+          active === 'Profile'
             ? dashboardScrollY.interpolate({
                 inputRange: [0, 95],
                 outputRange: [15, 91],
@@ -129,7 +132,10 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
             style={{
               overflow: 'hidden',
               opacity:
-                active === 'Home' || active === 'Subscriptions' || active === 'Savings'
+                active === 'Home' ||
+                active === 'Subscriptions' ||
+                active === 'Savings' ||
+                active === 'Profile'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 55, 95],
                       outputRange: [1, 0.35, 0],
@@ -137,7 +143,10 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                     })
                   : 1,
               maxHeight:
-                active === 'Home' || active === 'Subscriptions' || active === 'Savings'
+                active === 'Home' ||
+                active === 'Subscriptions' ||
+                active === 'Savings' ||
+                active === 'Profile'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 95],
                       outputRange: [13, 0],
