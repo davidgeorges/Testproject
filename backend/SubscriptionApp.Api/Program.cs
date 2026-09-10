@@ -6,6 +6,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -75,6 +76,13 @@ else
 }
 builder.Services.AddAuthorization();
 builder.Services.AddMemoryCache();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 var redisConnection = builder.Configuration.GetConnectionString("Redis");
 if (string.IsNullOrWhiteSpace(redisConnection)) builder.Services.AddDistributedMemoryCache();
 else builder.Services.AddStackExchangeRedisCache(options =>
@@ -283,6 +291,7 @@ if (connectionString is not null && builder.Configuration.GetValue("Database:App
     await using var migrationScope = app.Services.CreateAsyncScope();
     await migrationScope.ServiceProvider.GetRequiredService<WorkspaceDbContext>().Database.MigrateAsync();
 }
+app.UseForwardedHeaders();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.Use(async (ctx, next) =>
 {
