@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Animated,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -13,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBankAccounts, useBankConnections, useProfile } from '../../design/reference';
-import { Button, Card, Label, Page, State, useColors } from '../../design/ui';
+import { Card, Label, Page, State, useColors } from '../../design/ui';
 import { dashboardScrollY, ScreenWithTabs, useNav } from '../../design/MainScreens';
 import { api } from '../../services/api';
 import { useLiveToken, useSession } from '../../store/session';
@@ -61,15 +62,86 @@ const monthEnd = (value: string) => {
   const [year, month] = value.split('-').map(Number);
   return `${value}-${String(new Date(Date.UTC(year!, month!, 0)).getUTCDate()).padStart(2, '0')}`;
 };
-const monthChoices = () => {
-  const now = new Date();
-  return Array.from({ length: 24 }, (_, index) => {
-    const value = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - index, 1));
-    const id = `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}`;
-    return { id, label: monthLabel(id) };
-  });
-};
 const numeric = (value: string) => value.replace(',', '.').replace(/[^0-9.]/gu, '');
+
+function MonthField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const c = useColors();
+  const [draft, setDraft] = useState(monthLabel(value));
+  React.useEffect(() => setDraft(monthLabel(value)), [value]);
+  const commit = () => {
+    const match = /^(0[1-9]|1[0-2])\/(\d{4})$/u.exec(draft.trim());
+    if (!match) {
+      setDraft(monthLabel(value));
+      return;
+    }
+    onChange(`${match[2]}-${match[1]}`);
+  };
+  const webMonthPicker =
+    Platform.OS === 'web'
+      ? React.createElement('input', {
+          type: 'month',
+          value,
+          'aria-label': `${label}, ouvrir le calendrier`,
+          onChange: (event: React.ChangeEvent<HTMLInputElement>) => onChange(event.target.value),
+          style: {
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            width: 44,
+            height: 44,
+            opacity: 0,
+            cursor: 'pointer',
+          },
+        })
+      : null;
+  return (
+    <View style={{ flex: 1, gap: 6 }}>
+      <Label style={{ color: c.muted, fontSize: 11 }}>{label}</Label>
+      <View
+        style={{
+          height: 44,
+          borderRadius: 14,
+          paddingLeft: 12,
+          paddingRight: 42,
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: c.surface,
+          borderWidth: 1,
+          borderColor: c.border,
+          overflow: 'hidden',
+        }}
+      >
+        <TextInput
+          accessibilityLabel={label}
+          value={draft}
+          maxLength={7}
+          keyboardType="numbers-and-punctuation"
+          placeholder="MM/AAAA"
+          placeholderTextColor={c.muted}
+          onChangeText={setDraft}
+          onBlur={commit}
+          onSubmitEditing={commit}
+          style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '700' }}
+        />
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', right: 0, width: 42, alignItems: 'center' }}
+        >
+          <Ionicons name="calendar-outline" size={18} color={c.muted} />
+        </View>
+        {webMonthPicker}
+      </View>
+    </View>
+  );
+}
 
 function Chip({
   label,
@@ -178,7 +250,6 @@ export function FinancesScreen() {
       };
   const queryClient = useQueryClient();
   const profile = useProfile();
-  const months = useMemo(monthChoices, []);
   const [fromMonth, setFromMonth] = useState(currentMonth());
   const [toMonth, setToMonth] = useState(currentMonth());
   const [kind, setKind] = useState<KindFilter>('all');
@@ -194,6 +265,10 @@ export function FinancesScreen() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [budgetsOpen, setBudgetsOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [creatingBudget, setCreatingBudget] = useState(false);
+  const [newBudgetCategory, setNewBudgetCategory] = useState('');
+  const [newBudgetValue, setNewBudgetValue] = useState('');
+  const [newBudgetType, setNewBudgetType] = useState<FinanceCategoryType>('variable');
 
   const orderedMonths = fromMonth <= toMonth ? [fromMonth, toMonth] : [toMonth, fromMonth];
   const filters = useMemo<FinanceFilters>(
@@ -258,6 +333,9 @@ export function FinancesScreen() {
     }) => api.saveFinanceBudget(categoryId, amount, type),
     onSuccess: async () => {
       setEditingBudget(null);
+      setCreatingBudget(false);
+      setNewBudgetCategory('');
+      setNewBudgetValue('');
       await refreshFinance();
     },
     onError: (error: Error) => Alert.alert('Budget', error.message),
@@ -309,6 +387,7 @@ export function FinancesScreen() {
     () => new Map((overview.data?.categories ?? []).map((item) => [item.category, item])),
     [overview.data?.categories],
   );
+  const availableBudgetCategories = categories.filter((item) => !budgetMap.has(item.id));
 
   const exportCsv = async () => {
     try {
@@ -934,22 +1013,8 @@ export function FinancesScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <ChoiceRow
-                    title="Du mois"
-                    options={months}
-                    value={fromMonth}
-                    onChange={setFromMonth}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ChoiceRow
-                    title="Au mois"
-                    options={months}
-                    value={toMonth}
-                    onChange={setToMonth}
-                  />
-                </View>
+                <MonthField label="Date de début" value={fromMonth} onChange={setFromMonth} />
+                <MonthField label="Date de fin" value={toMonth} onChange={setToMonth} />
               </View>
               <ChoiceRow
                 title="Banques"
@@ -966,12 +1031,19 @@ export function FinancesScreen() {
                 value={accountId}
                 onChange={setAccountId}
               />
-              <ChoiceRow
-                title="Catégories"
-                options={[{ id: 'all', label: 'Toutes' }, ...categories]}
-                value={category}
-                onChange={setCategory}
-              />
+              <View style={{ gap: 7 }}>
+                <Label style={{ color: pageColors.muted, fontSize: 11 }}>Catégories</Label>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                  {[{ id: 'all', label: 'Toutes' }, ...categories].map((item) => (
+                    <Chip
+                      key={item.id}
+                      label={item.label}
+                      selected={category === item.id}
+                      onPress={() => setCategory(item.id)}
+                    />
+                  ))}
+                </View>
+              </View>
               <View style={{ flexDirection: 'row', gap: 7 }}>
                 <Chip label="Toutes" selected={kind === 'all'} onPress={() => setKind('all')} />
                 <Chip
@@ -1008,12 +1080,40 @@ export function FinancesScreen() {
                 </Label>
               </Pressable>
               <View style={{ flexDirection: 'row', gap: 9 }}>
-                <View style={{ flex: 1 }}>
-                  <Button title="Réinitialiser" secondary onPress={resetFilters} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button title="Afficher" onPress={() => setFiltersOpen(false)} />
-                </View>
+                <Pressable
+                  onPress={resetFilters}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    height: 40,
+                    borderRadius: 13,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: pageColors.separator,
+                    backgroundColor: pageColors.surface,
+                    opacity: pressed ? 0.68 : 1,
+                  })}
+                >
+                  <Label style={{ color: pageColors.secondary, fontSize: 12, fontWeight: '700' }}>
+                    Réinitialiser
+                  </Label>
+                </Pressable>
+                <Pressable
+                  onPress={() => setFiltersOpen(false)}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    height: 40,
+                    borderRadius: 13,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: normalizedAccent,
+                    opacity: pressed ? 0.68 : 1,
+                  })}
+                >
+                  <Label style={{ color: accentForeground, fontSize: 12, fontWeight: '800' }}>
+                    Afficher les résultats
+                  </Label>
+                </Pressable>
               </View>
             </ScrollView>
           </View>
@@ -1174,16 +1274,167 @@ export function FinancesScreen() {
               contentContainerStyle={{ gap: 8, paddingBottom: 78 }}
               showsVerticalScrollIndicator={false}
             >
-              {categories.map((definition) => {
-                const budget = budgetMap.get(definition.id);
-                const summary = summaryMap.get(definition.id);
-                const limit = summary?.periodLimit ?? budget?.monthlyLimit ?? null;
+              {!creatingBudget ? (
+                <Pressable
+                  disabled={availableBudgetCategories.length === 0}
+                  onPress={() => {
+                    const first = availableBudgetCategories[0];
+                    if (!first) return;
+                    setNewBudgetCategory(first.id);
+                    setNewBudgetType(first.type);
+                    setCreatingBudget(true);
+                  }}
+                  style={({ pressed }) => ({
+                    height: 42,
+                    borderRadius: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 7,
+                    backgroundColor: normalizedAccent,
+                    opacity: availableBudgetCategories.length === 0 ? 0.45 : pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Ionicons name="add" size={18} color={accentForeground} />
+                  <Label style={{ color: accentForeground, fontSize: 12, fontWeight: '900' }}>
+                    Créer un budget
+                  </Label>
+                </Pressable>
+              ) : null}
+
+              {creatingBudget ? (
+                <Card style={{ gap: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ flex: 1 }}>
+                      <Label style={{ fontSize: 15, fontWeight: '900' }}>Nouveau budget</Label>
+                      <Label muted style={{ fontSize: 10 }}>
+                        Choisissez ce que vous souhaitez plafonner.
+                      </Label>
+                    </View>
+                    <Pressable
+                      accessibilityLabel="Annuler la création du budget"
+                      onPress={() => setCreatingBudget(false)}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="close" size={20} color={pageColors.muted} />
+                    </Pressable>
+                  </View>
+                  <View style={{ gap: 7 }}>
+                    <Label muted style={{ fontSize: 11 }}>
+                      Intitulé
+                    </Label>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                      {availableBudgetCategories.map((item) => (
+                        <Chip
+                          key={item.id}
+                          label={item.label}
+                          selected={newBudgetCategory === item.id}
+                          onPress={() => {
+                            setNewBudgetCategory(item.id);
+                            setNewBudgetType(item.type);
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                  <TextInput
+                    accessibilityLabel="Montant mensuel du budget"
+                    value={newBudgetValue}
+                    keyboardType="decimal-pad"
+                    onChangeText={(value) => setNewBudgetValue(numeric(value))}
+                    placeholder="Montant mensuel en €"
+                    placeholderTextColor={pageColors.muted}
+                    style={{
+                      minHeight: 44,
+                      borderRadius: 13,
+                      borderWidth: 1,
+                      borderColor: pageColors.separator,
+                      backgroundColor: pageColors.elevated,
+                      color: pageColors.text,
+                      paddingHorizontal: 12,
+                      fontWeight: '700',
+                    }}
+                  />
+                  <View style={{ flexDirection: 'row', gap: 7 }}>
+                    <Chip
+                      label="Dépense fixe"
+                      selected={newBudgetType === 'fixed'}
+                      onPress={() => setNewBudgetType('fixed')}
+                    />
+                    <Chip
+                      label="Dépense variable"
+                      selected={newBudgetType === 'variable'}
+                      onPress={() => setNewBudgetType('variable')}
+                    />
+                  </View>
+                  <Pressable
+                    disabled={
+                      !newBudgetCategory ||
+                      !Number.isFinite(Number(newBudgetValue)) ||
+                      Number(newBudgetValue) <= 0 ||
+                      saveBudget.isPending
+                    }
+                    onPress={() => {
+                      const amount = Number(newBudgetValue);
+                      if (newBudgetCategory && Number.isFinite(amount) && amount > 0)
+                        saveBudget.mutate({
+                          categoryId: newBudgetCategory,
+                          amount,
+                          type: newBudgetType,
+                        });
+                    }}
+                    style={({ pressed }) => ({
+                      height: 40,
+                      borderRadius: 13,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: normalizedAccent,
+                      opacity:
+                        !newBudgetCategory || Number(newBudgetValue) <= 0 || saveBudget.isPending
+                          ? 0.45
+                          : pressed
+                            ? 0.7
+                            : 1,
+                    })}
+                  >
+                    <Label style={{ color: accentForeground, fontSize: 12, fontWeight: '900' }}>
+                      {saveBudget.isPending ? 'Création…' : 'Créer ce budget'}
+                    </Label>
+                  </Pressable>
+                </Card>
+              ) : null}
+
+              {(budgets.data ?? []).length === 0 && !creatingBudget ? (
+                <Card style={{ alignItems: 'center', gap: 7, paddingVertical: 24 }}>
+                  <Ionicons name="wallet-outline" size={25} color={pageColors.muted} />
+                  <Label style={{ fontWeight: '800' }}>Aucun budget créé</Label>
+                  <Label muted style={{ maxWidth: 250, textAlign: 'center', fontSize: 11 }}>
+                    Créez uniquement les budgets utiles à votre quotidien, par exemple Logement ou
+                    Courses.
+                  </Label>
+                </Card>
+              ) : null}
+
+              {availableBudgetCategories.length === 0 && !creatingBudget ? (
+                <Label muted style={{ textAlign: 'center', fontSize: 10 }}>
+                  Toutes les catégories disposent déjà d’un budget.
+                </Label>
+              ) : null}
+
+              {(budgets.data ?? []).map((budget) => {
+                const definition = categories.find((item) => item.id === budget.category) ?? {
+                  id: budget.category,
+                  label: budget.category,
+                  type: budget.categoryType,
+                };
+                const summary = summaryMap.get(budget.category);
+                const limit = summary?.periodLimit ?? budget.monthlyLimit;
                 const spent = summary?.expense ?? 0;
                 const progress = limit ? Math.min((spent / limit) * 100, 100) : 0;
                 const status = summary?.status ?? 'unset';
-                const type = budget?.categoryType ?? definition.type;
+                const type = budget.categoryType;
                 return (
-                  <Card key={definition.id} style={{ gap: 8 }}>
+                  <Card key={budget.id} style={{ gap: 8 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <View style={{ flex: 1 }}>
                         <Label style={{ fontWeight: '800' }}>{definition.label}</Label>
@@ -1195,12 +1446,12 @@ export function FinancesScreen() {
                         onPress={() =>
                           setEditingBudget({
                             category: definition.id,
-                            value: budget ? String(budget.monthlyLimit) : '',
+                            value: String(budget.monthlyLimit),
                           })
                         }
                       >
                         <Label style={{ color: normalizedAccent, fontSize: 11, fontWeight: '800' }}>
-                          {budget ? money(budget.monthlyLimit) : 'Définir'}
+                          {money(budget.monthlyLimit)}
                         </Label>
                       </Pressable>
                     </View>
@@ -1268,7 +1519,6 @@ export function FinancesScreen() {
                             label="Fixe"
                             selected={type === 'fixed'}
                             onPress={() =>
-                              budget &&
                               saveBudget.mutate({
                                 categoryId: definition.id,
                                 amount: budget.monthlyLimit,
@@ -1280,7 +1530,6 @@ export function FinancesScreen() {
                             label="Variable"
                             selected={type === 'variable'}
                             onPress={() =>
-                              budget &&
                               saveBudget.mutate({
                                 categoryId: definition.id,
                                 amount: budget.monthlyLimit,
@@ -1288,14 +1537,12 @@ export function FinancesScreen() {
                               })
                             }
                           />
-                          {budget ? (
-                            <Pressable
-                              onPress={() => removeBudget.mutate(definition.id)}
-                              style={{ justifyContent: 'center', paddingHorizontal: 7 }}
-                            >
-                              <Label style={{ color: '#E86D67', fontSize: 11 }}>Supprimer</Label>
-                            </Pressable>
-                          ) : null}
+                          <Pressable
+                            onPress={() => removeBudget.mutate(definition.id)}
+                            style={{ justifyContent: 'center', paddingHorizontal: 7 }}
+                          >
+                            <Label style={{ color: '#E86D67', fontSize: 11 }}>Supprimer</Label>
+                          </Pressable>
                         </View>
                       </View>
                     ) : null}
