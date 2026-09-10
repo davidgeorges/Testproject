@@ -753,11 +753,13 @@ export function SettingsScreen() {
           />
         </Card>
       </View>
-      {message && (
-        <Label muted style={{ fontSize: 12 }}>
-          {message}
-        </Label>
-      )}
+      <View style={{ height: 20, justifyContent: 'center', overflow: 'hidden' }}>
+        {message ? (
+          <Label muted style={{ fontSize: 12 }}>
+            {message}
+          </Label>
+        ) : null}
+      </View>
       {confirm ? (
         <Card>
           <Label>Supprimer définitivement votre compte et toutes ses données ?</Label>
