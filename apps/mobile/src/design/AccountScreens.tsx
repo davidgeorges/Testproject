@@ -252,6 +252,48 @@ export function ProfileScreen() {
       </LinearGradient>
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel="Passer au Premium"
+        onPress={() => nav.navigate('Main', { screen: 'Premium' })}
+        style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
+      >
+        <LinearGradient
+          colors={['#292515', '#11120D']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            minHeight: 58,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: '#665A2D',
+            paddingHorizontal: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 11,
+          }}
+        >
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: '#3A2F0D',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="diamond" size={19} color="#FFD35A" />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Label style={{ fontSize: 13, fontWeight: '800' }}>Passer au Premium</Label>
+            <Label muted style={{ fontSize: 10, color: '#A69E7F' }}>
+              Débloquer toutes les recommandations
+            </Label>
+          </View>
+          <Ionicons name="chevron-forward" size={19} color="#D6BE63" />
+        </LinearGradient>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
         onPress={() => void logout()}
         style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
       >
