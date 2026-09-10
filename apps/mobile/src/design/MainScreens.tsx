@@ -434,7 +434,9 @@ export function DashboardScreen() {
     mixAccentColor(normalizedAccent, '#000000', isDark ? 0.16 : 0.06),
   ] as const;
   const summaryText =
-    normalizedAccent === ORIGINAL_THEME_ACCENT ? '#FFFFFF' : accentTextColor(normalizedAccent);
+    isDark && normalizedAccent === ORIGINAL_THEME_ACCENT
+      ? '#FFFFFF'
+      : accentTextColor(normalizedAccent);
   const summaryMuted = mixAccentColor(
     normalizedAccent,
     summaryText === '#FFFFFF' ? '#FFFFFF' : '#000000',
@@ -995,6 +997,42 @@ export function DashboardScreen() {
 export function SubscriptionsScreen() {
   const nav = useNav();
   const q = usePayments();
+  const profile = useProfile();
+  const isDark = useSession((s) => s.theme) === 'dark';
+  const accentColor = useSession((s) => s.accentColor);
+  const normalizedAccent = normalizeAccentColor(accentColor) ?? DEFAULT_ACCENT_COLOR;
+  const accentForeground = accentTextColor(normalizedAccent);
+  const heroText =
+    isDark && normalizedAccent === ORIGINAL_THEME_ACCENT
+      ? '#FFFFFF'
+      : accentTextColor(normalizedAccent);
+  const pageColors = isDark
+    ? {
+        background: '#0B0B0F',
+        surface: '#18181D',
+        elevated: '#222228',
+        text: '#F8F7FA',
+        body: '#ECEBF0',
+        secondary: '#AAA8B1',
+        muted: '#777780',
+        separator: '#2A292F',
+        avatar: '#493B34',
+        avatarText: '#FFF7F0',
+        shadow: '#000000',
+      }
+    : {
+        background: '#F4F3F7',
+        surface: '#FFFFFF',
+        elevated: '#FFFFFF',
+        text: '#171719',
+        body: '#242328',
+        secondary: '#858489',
+        muted: '#A4A3A9',
+        separator: '#F0EFF2',
+        avatar: '#E8D6C8',
+        avatarText: '#2B2420',
+        shadow: '#34313D',
+      };
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Tous');
   const showReference = PREVIEW_ENABLED && !useSession.getState().token;
@@ -1016,24 +1054,25 @@ export function SubscriptionsScreen() {
       p.merchant.toLowerCase().includes(search.toLowerCase()) &&
       (filter === 'Tous' || p.category === categories[filter]),
   );
+  const monthlyTotal = sourceItems.reduce((total, payment) => total + payment.monthlyCost, 0);
+  const heroGradient = [
+    mixAccentColor(normalizedAccent, '#FFFFFF', isDark ? 0.1 : 0.2),
+    mixAccentColor(normalizedAccent, '#000000', isDark ? 0.16 : 0.06),
+  ] as const;
+  const heroMuted = mixAccentColor(
+    normalizedAccent,
+    heroText === '#FFFFFF' ? '#FFFFFF' : '#000000',
+    0.72,
+  );
+  const initial = (profile.data?.firstName?.trim() || 'Vous').charAt(0).toLocaleUpperCase('fr');
   React.useEffect(() => {
     dashboardScrollY.setValue(0);
     return () => dashboardScrollY.setValue(0);
   }, []);
 
   return (
-    <ImageBackground
-      source={require('../../assets/home-fabric.png')}
-      resizeMode="cover"
-      imageStyle={{ opacity: 0.96 }}
-      style={{ flex: 1, backgroundColor: '#08111D' }}
-    >
-      <LinearGradient
-        pointerEvents="none"
-        colors={['#02060CE8', '#0B14205C', '#182432ED']}
-        locations={[0, 0.46, 1]}
-        style={{ position: 'absolute', inset: 0 }}
-      />
+    <View style={{ flex: 1, backgroundColor: pageColors.background }}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <Page
         fill
         transparent
@@ -1041,69 +1080,170 @@ export function SubscriptionsScreen() {
           useNativeDriver: false,
         })}
         scrollEventThrottle={16}
-        style={{ gap: 0, paddingHorizontal: 17, paddingTop: 10, paddingBottom: 150 }}
+        style={{ gap: 0, paddingHorizontal: 14, paddingTop: 7, paddingBottom: 128 }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+        <View style={{ minHeight: 57, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Voir mon profil"
             onPress={() => nav.navigate('Main', { screen: 'Profile' })}
             style={({ pressed }) => ({
-              width: 32,
-              height: 32,
-              borderRadius: 20,
+              width: 43,
+              height: 43,
+              borderRadius: 22,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: '#8FAC9CDA',
-              borderWidth: 2,
-              borderColor: '#D9E7DF9C',
-              opacity: pressed ? 0.75 : 1,
+              backgroundColor: pageColors.avatar,
+              opacity: pressed ? 0.65 : 1,
             })}
           >
-            <Ionicons name="person-outline" size={20} color="#FFFFFF" />
+            <Label style={{ color: pageColors.avatarText, fontSize: 17, fontWeight: '900' }}>
+              {initial}
+            </Label>
+            <View
+              style={{
+                position: 'absolute',
+                right: -3,
+                bottom: -2,
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                backgroundColor: pageColors.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: isDark ? '#3A3940' : '#DAD9DE',
+              }}
+            >
+              <Ionicons name="settings-outline" size={12} color={pageColors.secondary} />
+            </View>
           </Pressable>
           <View
             style={{
               flex: 1,
-              minHeight: 32,
-              borderRadius: 20,
-              paddingHorizontal: 14,
+              height: 46,
+              borderRadius: 23,
+              paddingHorizontal: 16,
               flexDirection: 'row',
               alignItems: 'center',
               gap: 10,
-              backgroundColor: '#5B6068D9',
+              backgroundColor: pageColors.surface,
             }}
           >
-            <Ionicons name="search" size={20} color="#FFFFFF" />
+            <Ionicons name="search-outline" size={20} color={pageColors.muted} />
             <TextInput
               accessibilityLabel="Rechercher un abonnement"
               value={search}
               onChangeText={setSearch}
               placeholder="Rechercher"
-              placeholderTextColor="#E6EBEFB8"
-              style={{ flex: 1, height: 32, color: '#FFFFFF', fontSize: 14, fontWeight: '500' }}
+              placeholderTextColor={pageColors.muted}
+              style={
+                { flex: 1, color: pageColors.text, fontSize: 15, outlineStyle: 'none' } as never
+              }
             />
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            onPress={() => nav.navigate('Notifications')}
+            style={({ pressed }) => ({
+              width: 43,
+              height: 43,
+              borderRadius: 22,
+              backgroundColor: pageColors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.65 : 1,
+            })}
+          >
+            <Ionicons name="notifications-outline" size={23} color={pageColors.text} />
+          </Pressable>
         </View>
 
-        <View style={{ marginTop: 31 }}>
-          <Label
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 18,
+            paddingHorizontal: 4,
+          }}
+        >
+          <Label style={{ flex: 1, color: pageColors.text, fontSize: 18, fontWeight: '800' }}>
+            Abonnements
+          </Label>
+          <Label style={{ color: pageColors.secondary, fontSize: 13 }}>
+            {showReference ? 6 : (q.data?.total ?? 0)} détectés
+          </Label>
+        </View>
+
+        {!q.isPending && !q.error && sourceItems.length ? (
+          <LinearGradient
+            colors={heroGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={{
-              color: '#FFFFFF',
-              fontSize: 27,
-              lineHeight: 33,
-              fontWeight: '700',
-              letterSpacing: -0.65,
+              minHeight: 166,
+              marginTop: 13,
+              borderRadius: 24,
+              padding: 19,
+              overflow: 'hidden',
+              shadowColor: isDark ? '#000000' : mixAccentColor(normalizedAccent, '#000000', 0.48),
+              shadowOpacity: isDark ? 0.34 : 0.22,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 9 },
             }}
           >
-            Vos abonnements
-          </Label>
-          <Label style={{ marginTop: 2, color: '#D0D8DF', fontSize: 13 }}>
-            {showReference ? 6 : (q.data?.total ?? 0)} abonnements détectés
-          </Label>
-        </View>
+            <View
+              style={{
+                position: 'absolute',
+                width: 178,
+                height: 178,
+                borderRadius: 89,
+                right: -57,
+                top: -72,
+                backgroundColor: accentWithAlpha(
+                  mixAccentColor(normalizedAccent, '#FFFFFF', 0.58),
+                  0.34,
+                ),
+              }}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 11,
+                  backgroundColor: mixAccentColor(normalizedAccent, '#000000', 0.2),
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="repeat" size={17} color={heroText} />
+              </View>
+              <Label style={{ marginLeft: 10, color: heroText, fontSize: 19, fontWeight: '900' }}>
+                Vos abonnements
+              </Label>
+            </View>
+            <Label
+              style={{
+                marginTop: 19,
+                color: heroText,
+                fontSize: 31,
+                lineHeight: 38,
+                fontWeight: '900',
+                letterSpacing: -0.8,
+              }}
+            >
+              {money(monthlyTotal)} / mois
+            </Label>
+            <Label style={{ marginTop: 4, color: heroMuted, fontSize: 11, fontWeight: '700' }}>
+              {money(monthlyTotal * 12)} par an · {sourceItems.length} abonnement
+              {sourceItems.length > 1 ? 's' : ''} actif{sourceItems.length > 1 ? 's' : ''}
+            </Label>
+          </LinearGradient>
+        ) : null}
 
-        <View style={{ flexDirection: 'row', gap: 7, marginTop: 18 }}>
+        <View style={{ flexDirection: 'row', gap: 7, marginTop: 22 }}>
           {['Tous', 'Streaming', 'Télécom', 'Assurance'].map((item) => {
             const selected = filter === item;
             return (
@@ -1116,20 +1256,20 @@ export function SubscriptionsScreen() {
               >
                 <View
                   style={{
-                    height: 32,
+                    height: 34,
                     borderRadius: 18,
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 1,
-                    borderColor: selected ? '#EAF1F259' : '#DDE6EC26',
-                    backgroundColor: selected ? '#7E8995C7' : '#394653A8',
+                    borderColor: selected ? normalizedAccent : pageColors.separator,
+                    backgroundColor: selected ? normalizedAccent : pageColors.surface,
                   }}
                 >
                   <Label
                     style={{
-                      color: selected ? '#FFFFFF' : '#D5DCE2',
+                      color: selected ? accentForeground : pageColors.secondary,
                       fontSize: 10,
-                      fontWeight: selected ? '700' : '500',
+                      fontWeight: selected ? '800' : '600',
                     }}
                   >
                     {item}
@@ -1141,21 +1281,37 @@ export function SubscriptionsScreen() {
         </View>
 
         {q.isPending || q.error ? (
-          <View style={{ marginTop: 85 }}>
+          <View style={{ marginTop: 70 }}>
             <State loading={q.isPending} error={q.error} retry={() => q.refetch()} />
           </View>
         ) : items.length ? (
           <View
             style={{
               marginTop: 17,
-              borderRadius: 23,
+              borderRadius: 17,
               overflow: 'hidden',
-              paddingHorizontal: 16,
-              backgroundColor: '#4B5966D4',
-              borderWidth: 1,
-              borderColor: '#E9EFF238',
+              paddingHorizontal: 15,
+              backgroundColor: pageColors.surface,
+              shadowColor: pageColors.shadow,
+              shadowOpacity: isDark ? 0.28 : 0.07,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 5 },
             }}
           >
+            <View
+              style={{
+                minHeight: 48,
+                flexDirection: 'row',
+                alignItems: 'center',
+                borderBottomWidth: 1,
+                borderBottomColor: pageColors.separator,
+              }}
+            >
+              <Label style={{ flex: 1, color: pageColors.text, fontSize: 17, fontWeight: '800' }}>
+                Vos abonnements
+              </Label>
+              <Label style={{ color: pageColors.secondary, fontSize: 11 }}>{items.length}</Label>
+            </View>
             {items.map((payment, index) => (
               <Pressable
                 key={payment.id}
@@ -1163,21 +1319,21 @@ export function SubscriptionsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`${payment.merchant}, ${money(payment.monthlyCost)} par mois`}
                 style={({ pressed }) => ({
-                  minHeight: 64,
+                  minHeight: 68,
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 12,
                   borderBottomWidth: index === items.length - 1 ? 0 : 1,
-                  borderBottomColor: '#DDE5EA24',
-                  opacity: pressed ? 0.72 : 1,
+                  borderBottomColor: pageColors.separator,
+                  opacity: pressed ? 0.68 : 1,
                 })}
               >
                 <GlassBrandIcon name={payment.merchant} size={40} />
                 <View style={{ flex: 1 }}>
-                  <Label style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>
+                  <Label style={{ color: pageColors.body, fontSize: 15, fontWeight: '700' }}>
                     {payment.merchant}
                   </Label>
-                  <Label style={{ color: '#CFD7DE', fontSize: 11 }}>
+                  <Label style={{ color: pageColors.secondary, fontSize: 11, marginTop: 2 }}>
                     {payment.merchant.toLowerCase().includes('spotify')
                       ? 'Musique'
                       : payment.category === 'streaming'
@@ -1186,17 +1342,17 @@ export function SubscriptionsScreen() {
                   </Label>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Label style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>
+                  <Label style={{ color: pageColors.body, fontSize: 14, fontWeight: '800' }}>
                     {money(payment.monthlyCost)}
                   </Label>
-                  <Label style={{ color: '#D3DAE0', fontSize: 10 }}>par mois</Label>
+                  <Label style={{ color: pageColors.secondary, fontSize: 10 }}>par mois</Label>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#D3DBE2" />
+                <Ionicons name="chevron-forward" size={17} color={pageColors.muted} />
               </Pressable>
             ))}
           </View>
         ) : (
-          <View style={{ marginTop: 85 }}>
+          <View style={{ marginTop: 70 }}>
             <State
               title="Aucun abonnement trouvé"
               description="Essayez une autre recherche ou connectez votre banque."
@@ -1204,7 +1360,7 @@ export function SubscriptionsScreen() {
           </View>
         )}
       </Page>
-    </ImageBackground>
+    </View>
   );
 }
 export function SubscriptionDetail() {
