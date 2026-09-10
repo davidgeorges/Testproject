@@ -212,7 +212,9 @@ function Navigator({ onChange }: { onChange: () => void }) {
       <Stack.Navigator
         initialRouteName={token || PREVIEW_ENABLED ? 'Main' : 'Welcome'}
         screenOptions={({ route, navigation: nav }) => ({
-          contentStyle: { backgroundColor: c.background },
+          contentStyle: {
+            backgroundColor: route.name === 'Subscription' ? '#020609' : c.background,
+          },
           animation: 'fade',
           header: ({ options }) => (
             <View
@@ -220,7 +222,7 @@ function Navigator({ onChange }: { onChange: () => void }) {
                 height: 44,
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: c.background,
+                backgroundColor: route.name === 'Subscription' ? '#020609' : c.background,
                 paddingHorizontal: 6,
               }}
             >
@@ -254,7 +256,7 @@ function Navigator({ onChange }: { onChange: () => void }) {
           options={{ headerShown: false }}
         />
         <Stack.Screen name="Sync" component={SyncScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Subscription" component={SubscriptionDetail} />
+        <Stack.Screen name="Subscription" component={SubscriptionDetail} options={{ title: '' }} />
         <Stack.Screen
           name="Recommendation"
           component={RecommendationDetail}
@@ -281,7 +283,7 @@ function Experience() {
   const { width, height } = useWindowDimensions();
   const [active, setActive] = useState(9);
   const desktop = Platform.OS === 'web' && width >= 760;
-  const deviceHeight = active === 9 || active === 10 ? 864 : 844;
+  const deviceHeight = active >= 9 && active <= 11 ? 864 : 844;
   const scale = desktop ? Math.min(1, (height - 54) / deviceHeight) : 1;
   const c = useColors();
   const [picker, setPicker] = useState(false);

@@ -691,7 +691,14 @@ export function SubscriptionsScreen() {
     Télécom: 'mobile',
     Assurance: 'insurance',
   };
-  const sourceItems = showReference ? referencePayments.slice(0, 6) : (q.data?.items ?? []);
+  const previewPrices: Record<string, number> = { Netflix: 13.99, Spotify: 10.99, Adobe: 52.99 };
+  const sourceItems = showReference
+    ? referencePayments.slice(0, 6).map((item) => ({
+        ...item,
+        amount: previewPrices[item.merchant] ?? item.amount,
+        monthlyCost: previewPrices[item.merchant] ?? item.monthlyCost,
+      }))
+    : (q.data?.items ?? []);
   const items = sourceItems.filter(
     (p) =>
       p.merchant.toLowerCase().includes(search.toLowerCase()) &&
@@ -848,6 +855,9 @@ export function SubscriptionDetail() {
   const q = usePayments();
   const p = q.data?.items.find((p) => p.id === route.params.id);
   const preview = PREVIEW_ENABLED && !useLiveToken();
+  const previewPrice = p
+    ? ({ Netflix: 13.99, Spotify: 10.99, Adobe: 52.99 }[p.merchant] ?? p.amount)
+    : 0;
   const c = useColors();
   const [message, setMessage] = useState('');
   const [dialog, setDialog] = useState<'category' | 'ignore' | null>(null);
@@ -871,14 +881,27 @@ export function SubscriptionDetail() {
   });
   return (
     <ScreenWithTabs active="Subscriptions">
-      <Page style={{ gap: 15 }}>
+      <Page
+        backgroundColor="#020609"
+        style={{ gap: 10, paddingHorizontal: 16, paddingTop: 3, paddingBottom: 10 }}
+      >
         {!p ? (
           <State loading={q.isPending} error={q.error} title="Abonnement introuvable" />
         ) : (
           <>
-            <View style={{ alignItems: 'center', gap: 6 }}>
-              <BrandIcon name={p.merchant} size={60} />
-              <Label style={{ fontWeight: '700', fontSize: 20 }}>{p.merchant}</Label>
+            <LinearGradient
+              colors={['#121A22', '#070C11']}
+              style={{
+                alignItems: 'center',
+                gap: 5,
+                paddingVertical: 14,
+                borderRadius: 25,
+                borderWidth: 1,
+                borderColor: '#28333D',
+              }}
+            >
+              <GlassBrandIcon name={p.merchant} size={58} />
+              <Label style={{ fontWeight: '800', fontSize: 21 }}>{p.merchant}</Label>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Modifier la catégorie"
@@ -888,19 +911,43 @@ export function SubscriptionDetail() {
                     : setDialog('category')
                 }
               >
-                <Label muted style={{ fontSize: 13 }}>
+                <Label muted style={{ fontSize: 12, color: '#929DAE' }}>
                   {fr.categories[p.category]} · Modifier
                 </Label>
               </Pressable>
-              <Label style={{ fontWeight: '700', fontSize: 29, lineHeight: 38 }}>
-                {money(p.amount)}
-                <Label style={{ fontSize: 17 }}> /{cadence[p.cadence]}</Label>
+              <Label
+                style={{
+                  marginTop: 3,
+                  fontWeight: '800',
+                  fontSize: 31,
+                  lineHeight: 37,
+                  letterSpacing: -0.5,
+                }}
+              >
+                {money(preview ? previewPrice : p.amount)}
+                <Label style={{ fontSize: 15, color: '#A0AABA' }}> /{cadence[p.cadence]}</Label>
               </Label>
-              <View>
-                <Badge text="● Actif" />
+              <View
+                style={{
+                  paddingHorizontal: 11,
+                  paddingVertical: 5,
+                  borderRadius: 15,
+                  backgroundColor: '#063E2C',
+                }}
+              >
+                <Label style={{ color: '#20F2A0', fontSize: 11, fontWeight: '700' }}>● Actif</Label>
               </View>
-            </View>
-            <View>
+            </LinearGradient>
+            <LinearGradient
+              colors={['#111820', '#080D12']}
+              style={{
+                borderRadius: 22,
+                borderWidth: 1,
+                borderColor: '#27323C',
+                paddingHorizontal: 14,
+                overflow: 'hidden',
+              }}
+            >
               {[
                 ['calendar-outline', 'Depuis', preview ? 'Janvier 2022' : date(p.firstSeenAt)],
                 ['repeat-outline', 'Fréquence', 'Mensuel'],
@@ -921,78 +968,127 @@ export function SubscriptionDetail() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 10,
-                    paddingVertical: 11,
+                    paddingVertical: 9,
                     borderBottomWidth: 0.5,
-                    borderColor: c.border,
+                    borderColor: '#26313B',
                   }}
                 >
-                  <Ionicons name={icon as 'calendar-outline'} color={c.muted} size={17} />
-                  <Label muted style={{ flex: 1, fontSize: 12 }}>
+                  <View
+                    style={{
+                      width: 29,
+                      height: 29,
+                      borderRadius: 15,
+                      backgroundColor: '#18212A',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name={icon as 'calendar-outline'} color="#DDE5ED" size={15} />
+                  </View>
+                  <Label muted style={{ flex: 1, fontSize: 12, color: '#919CAB' }}>
                     {label}
                   </Label>
                   <Label style={{ fontSize: 12, fontWeight: '600' }}>{value}</Label>
                 </View>
               ))}
-            </View>
-            <Label style={{ fontWeight: '700', fontSize: 16 }}>Historique des paiements</Label>
-            <View
+            </LinearGradient>
+            <LinearGradient
+              colors={['#111820', '#080D12']}
               style={{
-                height: 115,
-                flexDirection: 'row',
-                alignItems: 'flex-end',
-                gap: 16,
-                paddingHorizontal: 7,
+                borderRadius: 22,
+                borderWidth: 1,
+                borderColor: '#27323C',
+                paddingHorizontal: 14,
+                paddingTop: 12,
+                paddingBottom: 8,
               }}
             >
-              {p.history.slice(-6).map((h, i) => (
-                <View key={h.date} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-                  {i === 5 && (
-                    <Label
+              <Label style={{ fontWeight: '700', fontSize: 15 }}>Historique des paiements</Label>
+              <View
+                style={{
+                  height: 88,
+                  flexDirection: 'row',
+                  alignItems: 'flex-end',
+                  gap: 13,
+                  paddingHorizontal: 3,
+                  marginTop: 5,
+                }}
+              >
+                {p.history.slice(-6).map((h, i) => (
+                  <View key={h.date} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                    {i === 5 && (
+                      <Label
+                        style={{
+                          fontSize: 10,
+                          position: 'absolute',
+                          top: -14,
+                          width: 70,
+                          textAlign: 'center',
+                        }}
+                      >
+                        {money(preview ? previewPrice : h.amount)}
+                      </Label>
+                    )}
+                    <LinearGradient
+                      colors={i === 5 ? ['#E7EEF5', '#778596'] : ['#515E6D', '#202A34']}
                       style={{
-                        fontSize: 11,
-                        position: 'absolute',
-                        top: -20,
-                        width: 70,
-                        textAlign: 'center',
+                        height: [34, 52, 36, 39, 37, 42][i],
+                        width: '76%',
+                        borderTopLeftRadius: 5,
+                        borderTopRightRadius: 5,
                       }}
-                    >
-                      {money(h.amount)}
+                    />
+                    <Label muted style={{ fontSize: 9 }}>
+                      {new Intl.DateTimeFormat('fr-FR', { month: 'short' }).format(
+                        new Date(h.date),
+                      )}
                     </Label>
-                  )}
-                  <LinearGradient
-                    colors={i === 5 ? ['#7E46FF', '#0C75D0'] : ['#257FFF', '#1046AB']}
-                    style={{
-                      height: [43, 63, 44, 47, 45, 49][i],
-                      width: '80%',
-                      borderTopLeftRadius: 5,
-                      borderTopRightRadius: 5,
-                    }}
-                  />
-                  <Label muted style={{ fontSize: 10 }}>
-                    {new Intl.DateTimeFormat('fr-FR', { month: 'short' }).format(new Date(h.date))}
-                  </Label>
-                </View>
-              ))}
-            </View>
+                  </View>
+                ))}
+              </View>
+            </LinearGradient>
             <Pressable
               onPress={() => nav.navigate('Main', { screen: 'Savings' })}
               accessibilityRole="button"
+              style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
             >
-              <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <CategoryIcon category="energy" size={35} />
+              <LinearGradient
+                colors={['#111820', '#080D12']}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 11,
+                  minHeight: 61,
+                  paddingHorizontal: 13,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: '#27323C',
+                }}
+              >
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#063E2C',
+                  }}
+                >
+                  <Ionicons name="sparkles-outline" size={20} color="#20F2A0" />
+                </View>
                 <View style={{ flex: 1 }}>
-                  <Label style={{ fontSize: 13, fontWeight: '600' }}>Voir les alternatives</Label>
-                  <Label muted style={{ fontSize: 10 }}>
+                  <Label style={{ fontSize: 13, fontWeight: '700' }}>Voir les alternatives</Label>
+                  <Label muted style={{ fontSize: 10, color: '#8E99A9' }}>
                     Des offres similaires moins chères
                   </Label>
                 </View>
-                <Ionicons name="chevron-forward" color={c.muted} />
-              </Card>
+                <Ionicons name="chevron-forward" color="#8792A2" size={21} />
+              </LinearGradient>
             </Pressable>
-            <Button
-              title="Annuler cet abonnement"
-              secondary
-              loading={update.isPending}
+            <Pressable
+              accessibilityRole="button"
+              disabled={update.isPending}
               onPress={() =>
                 preview
                   ? setMessage(
@@ -1000,7 +1096,27 @@ export function SubscriptionDetail() {
                     )
                   : setDialog('ignore')
               }
-            />
+              style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+            >
+              <View
+                style={{
+                  minHeight: 45,
+                  borderRadius: 18,
+                  borderWidth: 1,
+                  borderColor: '#84323A',
+                  backgroundColor: '#2A0D12',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                }}
+              >
+                <Ionicons name="close-circle-outline" size={18} color="#FF6B78" />
+                <Label style={{ color: '#FF7A86', fontSize: 13, fontWeight: '700' }}>
+                  {update.isPending ? 'Chargement…' : 'Annuler cet abonnement'}
+                </Label>
+              </View>
+            </Pressable>
             {message && (
               <Label muted style={{ fontSize: 12 }}>
                 {message}
