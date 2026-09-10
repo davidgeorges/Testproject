@@ -40,6 +40,25 @@ Les composants ne doivent jamais simuler une donnée. Les montants, compteurs, d
 | Rouge négatif | `#B21D1D` | Dépassement de budget ou erreur bloquante |
 | Avatar neutre | `#E8D6C8` | Avatar sans photo |
 
+### Variante sombre
+
+Le mode sombre conserve le panneau jaune et la même hiérarchie. Il remplace uniquement les surfaces, textes, séparateurs, ombres et états d’icônes :
+
+| Rôle | Valeur sombre |
+|---|---:|
+| Fond de page | `#0B0B0F` |
+| Surface principale | `#18181D` |
+| Surface élevée | `#222228` |
+| Texte principal | `#F8F7FA` |
+| Texte courant | `#ECEBF0` |
+| Texte secondaire | `#AAA8B1` |
+| Texte discret | `#777780` |
+| Séparateur | `#2A292F` |
+| Avatar neutre | `#493B34` |
+| Revenu positif | `#44D56A` |
+
+Les actions rapides utilisent une surface sombre avec un noyau jaune et une icône noire. La barre inférieure utilise `#17171CFA`. La zone système supérieure et l’indicateur inférieur adoptent également le fond sombre ; aucune bande blanche ne doit rester autour de l’écran.
+
 ### Règles de couleur
 
 - Une page utilise au maximum un grand composant jaune.

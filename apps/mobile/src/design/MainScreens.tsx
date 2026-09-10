@@ -51,6 +51,7 @@ export const dashboardScrollY = new Animated.Value(0);
 export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
+  const isDark = useSession((s) => s.theme) === 'dark';
   if (active === 'Profile') return null;
   const homeLight = active === 'Home';
   const glassTheme =
@@ -80,11 +81,11 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           paddingBottom: 7,
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: '#FFFFFFFA',
+          backgroundColor: isDark ? '#17171CFA' : '#FFFFFFFA',
           borderTopLeftRadius: 25,
           borderTopRightRadius: 25,
-          shadowColor: '#25233A',
-          shadowOpacity: 0.1,
+          shadowColor: isDark ? '#000000' : '#25233A',
+          shadowOpacity: isDark ? 0.34 : 0.1,
           shadowRadius: 16,
           shadowOffset: { width: 0, height: -5 },
         }}
@@ -118,7 +119,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                   justifyContent: 'center',
                   backgroundColor: center ? '#FFD900' : 'transparent',
                   borderWidth: center ? 5 : 0,
-                  borderColor: center ? '#F7F6F8' : 'transparent',
+                  borderColor: center ? (isDark ? '#0B0B0F' : '#F7F6F8') : 'transparent',
                   shadowColor: center ? '#E6C400' : 'transparent',
                   shadowOpacity: center ? 0.28 : 0,
                   shadowRadius: 9,
@@ -128,12 +129,12 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
                 <Ionicons
                   name={selected && key === 'Home' ? 'home' : icon}
                   size={center ? 22 : 22}
-                  color={center ? '#171719' : selected ? '#171719' : '#929295'}
+                  color={center ? '#171719' : selected ? (isDark ? '#FFFFFF' : '#171719') : isDark ? '#777780' : '#929295'}
                 />
               </View>
               <Label
                 style={{
-                  color: selected ? '#171719' : '#929295',
+                  color: selected ? (isDark ? '#FFFFFF' : '#171719') : isDark ? '#777780' : '#929295',
                   fontSize: 10,
                   lineHeight: 12,
                   fontWeight: selected ? '800' : '500',
@@ -373,6 +374,34 @@ function GlassBrandIcon({ name, size = 38 }: { name: string; size?: number }) {
 export function DashboardScreen() {
   const nav = useNav();
   const token = useLiveToken();
+  const isDark = useSession((s) => s.theme) === 'dark';
+  const homeColors = isDark
+    ? {
+        background: '#0B0B0F',
+        surface: '#18181D',
+        elevated: '#222228',
+        text: '#F8F7FA',
+        body: '#ECEBF0',
+        secondary: '#AAA8B1',
+        muted: '#777780',
+        separator: '#2A292F',
+        avatar: '#493B34',
+        avatarText: '#FFF7F0',
+        shadow: '#000000',
+      }
+    : {
+        background: '#F4F3F7',
+        surface: '#FFFFFF',
+        elevated: '#FFFFFF',
+        text: '#171719',
+        body: '#242328',
+        secondary: '#858489',
+        muted: '#A4A3A9',
+        separator: '#F0EFF2',
+        avatar: '#E8D6C8',
+        avatarText: '#2B2420',
+        shadow: '#34313D',
+      };
   const dashboard = useOverview();
   const profile = useProfile();
   const finance = useQuery({
@@ -431,8 +460,8 @@ export function DashboardScreen() {
 
   return (
     <ScreenWithTabs active="Home">
-      <View style={{ flex: 1, backgroundColor: '#F4F3F7' }}>
-        <StatusBar barStyle="dark-content" />
+      <View style={{ flex: 1, backgroundColor: homeColors.background }}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <Page
           fill
           transparent
@@ -447,13 +476,13 @@ export function DashboardScreen() {
               width: 43,
               height: 43,
               borderRadius: 22,
-              backgroundColor: '#E8D6C8',
+              backgroundColor: homeColors.avatar,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.65 : 1,
             })}
           >
-            <Label style={{ color: '#2B2420', fontSize: 17, fontWeight: '900' }}>{initial}</Label>
+            <Label style={{ color: homeColors.avatarText, fontSize: 17, fontWeight: '900' }}>{initial}</Label>
             <View
               style={{
                 position: 'absolute',
@@ -462,14 +491,14 @@ export function DashboardScreen() {
                 width: 18,
                 height: 18,
                 borderRadius: 9,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: homeColors.surface,
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderWidth: 1,
-                borderColor: '#DAD9DE',
+                borderColor: isDark ? '#3A3940' : '#DAD9DE',
               }}
             >
-              <Ionicons name="settings-outline" size={12} color="#76757A" />
+              <Ionicons name="settings-outline" size={12} color={homeColors.secondary} />
             </View>
           </Pressable>
           <View
@@ -481,17 +510,17 @@ export function DashboardScreen() {
               flexDirection: 'row',
               alignItems: 'center',
               gap: 10,
-              backgroundColor: '#FFFFFF',
+              backgroundColor: homeColors.surface,
             }}
           >
-            <Ionicons name="search-outline" size={20} color="#A4A3A9" />
+            <Ionicons name="search-outline" size={20} color={homeColors.muted} />
             <TextInput
               value={search}
               onChangeText={setSearch}
               placeholder="Rechercher"
-              placeholderTextColor="#A4A3A9"
+              placeholderTextColor={homeColors.muted}
               accessibilityLabel="Rechercher une transaction"
-              style={{ flex: 1, color: '#1B1B1E', fontSize: 15, outlineStyle: 'none' } as never}
+              style={{ flex: 1, color: homeColors.text, fontSize: 15, outlineStyle: 'none' } as never}
             />
           </View>
           <Pressable
@@ -502,13 +531,13 @@ export function DashboardScreen() {
               width: 43,
               height: 43,
               borderRadius: 22,
-              backgroundColor: '#FFFFFF',
+              backgroundColor: homeColors.surface,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.65 : 1,
             })}
           >
-            <Ionicons name="notifications-outline" size={23} color="#1B1B1E" />
+            <Ionicons name="notifications-outline" size={23} color={homeColors.text} />
           </Pressable>
         </View>
 
@@ -527,11 +556,11 @@ export function DashboardScreen() {
         ) : (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18, paddingHorizontal: 4 }}>
-              <Label style={{ flex: 1, color: '#202024', fontSize: 18, fontWeight: '800' }}>
+              <Label style={{ flex: 1, color: homeColors.text, fontSize: 18, fontWeight: '800' }}>
                 Aperçu
               </Label>
               <Pressable onPress={() => nav.navigate('Main', { screen: 'Finances' })}>
-                <Label style={{ color: '#828187', fontSize: 13 }}>Voir tout</Label>
+                <Label style={{ color: homeColors.secondary, fontSize: 13 }}>Voir tout</Label>
               </Pressable>
             </View>
 
@@ -636,20 +665,20 @@ export function DashboardScreen() {
                       width: 57,
                       height: 63,
                       borderRadius: 19,
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: homeColors.elevated,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      shadowColor: '#34313D',
-                      shadowOpacity: 0.06,
+                      shadowColor: homeColors.shadow,
+                      shadowOpacity: isDark ? 0.24 : 0.06,
                       shadowRadius: 7,
                       shadowOffset: { width: 0, height: 3 },
                     }}
                   >
-                    <View style={{ width: 24, height: 28, borderRadius: 7, backgroundColor: '#1D1D20', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name={action.icon} size={15} color="#FFFFFF" />
+                    <View style={{ width: 24, height: 28, borderRadius: 7, backgroundColor: isDark ? '#FFD900' : '#1D1D20', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={action.icon} size={15} color={isDark ? '#171719' : '#FFFFFF'} />
                     </View>
                   </View>
-                  <Label style={{ color: '#252429', fontSize: 10, fontWeight: '700', marginTop: 8, textAlign: 'center' }}>
+                  <Label style={{ color: homeColors.body, fontSize: 10, fontWeight: '700', marginTop: 8, textAlign: 'center' }}>
                     {action.label}
                   </Label>
                 </Pressable>
@@ -663,23 +692,23 @@ export function DashboardScreen() {
                 paddingHorizontal: 15,
                 paddingTop: 17,
                 paddingBottom: 7,
-                backgroundColor: '#FFFFFF',
-                shadowColor: '#34313D',
-                shadowOpacity: 0.07,
+                backgroundColor: homeColors.surface,
+                shadowColor: homeColors.shadow,
+                shadowOpacity: isDark ? 0.28 : 0.07,
                 shadowRadius: 12,
                 shadowOffset: { width: 0, height: 5 },
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 9 }}>
-                <Label style={{ flex: 1, color: '#202024', fontSize: 18, fontWeight: '800' }}>Historique</Label>
+                <Label style={{ flex: 1, color: homeColors.text, fontSize: 18, fontWeight: '800' }}>Historique</Label>
                 <Pressable onPress={() => nav.navigate('Main', { screen: 'Finances' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                  <Label style={{ color: '#858489', fontSize: 12 }}>Voir plus</Label>
-                  <Ionicons name="chevron-forward" size={15} color="#858489" />
+                  <Label style={{ color: homeColors.secondary, fontSize: 12 }}>Voir plus</Label>
+                  <Ionicons name="chevron-forward" size={15} color={homeColors.secondary} />
                 </Pressable>
               </View>
               {transactions.isPending ? (
                 <View style={{ minHeight: 116, alignItems: 'center', justifyContent: 'center' }}>
-                  <Label style={{ color: '#8B8A90' }}>Chargement des transactions…</Label>
+                  <Label style={{ color: homeColors.secondary }}>Chargement des transactions…</Label>
                 </View>
               ) : transactions.error ? (
                 <Pressable onPress={() => transactions.refetch()} style={{ minHeight: 95, alignItems: 'center', justifyContent: 'center' }}>
@@ -687,7 +716,7 @@ export function DashboardScreen() {
                 </Pressable>
               ) : recentTransactions.length === 0 ? (
                 <View style={{ minHeight: 95, alignItems: 'center', justifyContent: 'center' }}>
-                  <Label style={{ color: '#8B8A90', textAlign: 'center' }}>
+                  <Label style={{ color: homeColors.secondary, textAlign: 'center' }}>
                     {search ? 'Aucune transaction ne correspond à cette recherche.' : 'Aucune transaction disponible.'}
                   </Label>
                 </View>
@@ -702,24 +731,24 @@ export function DashboardScreen() {
                       alignItems: 'center',
                       gap: 11,
                       borderBottomWidth: index === recentTransactions.length - 1 ? 0 : 1,
-                      borderBottomColor: '#F0EFF2',
+                      borderBottomColor: homeColors.separator,
                       opacity: pressed ? 0.68 : 1,
                     })}
                   >
-                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: item.amount >= 0 ? '#F4F5A2' : '#171719', alignItems: 'center', justifyContent: 'center' }}>
-                      <Label style={{ color: item.amount >= 0 ? '#6D7100' : '#FFFFFF', fontSize: 13, fontWeight: '900' }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: item.amount >= 0 ? (isDark ? '#605D1E' : '#F4F5A2') : (isDark ? '#2B2B32' : '#171719'), alignItems: 'center', justifyContent: 'center' }}>
+                      <Label style={{ color: item.amount >= 0 ? (isDark ? '#FFF28A' : '#6D7100') : '#FFFFFF', fontSize: 13, fontWeight: '900' }}>
                         {(item.merchantName || '?').charAt(0).toLocaleUpperCase('fr')}
                       </Label>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Label numberOfLines={1} style={{ color: '#242328', fontSize: 15, fontWeight: '700' }}>
+                      <Label numberOfLines={1} style={{ color: homeColors.body, fontSize: 15, fontWeight: '700' }}>
                         {item.merchantName || 'Transaction'}
                       </Label>
-                      <Label numberOfLines={1} style={{ color: '#929196', fontSize: 11, marginTop: 2 }}>
+                      <Label numberOfLines={1} style={{ color: homeColors.secondary, fontSize: 11, marginTop: 2 }}>
                         {item.categoryLabel} · {item.bankName}
                       </Label>
                     </View>
-                    <Label style={{ color: item.amount >= 0 ? '#10A330' : '#242328', fontSize: 14, fontWeight: '800' }}>
+                    <Label style={{ color: item.amount >= 0 ? (isDark ? '#44D56A' : '#10A330') : homeColors.body, fontSize: 14, fontWeight: '800' }}>
                       {item.amount > 0 ? '+' : ''}{money(item.amount)}
                     </Label>
                   </Pressable>

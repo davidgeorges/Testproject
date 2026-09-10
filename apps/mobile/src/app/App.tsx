@@ -339,6 +339,8 @@ function Experience() {
   const token = useLiveToken();
   const dark = useSession((s) => s.theme) === 'dark';
   const homePreview = active === 9;
+  const homeChromeBackground = homePreview ? (dark ? '#0B0B0F' : '#F4F3F7') : c.background;
+  const homeChromeText = homePreview ? (dark ? '#F8F7FA' : '#171719') : c.text;
   const onChange = () => {
     const route = navigation.getCurrentRoute() as
       | ({
@@ -540,13 +542,13 @@ function Experience() {
                     borderColor: '#41566E',
                     borderRadius: 31,
                     overflow: 'hidden',
-                    backgroundColor: homePreview ? '#F7F7F8' : c.background,
+                    backgroundColor: homeChromeBackground,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 20 },
                     shadowRadius: 40,
                     shadowOpacity: 0.5,
                   }
-                : { flex: 1, backgroundColor: homePreview ? '#F7F7F8' : c.background }
+                : { flex: 1, backgroundColor: homeChromeBackground }
             }
           >
             {Platform.OS === 'web' && (
@@ -558,28 +560,28 @@ function Experience() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  backgroundColor: homePreview ? '#F7F7F8' : c.background,
+                  backgroundColor: homeChromeBackground,
                 }}
               >
                 <Label
                   style={{
                     fontSize: 11,
                     fontWeight: '600',
-                    color: homePreview ? '#111114' : c.text,
+                    color: homeChromeText,
                   }}
                 >
                   9:41
                 </Label>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="cellular" size={12} color={homePreview ? '#111114' : c.text} />
-                  <Ionicons name="wifi" size={12} color={homePreview ? '#111114' : c.text} />
-                  <Ionicons name="battery-full" size={19} color={homePreview ? '#111114' : c.text} />
+                  <Ionicons name="cellular" size={12} color={homeChromeText} />
+                  <Ionicons name="wifi" size={12} color={homeChromeText} />
+                  <Ionicons name="battery-full" size={19} color={homeChromeText} />
                 </View>
               </View>
             )}
             <SafeAreaView
               edges={Platform.OS === 'web' ? [] : ['top', 'bottom']}
-              style={{ flex: 1, backgroundColor: homePreview ? '#F7F7F8' : c.background }}
+              style={{ flex: 1, backgroundColor: homeChromeBackground }}
             >
               <Navigator onChange={onChange} />
             </SafeAreaView>
@@ -589,14 +591,14 @@ function Experience() {
                   height: 16,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: homePreview ? '#F7F7F8' : c.background,
+                  backgroundColor: homeChromeBackground,
                 }}
               >
                 <View
                   style={{
                     height: 4,
                     width: 115,
-                    backgroundColor: homePreview ? '#111114' : c.text,
+                    backgroundColor: homeChromeText,
                     borderRadius: 5,
                   }}
                 />
