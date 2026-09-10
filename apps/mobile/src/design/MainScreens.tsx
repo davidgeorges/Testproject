@@ -1193,60 +1193,6 @@ export function SubscriptionDetail() {
     </ScreenWithTabs>
   );
 }
-export function PremiumBanner() {
-  const nav = useNav();
-  return (
-    <LinearGradient
-      colors={['#191D22', '#090E13']}
-      style={{
-        padding: 13,
-        borderRadius: 21,
-        borderColor: '#353E47',
-        borderWidth: 1,
-        gap: 11,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: '#32280D',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="star" color="#FFD35A" size={21} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Label style={{ fontSize: 13, fontWeight: '700', color: 'white' }}>
-            Passez au Premium
-          </Label>
-          <Label style={{ fontSize: 10, lineHeight: 14, color: '#9BA6B5' }}>
-            Recevez des alertes et des recommandations en temps réel.
-          </Label>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Découvrir Premium"
-          onPress={() => nav.navigate('Main', { screen: 'Premium' })}
-          style={{
-            paddingHorizontal: 12,
-            minHeight: 34,
-            borderRadius: 17,
-            borderWidth: 1,
-            borderColor: '#6B5A25',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Label style={{ color: '#FFD35A', fontSize: 10, fontWeight: '700' }}>Découvrir</Label>
-        </Pressable>
-      </View>
-    </LinearGradient>
-  );
-}
 export function SavingsScreen() {
   const nav = useNav();
   const q = useRecommendations();
@@ -1550,10 +1496,6 @@ export function SavingsScreen() {
             ))}
           </View>
         )}
-
-        <View style={{ marginTop: 12 }}>
-          <PremiumBanner />
-        </View>
       </Page>
     </ImageBackground>
   );
@@ -1634,10 +1576,10 @@ export function RecommendationDetail() {
                 paddingHorizontal: 10,
                 paddingVertical: 7,
                 borderRadius: 16,
-                backgroundColor: '#063E2C',
+                backgroundColor: '#34424FCE',
               }}
             >
-              <Label style={{ color: '#20F2A0', fontSize: 11, fontWeight: '700' }}>
+              <Label style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>
                 + {money(r.annualSaving)} /an
               </Label>
             </View>
@@ -1686,18 +1628,18 @@ export function RecommendationDetail() {
             Notre recommandation
           </Label>
           <LinearGradient
-            colors={['#15231F', '#0A1514', '#070C11']}
+            colors={['#4B5966D4', '#354451D4', '#202B35D9']}
             style={{
               gap: 9,
               padding: 14,
               borderRadius: 24,
               borderWidth: 1,
-              borderColor: '#32605466',
+              borderColor: '#E9EFF238',
               overflow: 'hidden',
             }}
           >
             <LinearGradient
-              colors={['#20F2A020', '#FFFFFF04', '#00000000']}
+              colors={['#FFFFFF16', '#FFFFFF06', '#00000000']}
               style={{
                 position: 'absolute',
                 left: -35,
@@ -1741,12 +1683,12 @@ export function RecommendationDetail() {
                     width: 18,
                     height: 18,
                     borderRadius: 9,
-                    backgroundColor: '#063E2C',
+                    backgroundColor: '#34424FCE',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name="checkmark" color="#20F2A0" size={12} />
+                  <Ionicons name="checkmark" color="#FFFFFF" size={12} />
                 </View>
                 <Label muted style={{ fontSize: 11, flex: 1, color: '#A1ACB8' }}>
                   {b}
@@ -1759,10 +1701,10 @@ export function RecommendationDetail() {
                 paddingHorizontal: 11,
                 paddingVertical: 6,
                 borderRadius: 15,
-                backgroundColor: '#063E2C',
+                backgroundColor: '#34424FCE',
               }}
             >
-              <Label style={{ color: '#20F2A0', fontSize: 11, fontWeight: '700' }}>
+              <Label style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>
                 Économie : {money(r.annualSaving)} /an
               </Label>
             </View>
