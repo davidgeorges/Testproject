@@ -213,7 +213,10 @@ function Navigator({ onChange }: { onChange: () => void }) {
         initialRouteName={token || PREVIEW_ENABLED ? 'Main' : 'Welcome'}
         screenOptions={({ route, navigation: nav }) => ({
           contentStyle: {
-            backgroundColor: route.name === 'Subscription' ? '#020609' : c.background,
+            backgroundColor:
+              route.name === 'Subscription' || route.name === 'Recommendation'
+                ? '#020609'
+                : c.background,
           },
           animation: 'fade',
           header: ({ options }) => (
@@ -222,7 +225,10 @@ function Navigator({ onChange }: { onChange: () => void }) {
                 height: 44,
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: route.name === 'Subscription' ? '#020609' : c.background,
+                backgroundColor:
+                  route.name === 'Subscription' || route.name === 'Recommendation'
+                    ? '#020609'
+                    : c.background,
                 paddingHorizontal: 6,
               }}
             >
@@ -283,7 +289,7 @@ function Experience() {
   const { width, height } = useWindowDimensions();
   const [active, setActive] = useState(9);
   const desktop = Platform.OS === 'web' && width >= 760;
-  const deviceHeight = active >= 9 && active <= 12 ? 864 : 844;
+  const deviceHeight = active >= 9 && active <= 13 ? 864 : 844;
   const scale = desktop ? Math.min(1, (height - 54) / deviceHeight) : 1;
   const c = useColors();
   const [picker, setPicker] = useState(false);

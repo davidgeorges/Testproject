@@ -1496,28 +1496,75 @@ export function RecommendationDetail() {
     },
   });
   return (
-    <Page style={{ gap: 13 }}>
+    <Page
+      backgroundColor="#020609"
+      style={{ gap: 10, paddingHorizontal: 16, paddingTop: 3, paddingBottom: 14 }}
+    >
       {!r ? (
         <State loading={q.isPending} error={q.error} title="Recommandation introuvable" />
       ) : (
         <>
-          <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }}>
-            <CategoryIcon
-              category={r.category}
-              accent={r.category === 'mobile' ? '#0877FF' : undefined}
-            />
+          <LinearGradient
+            colors={['#111820', '#080D12']}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              minHeight: 74,
+              padding: 13,
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: '#28333D',
+            }}
+          >
+            <View
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: 15,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#18212A',
+              }}
+            >
+              <Ionicons
+                name={r.category === 'mobile' ? 'phone-portrait-outline' : 'sparkles-outline'}
+                size={24}
+                color="#F3F6F9"
+              />
+            </View>
             <View style={{ flex: 1 }}>
-              <Label style={{ fontWeight: '600', fontSize: 14 }}>{r.title}</Label>
-              <Label muted style={{ fontSize: 11 }}>
-                Économie possible :{' '}
-                <Label style={{ color: '#24FA95', fontSize: 12, fontWeight: '700' }}>
-                  {money(r.annualSaving)}/an
-                </Label>
+              <Label style={{ fontWeight: '800', fontSize: 16 }}>{r.title}</Label>
+              <Label muted style={{ fontSize: 11, color: '#8E99A9' }}>
+                Recommandation personnalisée
               </Label>
             </View>
-          </Card>
-          <Label style={{ fontWeight: '700', fontSize: 15 }}>Votre situation actuelle</Label>
-          <Card>
+            <View
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 7,
+                borderRadius: 16,
+                backgroundColor: '#063E2C',
+              }}
+            >
+              <Label style={{ color: '#20F2A0', fontSize: 11, fontWeight: '700' }}>
+                + {money(r.annualSaving)} /an
+              </Label>
+            </View>
+          </LinearGradient>
+          <Label style={{ fontWeight: '800', fontSize: 16, marginTop: 2 }}>
+            Votre situation actuelle
+          </Label>
+          <LinearGradient
+            colors={['#111820', '#080D12']}
+            style={{
+              borderRadius: 21,
+              borderWidth: 1,
+              borderColor: '#27323C',
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+            }}
+          >
             {[
               ['Prix mensuel', money(r.currentCost)],
               ...(PREVIEW_ENABLED && !token && r.id === 'mobile'
@@ -1532,86 +1579,185 @@ export function RecommendationDetail() {
                 style={{
                   flexDirection: 'row',
                   justifyContent: 'space-between',
-                  paddingVertical: 3,
+                  alignItems: 'center',
+                  minHeight: 31,
+                  borderBottomWidth: k === 'Consommation moyenne' ? 0 : 0.5,
+                  borderBottomColor: '#25303A',
                 }}
               >
-                <Label muted style={{ fontSize: 12 }}>
+                <Label muted style={{ fontSize: 12, color: '#8E99A9' }}>
                   {k}
                 </Label>
                 <Label style={{ fontSize: 12, fontWeight: '600' }}>{v}</Label>
               </View>
             ))}
-          </Card>
-          <Label style={{ fontWeight: '700', fontSize: 15 }}>Notre recommandation</Label>
-          <Card style={{ gap: 11 }}>
+          </LinearGradient>
+          <Label style={{ fontWeight: '800', fontSize: 16, marginTop: 2 }}>
+            Notre recommandation
+          </Label>
+          <LinearGradient
+            colors={['#15231F', '#0A1514', '#070C11']}
+            style={{
+              gap: 9,
+              padding: 14,
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: '#32605466',
+              overflow: 'hidden',
+            }}
+          >
+            <LinearGradient
+              colors={['#20F2A020', '#FFFFFF04', '#00000000']}
+              style={{
+                position: 'absolute',
+                left: -35,
+                right: 90,
+                top: -55,
+                height: 120,
+                borderRadius: 60,
+              }}
+            />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <LinearGradient
-                colors={['#00BDD2', '#008DA8']}
-                style={{ padding: 8, borderRadius: 6 }}
+                colors={['#18C7C7', '#067A8B']}
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 15,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <Label style={{ color: 'white', fontSize: 23, fontWeight: '800' }}>
+                <Label style={{ color: 'white', fontSize: 16, fontWeight: '800' }}>
                   {PREVIEW_ENABLED && !token && r.id === 'mobile' ? 'Sosh' : 'Offre'}
                 </Label>
               </LinearGradient>
               <View style={{ flex: 1 }}>
-                <Label style={{ fontSize: 15, fontWeight: '600' }}>
+                <Label style={{ fontSize: 15, fontWeight: '700' }}>
                   {PREVIEW_ENABLED && !token && r.id === 'mobile'
                     ? 'Série 80 Go'
                     : r.offer.providerName}
                 </Label>
-                <Label style={{ fontSize: 16, fontWeight: '600' }}>
-                  {money(r.suggestedCost)}/mois
+                <Label style={{ fontSize: 18, fontWeight: '800', marginTop: 2 }}>
+                  {money(r.suggestedCost)}
+                  <Label style={{ fontSize: 12, color: '#9AA5B5' }}> /mois</Label>
                 </Label>
               </View>
             </View>
             {r.offer.benefits.map((b) => (
-              <View key={b} style={{ flexDirection: 'row', gap: 8 }}>
-                <Ionicons name="checkmark" color="#22FFAC" size={16} />
-                <Label muted style={{ fontSize: 12, flex: 1 }}>
+              <View key={b} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <View
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    backgroundColor: '#063E2C',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="checkmark" color="#20F2A0" size={12} />
+                </View>
+                <Label muted style={{ fontSize: 11, flex: 1, color: '#A1ACB8' }}>
                   {b}
                 </Label>
               </View>
             ))}
-            <Badge text={`Économie : ${money(r.annualSaving)}/an`} />
-          </Card>
-          <View style={{ gap: 4 }}>
-            <Label style={{ fontWeight: '700', fontSize: 15 }}>Pourquoi ?</Label>
-            <Label muted style={{ fontSize: 12, lineHeight: 17 }}>
+            <View
+              style={{
+                alignSelf: 'flex-start',
+                paddingHorizontal: 11,
+                paddingVertical: 6,
+                borderRadius: 15,
+                backgroundColor: '#063E2C',
+              }}
+            >
+              <Label style={{ color: '#20F2A0', fontSize: 11, fontWeight: '700' }}>
+                Économie : {money(r.annualSaving)} /an
+              </Label>
+            </View>
+          </LinearGradient>
+          <LinearGradient
+            colors={['#111820', '#080D12']}
+            style={{
+              gap: 5,
+              padding: 13,
+              borderRadius: 21,
+              borderWidth: 1,
+              borderColor: '#27323C',
+            }}
+          >
+            <Label style={{ fontWeight: '800', fontSize: 15 }}>Pourquoi ?</Label>
+            <Label muted style={{ fontSize: 11, lineHeight: 16, color: '#98A3B2' }}>
               {r.explanation}
             </Label>
-          </View>
-          <Pressable onPress={() => setExplain(!explain)} accessibilityRole="button">
-            <Label style={{ fontSize: 11, color: '#2896FF' }}>
-              Partenaire · confiance faible · conditions {explain ? '−' : '+'}
-            </Label>
-          </Pressable>
+            <Pressable onPress={() => setExplain(!explain)} accessibilityRole="button">
+              <Label style={{ fontSize: 10, color: '#20F2A0', marginTop: 2 }}>
+                Partenaire · confiance faible · conditions {explain ? '−' : '+'}
+              </Label>
+            </Pressable>
+          </LinearGradient>
           {explain && (
-            <Card>
+            <LinearGradient
+              colors={['#161B20', '#0A0F14']}
+              style={{ padding: 12, borderRadius: 18, borderWidth: 1, borderColor: '#343D46' }}
+            >
               {r.assumptions.map((a) => (
                 <Label key={a} muted style={{ fontSize: 11 }}>
                   • {a}
                 </Label>
               ))}
               <Badge text="Confiance faible · à vérifier" tone="warning" />
-            </Card>
+            </LinearGradient>
           )}
           <View style={{ flexDirection: 'row', gap: 9, alignItems: 'center' }}>
-            <View style={{ flex: 1 }}>
-              <Button
-                title="Voir l’offre"
-                loading={click.isPending}
-                onPress={() => click.mutate()}
-              />
-            </View>
-            <IconButton
-              icon="share-social-outline"
-              label="Partager la recommandation"
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => click.mutate()}
+              disabled={click.isPending}
+              style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.78 : 1 })}
+            >
+              <LinearGradient
+                colors={['#20D994', '#0D9F72']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  minHeight: 46,
+                  borderRadius: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Label style={{ color: '#03110B', fontSize: 13, fontWeight: '800' }}>
+                  {click.isPending ? 'Chargement…' : 'Voir l’offre'}
+                </Label>
+              </LinearGradient>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Partager la recommandation"
               onPress={() => {
                 void Share.share({
                   message: `${r.title} : économie estimée à ${money(r.annualSaving)}/an. Vérifiez les conditions de l’offre avant toute souscription.`,
                 }).catch(() => setMessage('Le partage n’est pas disponible sur cet appareil.'));
               }}
-            />
+              style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+            >
+              <View
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 18,
+                  borderWidth: 1,
+                  borderColor: '#343E48',
+                  backgroundColor: '#111820',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="share-social-outline" size={20} color="#F0F4F8" />
+              </View>
+            </Pressable>
           </View>
           {token && !r.realized && (
             <Button
