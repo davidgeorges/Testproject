@@ -24,7 +24,7 @@ import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
 import { api } from '../services/api';
 import { watchFirebaseToken } from '../services/firebase';
 import { registerForPushNotifications } from '../services/notifications';
-import { useColors, Label, IconButton } from '../design/ui';
+import { useColors, Label } from '../design/ui';
 import {
   DashboardScreen,
   SubscriptionsScreen,
@@ -221,27 +221,40 @@ function Navigator({ onChange }: { onChange: () => void }) {
           },
           animation: 'fade',
           header: ({ options }) => (
-            <View
+            <LinearGradient
+              colors={['#344451F2', '#263541F2']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
               style={{
-                height: 44,
+                height: 52,
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: '#263541',
-                borderBottomWidth: 1,
-                borderBottomColor: '#E9EFF224',
-                paddingHorizontal: 6,
+                paddingHorizontal: 10,
               }}
             >
-              <IconButton
-                icon="chevron-back"
-                label="Retour"
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Retour"
                 onPress={() => (nav.canGoBack() ? nav.goBack() : nav.navigate('Main'))}
-              />
+                style={({ pressed }) => ({
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: pressed ? '#87929CBF' : '#5B6874CC',
+                  borderWidth: 1,
+                  borderColor: '#EFF4F54A',
+                  opacity: pressed ? 0.78 : 1,
+                })}
+              >
+                <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+              </Pressable>
               <Label style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: '600' }}>
                 {options.title ?? ''}
               </Label>
-              <View style={{ width: 44 }} />
-            </View>
+              <View style={{ width: 34 }} />
+            </LinearGradient>
           ),
         })}
       >
