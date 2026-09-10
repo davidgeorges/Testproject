@@ -63,11 +63,11 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         borderTopWidth: glassTheme ? 0 : 1,
         borderWidth: glassTheme ? 1 : 0,
         borderColor: glassTheme ? '#EEF3F526' : c.border,
-        paddingVertical: glassTheme ? 4 : 6,
+        paddingVertical: glassTheme ? 2 : 6,
         paddingHorizontal: glassTheme ? 5 : 0,
         marginHorizontal: glassTheme ? 15 : 0,
         marginBottom: 0,
-        borderRadius: glassTheme ? 31 : 0,
+        borderRadius: glassTheme ? 27 : 0,
         shadowColor: glassTheme ? '#000000' : 'transparent',
         shadowOpacity: glassTheme ? 0.44 : 0,
         shadowRadius: glassTheme ? 18 : 0,
@@ -83,18 +83,18 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
           onPress={() => nav.navigate('Main', { screen: key })}
           style={({ pressed }) => ({
             flex: 1,
-            minHeight: glassTheme ? 55 : 46,
+            minHeight: glassTheme ? 47 : 46,
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 3,
-            borderRadius: glassTheme ? 27 : 16,
+            gap: 2,
+            borderRadius: glassTheme ? 23 : 16,
             opacity: pressed ? 0.72 : 1,
             backgroundColor: glassTheme && key === active ? '#868D95A3' : 'transparent',
           })}
         >
           <Ionicons
             name={active === key && key === 'Home' ? 'home' : icon}
-            size={glassTheme ? 22 : 21}
+            size={glassTheme ? 20 : 21}
             color={
               glassTheme
                 ? key === active
