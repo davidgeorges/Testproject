@@ -49,12 +49,12 @@ export const dashboardScrollY = new Animated.Value(0);
 export function BottomBar({ active }: { active: keyof TabsParams }) {
   const nav = useNav();
   const c = useColors();
+  if (active === 'Profile') return null;
   const glassTheme =
     active === 'Home' ||
     active === 'Subscriptions' ||
     active === 'Savings' ||
-    active === 'Premium' ||
-    active === 'Profile';
+    active === 'Premium';
   const items: [keyof TabsParams, string, React.ComponentProps<typeof Ionicons>['name']][] = [
     ['Home', 'Accueil', 'home-outline'],
     ['Subscriptions', 'Abonnements', 'reader-outline'],
@@ -79,8 +79,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
         marginHorizontal:
           active === 'Home' ||
           active === 'Subscriptions' ||
-          active === 'Savings' ||
-          active === 'Profile'
+          active === 'Savings'
             ? dashboardScrollY.interpolate({
                 inputRange: [0, 95],
                 outputRange: [15, 91],
@@ -134,8 +133,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
               opacity:
                 active === 'Home' ||
                 active === 'Subscriptions' ||
-                active === 'Savings' ||
-                active === 'Profile'
+                active === 'Savings'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 55, 95],
                       outputRange: [1, 0.35, 0],
@@ -145,8 +143,7 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
               maxHeight:
                 active === 'Home' ||
                 active === 'Subscriptions' ||
-                active === 'Savings' ||
-                active === 'Profile'
+                active === 'Savings'
                   ? dashboardScrollY.interpolate({
                       inputRange: [0, 95],
                       outputRange: [13, 0],

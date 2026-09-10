@@ -176,6 +176,32 @@ export function ProfileScreen() {
         scrollEventThrottle={16}
         style={{ gap: 0, paddingHorizontal: 17, paddingTop: 18, paddingBottom: 150 }}
       >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Fermer le profil"
+          onPress={() =>
+            nav.canGoBack()
+              ? nav.goBack()
+              : nav.navigate('Main', { screen: 'Home' })
+          }
+          style={({ pressed }) => ({
+            position: 'absolute',
+            left: 17,
+            top: 18,
+            zIndex: 10,
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: pressed ? '#87929CBF' : '#5B6874CC',
+            borderWidth: 1,
+            borderColor: '#EFF4F54A',
+            opacity: pressed ? 0.78 : 1,
+          })}
+        >
+          <Ionicons name="close" size={22} color="#FFFFFF" />
+        </Pressable>
         <View style={{ alignItems: 'center' }}>
           <Pressable
             accessibilityRole="button"
