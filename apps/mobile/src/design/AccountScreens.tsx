@@ -572,19 +572,19 @@ export function PremiumScreen() {
         style={{ gap: 11, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 }}
       >
         <LinearGradient
-          colors={['#1E211C', '#101512', '#070C0B']}
+          colors={['#4B5966D4', '#354451D4', '#202B35D9']}
           style={{
             alignItems: 'center',
             gap: 7,
             paddingVertical: 17,
             borderRadius: 27,
             borderWidth: 1,
-            borderColor: '#5A51325E',
+            borderColor: '#E9EFF238',
             overflow: 'hidden',
           }}
         >
           <LinearGradient
-            colors={['#FFD65A2D', '#FFFFFF05', '#00000000']}
+            colors={['#FFFFFF16', '#FFFFFF06', '#00000000']}
             style={{
               position: 'absolute',
               left: 40,
@@ -599,15 +599,15 @@ export function PremiumScreen() {
               width: 62,
               height: 62,
               borderRadius: 31,
-              backgroundColor: '#32280D',
+              backgroundColor: '#34424FCE',
               alignItems: 'center',
               justifyContent: 'center',
-              shadowColor: '#FFD35A',
-              shadowOpacity: 0.3,
+              shadowColor: '#FFFFFF',
+              shadowOpacity: 0.12,
               shadowRadius: 15,
             }}
           >
-            <Ionicons name="diamond" size={30} color="#FFD35A" />
+            <Ionicons name="diamond" size={30} color="#FFFFFF" />
           </View>
           <Label style={{ fontSize: 25, lineHeight: 31, fontWeight: '800', letterSpacing: -0.5 }}>
             Passez au Premium
@@ -652,12 +652,12 @@ export function PremiumScreen() {
                   width: 22,
                   height: 22,
                   borderRadius: 11,
-                  backgroundColor: '#063E2C',
+                  backgroundColor: '#34424FCE',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Ionicons name="checkmark" color="#20F2A0" size={14} />
+                <Ionicons name="checkmark" color="#FFFFFF" size={14} />
               </View>
               <Label muted style={{ fontSize: 12, color: '#A2ACB9' }}>
                 {text}
@@ -678,12 +678,12 @@ export function PremiumScreen() {
               style={{ flex: 1 }}
             >
               <LinearGradient
-                colors={plan === id ? ['#26312D', '#111A17'] : ['#111820', '#080D12']}
+                colors={plan === id ? ['#566572D9', '#364551D9'] : ['#4B5966B8', '#354451B8']}
                 style={{
                   padding: 14,
                   borderRadius: 21,
                   borderWidth: 1,
-                  borderColor: plan === id ? '#5A776B' : '#28333D',
+                  borderColor: plan === id ? '#F2F6F875' : '#E9EFF238',
                   gap: 4,
                   minHeight: 104,
                 }}
@@ -694,13 +694,13 @@ export function PremiumScreen() {
                       position: 'absolute',
                       right: 8,
                       top: -10,
-                      backgroundColor: '#0B6B4B',
+                      backgroundColor: '#5B6874E8',
                       paddingHorizontal: 10,
                       paddingVertical: 3,
                       borderRadius: 15,
                     }}
                   >
-                    <Label style={{ color: '#8CFFD0', fontSize: 10, fontWeight: '700' }}>
+                    <Label style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>
                       -17%
                     </Label>
                   </View>
@@ -723,14 +723,14 @@ export function PremiumScreen() {
         </View>
         {premium ? (
           <LinearGradient
-            colors={['#12352F', '#081713']}
+            colors={['#4B5966D4', '#354451D4']}
             style={{
               alignItems: 'center',
               padding: 16,
               gap: 5,
               borderRadius: 21,
               borderWidth: 1,
-              borderColor: '#32705E',
+              borderColor: '#E9EFF238',
             }}
           >
             <Badge text="Premium actif" />
