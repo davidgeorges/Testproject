@@ -23,11 +23,7 @@ import { logOutRevenueCat, purchasePremium, restorePremium } from '../services/r
 import { deleteCurrentFirebaseUser, signOutFirebase } from '../services/firebase';
 import { unregisterPushNotifications } from '../services/notifications';
 import type { RootStackParams } from '../app/navigation';
-import {
-  accentTextColor,
-  DEFAULT_ACCENT_COLOR,
-  normalizeAccentColor,
-} from '../theme/accent';
+import { accentTextColor, DEFAULT_ACCENT_COLOR, normalizeAccentColor } from '../theme/accent';
 function Row({
   icon,
   title,
@@ -185,9 +181,7 @@ export function ProfileScreen() {
           accessibilityRole="button"
           accessibilityLabel="Fermer le profil"
           onPress={() =>
-            nav.canGoBack()
-              ? nav.goBack()
-              : nav.navigate('Main', { screen: 'Home' })
+            nav.canGoBack() ? nav.goBack() : nav.navigate('Main', { screen: 'Home' })
           }
           style={({ pressed }) => ({
             position: 'absolute',
@@ -227,11 +221,7 @@ export function ProfileScreen() {
                 justifyContent: 'center',
               }}
             >
-              <ReferenceCrop
-                rect={[1411, 435, 45, 45]}
-                width={82}
-                style={{ borderRadius: 41 }}
-              />
+              <ReferenceCrop rect={[1411, 435, 45, 45]} width={82} style={{ borderRadius: 41 }} />
               <View
                 style={{
                   position: 'absolute',
@@ -464,7 +454,8 @@ export function SettingsScreen() {
     mutationFn: async (nextColor: string) => {
       const normalized = normalizeAccentColor(nextColor);
       if (!normalized) throw new Error('Utilisez une couleur au format #RRGGBB.');
-      if (!token || !q.data) throw new Error('Votre profil doit être chargé avant la modification.');
+      if (!token || !q.data)
+        throw new Error('Votre profil doit être chargé avant la modification.');
       return api.saveProfile({ ...q.data, theme, accentColor: normalized });
     },
     onMutate: (nextColor) => {
@@ -517,11 +508,15 @@ export function SettingsScreen() {
               trackColor={{ true: '#126AFF', false: '#65748A' }}
             />
           </View>
-          <View style={{ paddingVertical: 14, borderBottomWidth: 0.5, borderColor: c.border, gap: 12 }}>
+          <View
+            style={{ paddingVertical: 14, borderBottomWidth: 0.5, borderColor: c.border, gap: 12 }}
+          >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="color-palette-outline" color={c.muted} size={21} />
               <Label style={{ flex: 1, marginLeft: 12, fontSize: 13 }}>Couleur d’accent</Label>
-              <Label muted style={{ fontSize: 11 }}>{accentColor}</Label>
+              <Label muted style={{ fontSize: 11 }}>
+                {accentColor}
+              </Label>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 11 }}>
               {accentChoices.map((color) => {
@@ -546,7 +541,9 @@ export function SettingsScreen() {
                       opacity: pressed || saveAccent.isPending ? 0.65 : 1,
                     })}
                   >
-                    {selected ? <Ionicons name="checkmark" size={18} color={accentTextColor(color)} /> : null}
+                    {selected ? (
+                      <Ionicons name="checkmark" size={18} color={accentTextColor(color)} />
+                    ) : null}
                   </Pressable>
                 );
               })}
@@ -571,7 +568,9 @@ export function SettingsScreen() {
                 opacity: pressed || saveAccent.isPending ? 0.68 : 1,
               })}
             >
-              <Label style={{ color: accentTextColor(accentColor), fontSize: 13, fontWeight: '800' }}>
+              <Label
+                style={{ color: accentTextColor(accentColor), fontSize: 13, fontWeight: '800' }}
+              >
                 {saveAccent.isPending ? 'Enregistrement…' : 'Appliquer'}
               </Label>
             </Pressable>

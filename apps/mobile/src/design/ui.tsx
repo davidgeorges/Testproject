@@ -367,9 +367,7 @@ export function Chips({
           style={{ flex: 1, minHeight: 36, justifyContent: 'center' }}
         >
           <LinearGradient
-            colors={
-              value === item ? ['#7E8995', '#65717D'] : ['#4B5966D4', '#354451D4']
-            }
+            colors={value === item ? ['#7E8995', '#65717D'] : ['#4B5966D4', '#354451D4']}
             style={{
               borderRadius: 20,
               paddingVertical: 7,

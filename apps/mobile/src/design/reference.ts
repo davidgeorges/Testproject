@@ -1,7 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
-import type { BankAccount, BankTransaction, Connection, Dashboard, Payment, Recommendation } from '../types/api';
+import type {
+  BankAccount,
+  BankTransaction,
+  Connection,
+  Dashboard,
+  Payment,
+  Recommendation,
+} from '../types/api';
 
 // Visual fixtures from the supplied mockup, never commercial quotes or live bank data.
 const services: [string, string, Payment['category'], number][] = [
@@ -129,16 +136,9 @@ export const referenceRecommendations: Recommendation[] = [
 ];
 const toDate = (monthOffset: number, day = 1, hour = 10) =>
   new Date(
-    Date.UTC(
-      new Date().getUTCFullYear(),
-      new Date().getUTCMonth() - monthOffset,
-      day,
-      hour,
-      30,
-    ),
+    Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - monthOffset, day, hour, 30),
   ).toISOString();
-const inDays = (days: number) =>
-  new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+const inDays = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 
 export const referenceConnections: Connection[] = [
   {
@@ -158,9 +158,19 @@ export const referenceConnections: Connection[] = [
 ];
 
 export const referenceAccounts: BankAccount[] = [
-  { id: 'acc-ccf-01', connectionId: 'conn-ccf', accountType: 'Compte courant', maskedName: 'Compte pro' },
+  {
+    id: 'acc-ccf-01',
+    connectionId: 'conn-ccf',
+    accountType: 'Compte courant',
+    maskedName: 'Compte pro',
+  },
   { id: 'acc-ccf-02', connectionId: 'conn-ccf', accountType: 'Épargne', maskedName: 'Épargne' },
-  { id: 'acc-lcl-01', connectionId: 'conn-lcl', accountType: 'Compte courant', maskedName: 'Compte perso' },
+  {
+    id: 'acc-lcl-01',
+    connectionId: 'conn-lcl',
+    accountType: 'Compte courant',
+    maskedName: 'Compte perso',
+  },
 ];
 
 export const referenceBankTransactions: BankTransaction[] = [
@@ -392,9 +402,7 @@ export function useBankConnections() {
   const token = useLiveToken();
   return useQuery({
     queryKey: ['bank-connections', token],
-    queryFn: token
-      ? api.connections
-      : async () => (PREVIEW_ENABLED ? referenceConnections : []),
+    queryFn: token ? api.connections : async () => (PREVIEW_ENABLED ? referenceConnections : []),
   });
 }
 export function useBankAccounts() {

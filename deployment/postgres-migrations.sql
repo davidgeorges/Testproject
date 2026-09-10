@@ -991,3 +991,137 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910075559_SeedVerifiedOfferCandidates') THEN
+    INSERT INTO offers ("Id", "Active", "Assumptions", "Benefits", "Category", "IsPartner", "MonthlyPrice", "ProviderName", "SetupFee", "UpdatedAt", "Url")
+    VALUES ('candidate-free-mobile-2eur-2026-03-31', FALSE, ARRAY['Tarif public vérifié le 10 septembre 2026 ; à revalider avant activation.','Le tarif à 0 €/mois est réservé aux abonnés Freebox éligibles.','Cette fiche n''établit aucun partenariat commercial avec Free.']::text[], ARRAY['2 h d''appels','50 Mo','SMS/MMS illimités','Sans engagement']::text[], 'mobile', FALSE, 2.0, 'Free Mobile — Forfait 2 €', 10.0, TIMESTAMPTZ '2026-09-10T00:00:00+00:00', 'https://mobile.free.fr/fiche-forfait-2-euros');
+    INSERT INTO offers ("Id", "Active", "Assumptions", "Benefits", "Category", "IsPartner", "MonthlyPrice", "ProviderName", "SetupFee", "UpdatedAt", "Url")
+    VALUES ('candidate-sosh-mobile-100go-2026-09-10', FALSE, ARRAY['Tarif public vérifié le 10 septembre 2026 ; à revalider avant activation.','Offre réservée aux nouvelles souscriptions, hors changement d''offre Orange ou Sosh.','Cette fiche n''établit aucun partenariat commercial avec Sosh.']::text[], ARRAY['100 Go en France','40 Go en Europe et DOM','Appels/SMS/MMS illimités','Sans engagement']::text[], 'mobile', FALSE, 13.99, 'Sosh — Forfait 100 Go', 10.0, TIMESTAMPTZ '2026-09-10T00:00:00+00:00', 'https://shop.sosh.fr/mobile/forfait-100go');
+    INSERT INTO offers ("Id", "Active", "Assumptions", "Benefits", "Category", "IsPartner", "MonthlyPrice", "ProviderName", "SetupFee", "UpdatedAt", "Url")
+    VALUES ('candidate-byou-mobile-100go-5g-2026-09-10', FALSE, ARRAY['Tarif public vérifié le 10 septembre 2026 ; à revalider avant activation.','Les frais et le volume de données à l''étranger doivent être revérifiés lors de l''activation.','Cette fiche n''établit aucun partenariat commercial avec Bouygues Telecom.']::text[], ARRAY['100 Go en 5G','35 Go en Europe et DOM','Appels/SMS/MMS illimités','Sans engagement']::text[], 'mobile', FALSE, 13.99, 'B&You — Forfait 100 Go 5G', 2.0, TIMESTAMPTZ '2026-09-10T00:00:00+00:00', 'https://www.bouyguestelecom.fr/forfaits-mobiles/sans-engagement');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910075559_SeedVerifiedOfferCandidates') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260910075559_SeedVerifiedOfferCandidates', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    ALTER TABLE transactions ADD "IsInternalTransfer" boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    UPDATE transactions
+    SET "IsInternalTransfer" = TRUE
+    WHERE "Category" ILIKE '%internal_transfer%'
+       OR "Category" ILIKE '%account_transfer%'
+       OR "MerchantName" ILIKE '%virement interne%'
+       OR "MerchantName" ILIKE '%transfert interne%'
+       OR "MerchantName" ILIKE '%transfert entre compte%'
+       OR "MerchantName" ILIKE '%internal transfer%';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    CREATE TABLE category_budgets (
+        "Id" uuid NOT NULL,
+        "UserId" text NOT NULL,
+        "Category" text NOT NULL,
+        "MonthlyLimit" numeric(18,2) NOT NULL,
+        "CategoryType" text NOT NULL,
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_category_budgets" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_category_budgets_user_profiles_UserId" FOREIGN KEY ("UserId") REFERENCES user_profiles ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    CREATE TABLE transaction_category_rules (
+        "Id" uuid NOT NULL,
+        "UserId" text NOT NULL,
+        "TransactionId" uuid NOT NULL,
+        "Category" text NOT NULL,
+        "CreatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_transaction_category_rules" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_transaction_category_rules_transactions_TransactionId" FOREIGN KEY ("TransactionId") REFERENCES transactions ("Id") ON DELETE CASCADE,
+        CONSTRAINT "FK_transaction_category_rules_user_profiles_UserId" FOREIGN KEY ("UserId") REFERENCES user_profiles ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    CREATE UNIQUE INDEX "IX_category_budgets_UserId_Category" ON category_budgets ("UserId", "Category");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    CREATE INDEX "IX_transaction_category_rules_TransactionId" ON transaction_category_rules ("TransactionId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    CREATE INDEX "IX_transaction_category_rules_UserId_Category" ON transaction_category_rules ("UserId", "Category");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    CREATE UNIQUE INDEX "IX_transaction_category_rules_UserId_TransactionId" ON transaction_category_rules ("UserId", "TransactionId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910184156_AddBudgetAssistant') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260910184156_AddBudgetAssistant', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910202029_AddProfileAccentColor') THEN
+    ALTER TABLE user_profiles ADD "AccentColor" character varying(7) NOT NULL DEFAULT '#70737A';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910202029_AddProfileAccentColor') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260910202029_AddProfileAccentColor', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
