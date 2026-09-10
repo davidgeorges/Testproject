@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, Switch, Share, Modal, Platform } from 'react-native';
+import { View, Pressable, Switch, Share, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -332,7 +332,6 @@ export function SettingsScreen() {
   );
 }
 export function PremiumScreen() {
-  const c = useColors();
   const token = useLiveToken();
   const profile = useProfile();
   const cache = useQueryClient();
@@ -358,40 +357,106 @@ export function PremiumScreen() {
   });
   const premium = status.data?.isPremium === true;
   return (
-    <LinearGradient
-      colors={
-        useSession((s) => s.theme) === 'dark'
-          ? ['#151052', '#070F1B', '#050D17']
-          : [c.background, c.background, c.background]
-      }
-      style={{ flex: 1 }}
-    >
-      <Page fill transparent style={{ gap: 21, paddingTop: 15 }}>
-        <View style={{ alignItems: 'center', gap: 12 }}>
-          <ReferenceCrop rect={[1227, 450, 43, 42]} width={84} />
-          <Label style={{ fontSize: 25, lineHeight: 32, fontWeight: '700' }}>
+    <LinearGradient colors={['#020609', '#07100E', '#020609']} style={{ flex: 1 }}>
+      <Page
+        fill
+        transparent
+        style={{ gap: 11, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 }}
+      >
+        <LinearGradient
+          colors={['#1E211C', '#101512', '#070C0B']}
+          style={{
+            alignItems: 'center',
+            gap: 7,
+            paddingVertical: 17,
+            borderRadius: 27,
+            borderWidth: 1,
+            borderColor: '#5A51325E',
+            overflow: 'hidden',
+          }}
+        >
+          <LinearGradient
+            colors={['#FFD65A2D', '#FFFFFF05', '#00000000']}
+            style={{
+              position: 'absolute',
+              left: 40,
+              right: 40,
+              top: -55,
+              height: 130,
+              borderRadius: 70,
+            }}
+          />
+          <View
+            style={{
+              width: 62,
+              height: 62,
+              borderRadius: 31,
+              backgroundColor: '#32280D',
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: '#FFD35A',
+              shadowOpacity: 0.3,
+              shadowRadius: 15,
+            }}
+          >
+            <Ionicons name="diamond" size={30} color="#FFD35A" />
+          </View>
+          <Label style={{ fontSize: 25, lineHeight: 31, fontWeight: '800', letterSpacing: -0.5 }}>
             Passez au Premium
           </Label>
-          <Label muted style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }}>
+          <Label
+            muted
+            style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', color: '#9CA6B4' }}
+          >
             Des économies encore plus grandes{'\n'}avec votre application Premium.
           </Label>
-        </View>
-        <View style={{ gap: 18, marginVertical: 12 }}>
+        </LinearGradient>
+        <LinearGradient
+          colors={['#111820', '#080D12']}
+          style={{
+            gap: 0,
+            paddingHorizontal: 14,
+            paddingVertical: 5,
+            borderRadius: 22,
+            borderWidth: 1,
+            borderColor: '#28333D',
+          }}
+        >
           {[
             'Toutes les recommandations détectées',
             'Alternatives détaillées par abonnement',
             'Alertes pour les nouvelles économies',
             'Restauration des achats sur vos appareils',
           ].map((text) => (
-            <View key={text} style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
-              <Ionicons name="checkmark-circle" color="#00E38D" size={23} />
-              <Label muted style={{ fontSize: 13 }}>
+            <View
+              key={text}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 11,
+                minHeight: 39,
+                borderBottomWidth: text === 'Restauration des achats sur vos appareils' ? 0 : 0.5,
+                borderBottomColor: '#25303A',
+              }}
+            >
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 11,
+                  backgroundColor: '#063E2C',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="checkmark" color="#20F2A0" size={14} />
+              </View>
+              <Label muted style={{ fontSize: 12, color: '#A2ACB9' }}>
                 {text}
               </Label>
             </View>
           ))}
-        </View>
-        <View style={{ flex: 1, minHeight: 8 }} />
+        </LinearGradient>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           {[
             ['monthly', 'Mensuel', '5 €/mois', 'Soit 60 €/an'],
@@ -405,55 +470,61 @@ export function PremiumScreen() {
               style={{ flex: 1 }}
             >
               <LinearGradient
-                colors={plan === id ? ['#087AFF', '#2539F3'] : [c.surface, c.background]}
+                colors={plan === id ? ['#26312D', '#111A17'] : ['#111820', '#080D12']}
                 style={{
-                  padding: 17,
-                  borderRadius: 14,
+                  padding: 14,
+                  borderRadius: 21,
                   borderWidth: 1,
-                  borderColor: plan === id ? '#5595FF' : c.border,
-                  gap: 6,
-                  minHeight: 121,
+                  borderColor: plan === id ? '#5A776B' : '#28333D',
+                  gap: 4,
+                  minHeight: 104,
                 }}
               >
                 {id === 'annual' && (
                   <View
                     style={{
                       position: 'absolute',
-                      right: 6,
-                      top: -12,
-                      backgroundColor: '#00CE74',
+                      right: 8,
+                      top: -10,
+                      backgroundColor: '#0B6B4B',
                       paddingHorizontal: 10,
                       paddingVertical: 3,
                       borderRadius: 15,
                     }}
                   >
-                    <Label style={{ color: 'white', fontSize: 11, fontWeight: '700' }}>-17%</Label>
+                    <Label style={{ color: '#8CFFD0', fontSize: 10, fontWeight: '700' }}>
+                      -17%
+                    </Label>
                   </View>
                 )}
-                <Label
-                  style={{ fontSize: 16, fontWeight: '600', color: plan === id ? 'white' : c.text }}
-                >
-                  {title}
-                </Label>
+                <Label style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC' }}>{title}</Label>
                 <Label
                   style={{
-                    fontSize: 22,
-                    lineHeight: 29,
-                    fontWeight: '600',
-                    color: plan === id ? 'white' : c.text,
+                    fontSize: 21,
+                    lineHeight: 27,
+                    fontWeight: '800',
+                    color: plan === id ? '#20F2A0' : '#F8FAFC',
                   }}
                 >
                   {price}
                 </Label>
-                <Label style={{ fontSize: 11, color: plan === id ? '#C8E1FF' : c.muted }}>
-                  {note}
-                </Label>
+                <Label style={{ fontSize: 10, color: '#8E99A9' }}>{note}</Label>
               </LinearGradient>
             </Pressable>
           ))}
         </View>
         {premium ? (
-          <Card style={{ alignItems: 'center', padding: 18 }}>
+          <LinearGradient
+            colors={['#12352F', '#081713']}
+            style={{
+              alignItems: 'center',
+              padding: 16,
+              gap: 5,
+              borderRadius: 21,
+              borderWidth: 1,
+              borderColor: '#32705E',
+            }}
+          >
             <Badge text="Premium actif" />
             <Label style={{ fontSize: 17, fontWeight: '700' }}>
               Offre {status.data?.plan === 'annual' ? 'annuelle' : 'mensuelle'}
@@ -463,18 +534,33 @@ export function PremiumScreen() {
                 Prochaine échéance : {new Date(status.data.renewsAt).toLocaleDateString('fr-FR')}
               </Label>
             )}
-          </Card>
+          </LinearGradient>
         ) : (
-          <Button
-            title={
-              Platform.OS === 'web' ? 'Configurer RevenueCat pour acheter' : 'Commencer maintenant'
-            }
-            loading={activate.isPending}
+          <Pressable
+            accessibilityRole="button"
+            disabled={activate.isPending}
             onPress={() => {
               setMessage('');
               activate.mutate({});
             }}
-          />
+            style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}
+          >
+            <LinearGradient
+              colors={['#20D994', '#0D9F72']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                minHeight: 47,
+                borderRadius: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Label style={{ color: '#03110B', fontSize: 13, fontWeight: '800' }}>
+                {activate.isPending ? 'Chargement…' : 'Commencer maintenant'}
+              </Label>
+            </LinearGradient>
+          </Pressable>
         )}
         {!premium && (
           <Pressable
@@ -484,9 +570,11 @@ export function PremiumScreen() {
               setMessage('');
               activate.mutate({ restore: true });
             }}
-            style={{ alignItems: 'center', padding: 10 }}
+            style={{ alignItems: 'center', padding: 6 }}
           >
-            <Label style={{ color: '#168CFF', fontWeight: '600' }}>Restaurer mes achats</Label>
+            <Label style={{ color: '#A4AFBC', fontSize: 12, fontWeight: '600' }}>
+              Restaurer mes achats
+            </Label>
           </Pressable>
         )}
         {activate.error && (
@@ -501,7 +589,7 @@ export function PremiumScreen() {
             </Label>
           </Card>
         )}
-        <Label muted style={{ fontSize: 11, textAlign: 'center' }}>
+        <Label muted style={{ fontSize: 10, textAlign: 'center', color: '#7D8897' }}>
           Annulation possible à tout moment.
         </Label>
       </Page>
