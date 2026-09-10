@@ -531,7 +531,22 @@ export function DashboardScreen() {
 
   return (
     <ScreenWithTabs active="Home">
-      <View style={{ flex: 1, backgroundColor: homeColors.background }}>
+      <ImageBackground
+        source={require('../../assets/home-fabric.png')}
+        resizeMode="cover"
+        imageStyle={{ opacity: 0.28 }}
+        style={{ flex: 1, backgroundColor: homeColors.background }}
+      >
+        <LinearGradient
+          pointerEvents="none"
+          colors={
+            isDark
+              ? ['#00000070', '#00000018', '#00000055']
+              : ['#FFFFFF70', '#FFFFFF18', '#FFFFFF55']
+          }
+          locations={[0, 0.46, 1]}
+          style={{ position: 'absolute', inset: 0 }}
+        />
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <Page
           fill
@@ -992,7 +1007,7 @@ export function DashboardScreen() {
             </>
           )}
         </Page>
-      </View>
+      </ImageBackground>
     </ScreenWithTabs>
   );
 }
