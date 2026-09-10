@@ -7,7 +7,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
     <ProjectReference Include="../SubscriptionApp.Infrastructure/SubscriptionApp.Infrastructure.csproj" />
     <ProjectReference Include="../SubscriptionApp.Persistence/SubscriptionApp.Persistence.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
   </ItemGroup>
 </Project>
