@@ -1,6 +1,7 @@
 export const DEFAULT_ACCENT_COLOR = '#70737A';
 
-export const normalizeAccentColor = (value: string) => {
+export const normalizeAccentColor = (value: string | null | undefined) => {
+  if (typeof value !== 'string') return null;
   const candidate = value.trim().toUpperCase();
   const prefixed = candidate.startsWith('#') ? candidate : `#${candidate}`;
   return /^#[0-9A-F]{6}$/.test(prefixed) ? prefixed : null;
