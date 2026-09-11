@@ -8,7 +8,14 @@
     "scheme": "subscriptionapp",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.davidgeorges.subscriptionapp"
+      "bundleIdentifier": "com.davidgeorges.subscriptionapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "scheme": [
+        "subscriptionapp",
+        "com.googleusercontent.apps.120450519440-d2ipa2rlo7u17vborla4h50u3f6cf7sh"
+      ]
     },
     "android": {
       "package": "com.davidgeorges.subscriptionapp",

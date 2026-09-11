@@ -93,11 +93,17 @@ export function useGoogleSignIn() {
   const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-  const [, , promptAsync] = Google.useIdTokenAuthRequest({
-    androidClientId: androidClientId ?? webClientId,
-    iosClientId: iosClientId ?? webClientId,
-    webClientId,
-  });
+  const iosRedirectScheme = iosClientId
+    ? `com.googleusercontent.apps.${iosClientId.split('.apps.googleusercontent.com')[0]}`
+    : undefined;
+  const [, , promptAsync] = Google.useIdTokenAuthRequest(
+    {
+      androidClientId: androidClientId ?? webClientId,
+      iosClientId: iosClientId ?? webClientId,
+      webClientId,
+    },
+    iosRedirectScheme ? { native: `${iosRedirectScheme}:/oauthredirect` } : undefined,
+  );
   return async (): Promise<FirebaseSession> => {
     try {
       const instance = requiredAuth();
