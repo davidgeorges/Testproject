@@ -158,6 +158,8 @@ function UploadSheet({
 
 export function DocumentsScreen() {
   const c = useColors();
+  const accent = normalizeAccentColor(useSession((s) => s.accentColor)) ?? DEFAULT_ACCENT_COLOR;
+  const accentForeground = accentTextColor(accent);
   const nav = useNavigation<NativeStackNavigationProp<RootStackParams>>();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -272,12 +274,12 @@ export function DocumentsScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 8,
-                  backgroundColor: c.text,
+                  backgroundColor: accent,
                   opacity: pressed ? 0.78 : 1,
                 })}
               >
-                <Ionicons name="add" size={18} color={c.background} />
-                <Label style={{ color: c.background, fontSize: 14, fontWeight: '800' }}>
+                <Ionicons name="add" size={18} color={accentForeground} />
+                <Label style={{ color: accentForeground, fontSize: 14, fontWeight: '800' }}>
                   Ajouter un document
                 </Label>
               </Pressable>
