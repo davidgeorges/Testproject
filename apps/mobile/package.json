@@ -5,6 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
+    "start:go": "node scripts/start-expo-go.cjs",
     "web": "expo start --web --port 8081",
     "typecheck": "tsc --noEmit",
     "build:web": "expo export --platform web"
