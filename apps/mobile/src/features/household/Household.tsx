@@ -213,6 +213,7 @@ export function HouseholdScreen() {
     setEditor(kind);
   };
   const data = household.data;
+  const expenses = data?.expenses ?? [];
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <Page style={{ paddingTop: 18, paddingBottom: 40 }}>
@@ -366,7 +367,7 @@ export function HouseholdScreen() {
                       key={item.id}
                       icon="wallet-outline"
                       title={item.name}
-                      subtitle={`${item.spent.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} sur ${item.monthlyLimit.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${Math.round(item.usagePercent)} %`}
+                      subtitle={`${(item.spent ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} sur ${item.monthlyLimit.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${Math.round(item.usagePercent ?? 0)} %`}
                       onPress={data.canManageBudgets ? () => open('budgets', item) : undefined}
                       onDelete={
                         data.canManageBudgets
@@ -392,8 +393,8 @@ export function HouseholdScreen() {
             {section === 'expenses' ? (
               <>
                 <Label style={{ fontSize: 19, fontWeight: '900' }}>Dépenses du foyer</Label>
-                {data.expenses.length ? (
-                  data.expenses.map((item) => (
+                {expenses.length ? (
+                  expenses.map((item) => (
                     <Row
                       key={item.id}
                       icon={item.source === 'bank' ? 'card-outline' : 'create-outline'}
