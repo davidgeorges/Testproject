@@ -596,10 +596,29 @@ export function DocumentDetailScreen() {
               {d.extractedText || 'Aucun texte reconnu.'}
             </Label>
           </Card>
-          <Button title="Ouvrir le document original" secondary onPress={openOriginal} />
-          <Button
-            title="Supprimer le document"
-            danger
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ouvrir le document original"
+            onPress={openOriginal}
+            style={({ pressed }) => ({
+              minHeight: 48,
+              borderRadius: 24,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              backgroundColor: accent,
+              opacity: pressed ? 0.78 : 1,
+            })}
+          >
+            <Ionicons name="open-outline" size={18} color={accentTextColor(accent)} />
+            <Label style={{ color: accentTextColor(accent), fontSize: 14, fontWeight: '800' }}>
+              Ouvrir le document original
+            </Label>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Supprimer le document"
             onPress={() =>
               Alert.alert(
                 'Supprimer ce document ?',
@@ -610,7 +629,24 @@ export function DocumentDetailScreen() {
                 ],
               )
             }
-          />
+            style={({ pressed }) => ({
+              minHeight: 46,
+              borderRadius: 23,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              borderWidth: 1,
+              borderColor: '#E86D6755',
+              backgroundColor: '#E86D6712',
+              opacity: pressed ? 0.72 : 1,
+            })}
+          >
+            <Ionicons name="trash-outline" size={17} color="#E86D67" />
+            <Label style={{ color: '#E86D67', fontSize: 14, fontWeight: '800' }}>
+              Supprimer le document
+            </Label>
+          </Pressable>
         </>
       )}
     </Page>
