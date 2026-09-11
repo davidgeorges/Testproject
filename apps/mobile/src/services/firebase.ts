@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import { FirebaseError, initializeApp, getApps } from 'firebase/app';
 import {
@@ -7,6 +9,7 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   getAuth,
+  getRedirectResult,
   getReactNativePersistence,
   GoogleAuthProvider,
   initializeAuth,
@@ -15,7 +18,7 @@ import {
   setPersistence,
   signInWithCredential,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile,
   type Auth,
@@ -93,30 +96,43 @@ export function useGoogleSignIn() {
   const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const usesExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  const expoProxyRedirectUri = usesExpoGo ? AuthSession.getRedirectUrl() : undefined;
   const iosRedirectScheme = iosClientId
     ? `com.googleusercontent.apps.${iosClientId.split('.apps.googleusercontent.com')[0]}`
     : undefined;
-  const [, , promptAsync] = Google.useIdTokenAuthRequest(
+  const [request, , promptAsync] = Google.useIdTokenAuthRequest(
     {
       androidClientId: androidClientId ?? webClientId,
-      iosClientId: iosClientId ?? webClientId,
+      iosClientId: usesExpoGo ? webClientId : (iosClientId ?? webClientId),
       webClientId,
+      redirectUri: expoProxyRedirectUri,
     },
     iosRedirectScheme ? { native: `${iosRedirectScheme}:/oauthredirect` } : undefined,
   );
-  return async (): Promise<FirebaseSession> => {
+  return async (): Promise<FirebaseSession | null> => {
     try {
       const instance = requiredAuth();
       if (Platform.OS === 'web') {
         await setPersistence(instance, browserLocalPersistence);
-        return session((await signInWithPopup(instance, new GoogleAuthProvider())).user);
+        await signInWithRedirect(instance, new GoogleAuthProvider());
+        return null;
       }
-      const clientId = Platform.OS === 'android' ? androidClientId : iosClientId;
+      const clientId = usesExpoGo
+        ? webClientId
+        : Platform.OS === 'android'
+          ? androidClientId
+          : iosClientId;
       if (!clientId)
         throw new Error(
           `La clé OAuth Google ${Platform.OS === 'android' ? 'Android' : 'iOS'} doit être renseignée dans la configuration du build.`,
         );
-      const result = await promptAsync();
+      const result =
+        usesExpoGo && request?.url && expoProxyRedirectUri
+          ? await promptAsync({
+              url: `${expoProxyRedirectUri}/start?authUrl=${encodeURIComponent(request.url)}&returnUrl=${encodeURIComponent(AuthSession.getDefaultReturnUrl())}`,
+            })
+          : await promptAsync();
       if (result.type !== 'success') throw new Error('Connexion Google annulée.');
       const idToken = result.params.id_token;
       if (!idToken) throw new Error('Google n’a retourné aucun jeton d’identité.');
@@ -164,11 +180,13 @@ export function watchFirebaseToken(callback: (value: FirebaseSession | null) => 
     callback(null);
     return () => undefined;
   }
-  return onIdTokenChanged(
+  const unsubscribe = onIdTokenChanged(
     auth,
     async (user) => callback(user ? await session(user) : null),
     () => callback(null),
   );
+  if (Platform.OS === 'web') void getRedirectResult(auth).catch(() => undefined);
+  return unsubscribe;
 }
 
 export async function signOutFirebase(): Promise<void> {

@@ -470,6 +470,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
     setMessage('');
     try {
       const firebase = await googleSignIn();
+      if (!firebase) return;
       await finishAuthentication(firebase);
       nav.navigate('Main');
     } catch (error) {
