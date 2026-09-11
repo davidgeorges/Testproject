@@ -213,8 +213,10 @@ export function DocumentsScreen() {
         <Search value={search} onChangeText={setSearch} placeholder="Rechercher un document…" />
         <ScrollView
           horizontal
+          nestedScrollEnabled
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}
+          style={{ width: '100%', maxWidth: '100%', flexGrow: 0 }}
+          contentContainerStyle={{ gap: 8, paddingRight: 24 }}
         >
           {categories.map((item) => (
             <Pressable
@@ -480,8 +482,10 @@ export function DocumentDetailScreen() {
           <Label style={{ fontWeight: '700' }}>Catégorie</Label>
           <ScrollView
             horizontal
+            nestedScrollEnabled
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 7 }}
+            style={{ width: '100%', maxWidth: '100%', flexGrow: 0 }}
+            contentContainerStyle={{ gap: 7, paddingRight: 24 }}
           >
             {categories
               .filter((item) => item.id !== 'all')
