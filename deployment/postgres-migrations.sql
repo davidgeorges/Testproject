@@ -1125,3 +1125,521 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910215913_AddBudgetDisplayName') THEN
+    ALTER TABLE category_budgets ADD "DisplayName" character varying(60);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260910215913_AddBudgetDisplayName') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260910215913_AddBudgetDisplayName', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911053038_AddDocuments') THEN
+    CREATE TABLE documents (
+        "Id" uuid NOT NULL,
+        "UserId" text NOT NULL,
+        "OriginalFileName" character varying(255) NOT NULL,
+        "ContentType" character varying(100) NOT NULL,
+        "Size" bigint NOT NULL,
+        "Sha256" character varying(64) NOT NULL,
+        "ProtectedContent" bytea NOT NULL,
+        "Status" character varying(20) NOT NULL,
+        "Category" character varying(40) NOT NULL,
+        "Title" character varying(160) NOT NULL,
+        "Issuer" character varying(160),
+        "ExtractedText" text NOT NULL,
+        "Amount" numeric(18,2),
+        "DocumentDate" date,
+        "DueDate" date,
+        "ContractNumber" character varying(120),
+        "ProcessingError" character varying(80),
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_documents" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_documents_user_profiles_UserId" FOREIGN KEY ("UserId") REFERENCES user_profiles ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911053038_AddDocuments') THEN
+    CREATE INDEX "IX_documents_UserId_Category" ON documents ("UserId", "Category");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911053038_AddDocuments') THEN
+    CREATE INDEX "IX_documents_UserId_CreatedAt" ON documents ("UserId", "CreatedAt");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911053038_AddDocuments') THEN
+    CREATE UNIQUE INDEX "IX_documents_UserId_Sha256" ON documents ("UserId", "Sha256");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911053038_AddDocuments') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260911053038_AddDocuments', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911060547_AddDeadlines') THEN
+    CREATE TABLE deadlines (
+        "Id" uuid NOT NULL,
+        "UserId" text NOT NULL,
+        "Title" character varying(160) NOT NULL,
+        "Category" character varying(40) NOT NULL,
+        "Notes" character varying(1000),
+        "DueAt" timestamp with time zone NOT NULL,
+        "ReminderMinutesBefore" integer NOT NULL,
+        "ReminderSentAt" timestamp with time zone,
+        "CompletedAt" timestamp with time zone,
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_deadlines" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_deadlines_user_profiles_UserId" FOREIGN KEY ("UserId") REFERENCES user_profiles ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911060547_AddDeadlines') THEN
+    CREATE INDEX "IX_deadlines_ReminderSentAt_CompletedAt_DueAt" ON deadlines ("ReminderSentAt", "CompletedAt", "DueAt");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911060547_AddDeadlines') THEN
+    CREATE INDEX "IX_deadlines_UserId_DueAt" ON deadlines ("UserId", "DueAt");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911060547_AddDeadlines') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260911060547_AddDeadlines', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE TABLE households (
+        "Id" uuid NOT NULL,
+        "OwnerUserId" text NOT NULL,
+        "Name" character varying(80) NOT NULL,
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_households" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_households_user_profiles_OwnerUserId" FOREIGN KEY ("OwnerUserId") REFERENCES user_profiles ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE TABLE household_budgets (
+        "Id" uuid NOT NULL,
+        "HouseholdId" uuid NOT NULL,
+        "Name" character varying(80) NOT NULL,
+        "Category" character varying(40) NOT NULL,
+        "MonthlyLimit" numeric(18,2) NOT NULL,
+        "Notes" character varying(500),
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_household_budgets" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_household_budgets_households_HouseholdId" FOREIGN KEY ("HouseholdId") REFERENCES households ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE TABLE household_members (
+        "Id" uuid NOT NULL,
+        "HouseholdId" uuid NOT NULL,
+        "DisplayName" character varying(80) NOT NULL,
+        "Relationship" character varying(30) NOT NULL,
+        "BirthDate" date,
+        "Email" character varying(254),
+        "LinkedUserId" text,
+        "AccountStatus" character varying(20) NOT NULL,
+        "AccessRole" character varying(20) NOT NULL,
+        "InvitationTokenHash" character varying(64),
+        "InvitationExpiresAt" timestamp with time zone,
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_household_members" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_household_members_households_HouseholdId" FOREIGN KEY ("HouseholdId") REFERENCES households ("Id") ON DELETE CASCADE,
+        CONSTRAINT "FK_household_members_user_profiles_LinkedUserId" FOREIGN KEY ("LinkedUserId") REFERENCES user_profiles ("Id") ON DELETE SET NULL
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE TABLE household_residences (
+        "Id" uuid NOT NULL,
+        "HouseholdId" uuid NOT NULL,
+        "Name" character varying(80) NOT NULL,
+        "Kind" character varying(30) NOT NULL,
+        "Address" character varying(300),
+        "Notes" character varying(500),
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_household_residences" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_household_residences_households_HouseholdId" FOREIGN KEY ("HouseholdId") REFERENCES households ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE TABLE household_vehicles (
+        "Id" uuid NOT NULL,
+        "HouseholdId" uuid NOT NULL,
+        "Name" character varying(80) NOT NULL,
+        "Registration" character varying(30),
+        "Notes" character varying(500),
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_household_vehicles" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_household_vehicles_households_HouseholdId" FOREIGN KEY ("HouseholdId") REFERENCES households ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE TABLE household_budget_members (
+        "BudgetId" uuid NOT NULL,
+        "MemberId" uuid NOT NULL,
+        CONSTRAINT "PK_household_budget_members" PRIMARY KEY ("BudgetId", "MemberId"),
+        CONSTRAINT "FK_household_budget_members_household_budgets_BudgetId" FOREIGN KEY ("BudgetId") REFERENCES household_budgets ("Id") ON DELETE CASCADE,
+        CONSTRAINT "FK_household_budget_members_household_members_MemberId" FOREIGN KEY ("MemberId") REFERENCES household_members ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE TABLE household_contracts (
+        "Id" uuid NOT NULL,
+        "HouseholdId" uuid NOT NULL,
+        "Name" character varying(100) NOT NULL,
+        "Category" character varying(40) NOT NULL,
+        "Provider" character varying(100),
+        "MonthlyAmount" numeric(18,2),
+        "RenewalDate" date,
+        "ResidenceId" uuid,
+        "VehicleId" uuid,
+        "Notes" character varying(500),
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_household_contracts" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_household_contracts_household_residences_ResidenceId" FOREIGN KEY ("ResidenceId") REFERENCES household_residences ("Id") ON DELETE SET NULL,
+        CONSTRAINT "FK_household_contracts_household_vehicles_VehicleId" FOREIGN KEY ("VehicleId") REFERENCES household_vehicles ("Id") ON DELETE SET NULL,
+        CONSTRAINT "FK_household_contracts_households_HouseholdId" FOREIGN KEY ("HouseholdId") REFERENCES households ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE TABLE household_contract_members (
+        "ContractId" uuid NOT NULL,
+        "MemberId" uuid NOT NULL,
+        CONSTRAINT "PK_household_contract_members" PRIMARY KEY ("ContractId", "MemberId"),
+        CONSTRAINT "FK_household_contract_members_household_contracts_ContractId" FOREIGN KEY ("ContractId") REFERENCES household_contracts ("Id") ON DELETE CASCADE,
+        CONSTRAINT "FK_household_contract_members_household_members_MemberId" FOREIGN KEY ("MemberId") REFERENCES household_members ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_budget_members_MemberId" ON household_budget_members ("MemberId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_budgets_HouseholdId_Name" ON household_budgets ("HouseholdId", "Name");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_contract_members_MemberId" ON household_contract_members ("MemberId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_contracts_HouseholdId_Category" ON household_contracts ("HouseholdId", "Category");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_contracts_ResidenceId" ON household_contracts ("ResidenceId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_contracts_VehicleId" ON household_contracts ("VehicleId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_members_HouseholdId_LinkedUserId" ON household_members ("HouseholdId", "LinkedUserId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE UNIQUE INDEX "IX_household_members_InvitationTokenHash" ON household_members ("InvitationTokenHash");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_members_LinkedUserId" ON household_members ("LinkedUserId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_residences_HouseholdId" ON household_residences ("HouseholdId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE INDEX "IX_household_vehicles_HouseholdId" ON household_vehicles ("HouseholdId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    CREATE UNIQUE INDEX "IX_households_OwnerUserId" ON households ("OwnerUserId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911065649_AddHouseholdWorkspace') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260911065649_AddHouseholdWorkspace', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    ALTER TABLE household_members ADD "CanManageAssets" boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    ALTER TABLE household_members ADD "CanManageBudgets" boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    ALTER TABLE household_members ADD "CanManageContracts" boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    ALTER TABLE household_contracts ADD "SourceDocumentId" uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    ALTER TABLE deadlines ADD "SourceId" character varying(80);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    ALTER TABLE deadlines ADD "SourceType" character varying(40) NOT NULL DEFAULT 'manual';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    UPDATE household_members SET "CanManageBudgets" = TRUE, "CanManageAssets" = TRUE, "CanManageContracts" = TRUE WHERE "AccountStatus" = 'owner';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE TABLE household_expenses (
+        "Id" uuid NOT NULL,
+        "HouseholdId" uuid NOT NULL,
+        "BudgetId" uuid,
+        "BankTransactionId" uuid,
+        "CreatedByUserId" text NOT NULL,
+        "Title" character varying(160) NOT NULL,
+        "Category" character varying(40) NOT NULL,
+        "Amount" numeric(18,2) NOT NULL,
+        "OccurredOn" date NOT NULL,
+        "Source" character varying(20) NOT NULL,
+        "Notes" character varying(500),
+        "CreatedAt" timestamp with time zone NOT NULL,
+        "UpdatedAt" timestamp with time zone NOT NULL,
+        CONSTRAINT "PK_household_expenses" PRIMARY KEY ("Id"),
+        CONSTRAINT "FK_household_expenses_household_budgets_BudgetId" FOREIGN KEY ("BudgetId") REFERENCES household_budgets ("Id") ON DELETE SET NULL,
+        CONSTRAINT "FK_household_expenses_households_HouseholdId" FOREIGN KEY ("HouseholdId") REFERENCES households ("Id") ON DELETE CASCADE,
+        CONSTRAINT "FK_household_expenses_transactions_BankTransactionId" FOREIGN KEY ("BankTransactionId") REFERENCES transactions ("Id") ON DELETE CASCADE,
+        CONSTRAINT "FK_household_expenses_user_profiles_CreatedByUserId" FOREIGN KEY ("CreatedByUserId") REFERENCES user_profiles ("Id") ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE TABLE household_expense_splits (
+        "ExpenseId" uuid NOT NULL,
+        "MemberId" uuid NOT NULL,
+        "Amount" numeric(18,2) NOT NULL,
+        CONSTRAINT "PK_household_expense_splits" PRIMARY KEY ("ExpenseId", "MemberId"),
+        CONSTRAINT "FK_household_expense_splits_household_expenses_ExpenseId" FOREIGN KEY ("ExpenseId") REFERENCES household_expenses ("Id") ON DELETE CASCADE,
+        CONSTRAINT "FK_household_expense_splits_household_members_MemberId" FOREIGN KEY ("MemberId") REFERENCES household_members ("Id") ON DELETE CASCADE
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE UNIQUE INDEX "IX_household_contracts_SourceDocumentId" ON household_contracts ("SourceDocumentId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE UNIQUE INDEX "IX_deadlines_UserId_SourceType_SourceId" ON deadlines ("UserId", "SourceType", "SourceId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE INDEX "IX_household_expense_splits_MemberId" ON household_expense_splits ("MemberId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE UNIQUE INDEX "IX_household_expenses_BankTransactionId" ON household_expenses ("BankTransactionId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE INDEX "IX_household_expenses_BudgetId" ON household_expenses ("BudgetId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE INDEX "IX_household_expenses_CreatedByUserId" ON household_expenses ("CreatedByUserId");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    CREATE INDEX "IX_household_expenses_HouseholdId_OccurredOn" ON household_expenses ("HouseholdId", "OccurredOn");
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    ALTER TABLE household_contracts ADD CONSTRAINT "FK_household_contracts_documents_SourceDocumentId" FOREIGN KEY ("SourceDocumentId") REFERENCES documents ("Id") ON DELETE SET NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260911082607_AddHouseholdExpenseTracking') THEN
+    INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+    VALUES ('20260911082607_AddHouseholdExpenseTracking', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
