@@ -213,7 +213,18 @@ export function HouseholdScreen() {
     setEditor(kind);
   };
   const data = household.data;
-  const expenses = data?.expenses ?? [];
+  const workspace = data
+    ? {
+        ...data,
+        members: data.members ?? [],
+        budgets: data.budgets ?? [],
+        expenses: data.expenses ?? [],
+        residences: data.residences ?? [],
+        vehicles: data.vehicles ?? [],
+        contracts: data.contracts ?? [],
+      }
+    : undefined;
+  const expenses = workspace?.expenses ?? [];
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <Page style={{ paddingTop: 18, paddingBottom: 40 }}>
@@ -221,7 +232,7 @@ export function HouseholdScreen() {
           <Label style={{ fontSize: 30, lineHeight: 36, fontWeight: '900' }}>Votre foyer</Label>
           <Label muted>Organisez ce qui concerne toute la famille</Label>
         </View>
-        {household.isPending || household.error || !data ? (
+        {household.isPending || household.error || !workspace ? (
           <State
             loading={household.isPending}
             error={household.error}
@@ -235,11 +246,11 @@ export function HouseholdScreen() {
                   <Label muted style={{ fontSize: 12, fontWeight: '700' }}>
                     MON FOYER
                   </Label>
-                  <Pressable disabled={!data.canManageMembers} onPress={() => open('rename')}>
+                  <Pressable disabled={!workspace.canManageMembers} onPress={() => open('rename')}>
                     <Label style={{ fontSize: 22, lineHeight: 28, fontWeight: '900' }}>
-                      {data.name}
+                      {workspace.name}
                     </Label>
-                    {data.canManageMembers ? (
+                    {workspace.canManageMembers ? (
                       <Label muted style={{ fontSize: 11 }}>
                         Toucher pour renommer
                       </Label>
@@ -261,9 +272,9 @@ export function HouseholdScreen() {
               </View>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {[
-                  [data.members.length, 'membres'],
-                  [data.budgets.length, 'budgets'],
-                  [data.contracts.length, 'contrats'],
+                  [workspace.members.length, 'membres'],
+                  [workspace.budgets.length, 'budgets'],
+                  [workspace.contracts.length, 'contrats'],
                 ].map(([number, label]) => (
                   <View
                     key={label}
@@ -316,7 +327,7 @@ export function HouseholdScreen() {
               <>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Label style={{ flex: 1, fontSize: 19, fontWeight: '900' }}>Membres</Label>
-                  {data.canManageMembers ? (
+                  {workspace.canManageMembers ? (
                     <Pressable onPress={() => open('join')}>
                       <Label muted style={{ fontWeight: '700' }}>
                         J’ai un code
@@ -324,7 +335,7 @@ export function HouseholdScreen() {
                     </Pressable>
                   ) : null}
                 </View>
-                {data.members.map((item) => (
+                {workspace.members.map((item) => (
                   <Row
                     key={item.id}
                     icon={
@@ -337,12 +348,12 @@ export function HouseholdScreen() {
                     title={item.displayName}
                     subtitle={`${item.relationship === 'self' ? 'Moi' : (relations.find((x) => x[0] === item.relationship)?.[1] ?? 'Membre')} · ${item.accountStatus === 'managed' ? 'Sans compte' : item.accountStatus === 'invited' ? 'Invitation en attente' : 'Compte connecté'}`}
                     onPress={() =>
-                      item.accountStatus !== 'owner' && data.canManageMembers
+                      item.accountStatus !== 'owner' && workspace.canManageMembers
                         ? open('members', item)
                         : undefined
                     }
                     onDelete={
-                      item.accountStatus !== 'owner' && data.canManageMembers
+                      item.accountStatus !== 'owner' && workspace.canManageMembers
                         ? () => confirmDelete('members', item.id, item.displayName)
                         : undefined
                     }
@@ -350,7 +361,7 @@ export function HouseholdScreen() {
                 ))}
                 <AddButton
                   label="Ajouter une personne"
-                  disabled={!data.canManageMembers}
+                  disabled={!workspace.canManageMembers}
                   onPress={() => open('members')}
                 />
                 <Label muted style={{ fontSize: 12, textAlign: 'center' }}>
@@ -361,16 +372,16 @@ export function HouseholdScreen() {
             {section === 'budgets' ? (
               <>
                 <Label style={{ fontSize: 19, fontWeight: '900' }}>Budgets partagés</Label>
-                {data.budgets.length ? (
-                  data.budgets.map((item) => (
+                {workspace.budgets.length ? (
+                  workspace.budgets.map((item) => (
                     <Row
                       key={item.id}
                       icon="wallet-outline"
                       title={item.name}
                       subtitle={`${(item.spent ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} sur ${item.monthlyLimit.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${Math.round(item.usagePercent ?? 0)} %`}
-                      onPress={data.canManageBudgets ? () => open('budgets', item) : undefined}
+                      onPress={workspace.canManageBudgets ? () => open('budgets', item) : undefined}
                       onDelete={
-                        data.canManageBudgets
+                        workspace.canManageBudgets
                           ? () => confirmDelete('budgets', item.id, item.name)
                           : undefined
                       }
@@ -385,7 +396,7 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Créer un budget partagé"
-                  disabled={!data.canManageBudgets}
+                  disabled={!workspace.canManageBudgets}
                   onPress={() => open('budgets')}
                 />
               </>
@@ -399,14 +410,14 @@ export function HouseholdScreen() {
                       key={item.id}
                       icon={item.source === 'bank' ? 'card-outline' : 'create-outline'}
                       title={item.title}
-                      subtitle={`${item.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${new Date(`${item.occurredOn}T12:00:00`).toLocaleDateString('fr-FR')} · ${item.splits.length} ${item.splits.length === 1 ? 'personne' : 'personnes'}`}
+                      subtitle={`${item.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${new Date(`${item.occurredOn}T12:00:00`).toLocaleDateString('fr-FR')} · ${(item.splits ?? []).length} ${(item.splits ?? []).length === 1 ? 'personne' : 'personnes'}`}
                       onPress={() =>
-                        item.source === 'manual' && data.canManageBudgets
+                        item.source === 'manual' && workspace.canManageBudgets
                           ? open('expenses', item)
                           : undefined
                       }
                       onDelete={
-                        data.canManageBudgets
+                        workspace.canManageBudgets
                           ? () => confirmDelete('expenses', item.id, item.title)
                           : undefined
                       }
@@ -421,12 +432,12 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Ajouter une dépense"
-                  disabled={!data.canManageBudgets}
+                  disabled={!workspace.canManageBudgets}
                   onPress={() => open('expenses')}
                 />
                 <AddButton
                   label="Affecter une opération bancaire"
-                  disabled={!data.canManageBudgets}
+                  disabled={!workspace.canManageBudgets}
                   onPress={() => open('bank')}
                 />
               </>
@@ -434,8 +445,8 @@ export function HouseholdScreen() {
             {section === 'homes' ? (
               <>
                 <Label style={{ fontSize: 19, fontWeight: '900' }}>Logements</Label>
-                {data.residences.length ? (
-                  data.residences.map((item) => (
+                {workspace.residences.length ? (
+                  workspace.residences.map((item) => (
                     <Row
                       key={item.id}
                       icon="home-outline"
@@ -444,9 +455,9 @@ export function HouseholdScreen() {
                         item.address ??
                         (item.kind === 'primary' ? 'Résidence principale' : 'Résidence secondaire')
                       }
-                      onPress={data.canManageAssets ? () => open('homes', item) : undefined}
+                      onPress={workspace.canManageAssets ? () => open('homes', item) : undefined}
                       onDelete={
-                        data.canManageAssets
+                        workspace.canManageAssets
                           ? () => confirmDelete('homes', item.id, item.name)
                           : undefined
                       }
@@ -461,7 +472,7 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Ajouter un logement"
-                  disabled={!data.canManageAssets}
+                  disabled={!workspace.canManageAssets}
                   onPress={() => open('homes')}
                 />
               </>
@@ -469,16 +480,16 @@ export function HouseholdScreen() {
             {section === 'vehicles' ? (
               <>
                 <Label style={{ fontSize: 19, fontWeight: '900' }}>Véhicules</Label>
-                {data.vehicles.length ? (
-                  data.vehicles.map((item) => (
+                {workspace.vehicles.length ? (
+                  workspace.vehicles.map((item) => (
                     <Row
                       key={item.id}
                       icon="car-outline"
                       title={item.name}
                       subtitle={item.registration ?? 'Immatriculation non renseignée'}
-                      onPress={data.canManageAssets ? () => open('vehicles', item) : undefined}
+                      onPress={workspace.canManageAssets ? () => open('vehicles', item) : undefined}
                       onDelete={
-                        data.canManageAssets
+                        workspace.canManageAssets
                           ? () => confirmDelete('vehicles', item.id, item.name)
                           : undefined
                       }
@@ -493,7 +504,7 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Ajouter un véhicule"
-                  disabled={!data.canManageAssets}
+                  disabled={!workspace.canManageAssets}
                   onPress={() => open('vehicles')}
                 />
               </>
@@ -501,16 +512,18 @@ export function HouseholdScreen() {
             {section === 'contracts' ? (
               <>
                 <Label style={{ fontSize: 19, fontWeight: '900' }}>Contrats du foyer</Label>
-                {data.contracts.length ? (
-                  data.contracts.map((item) => (
+                {workspace.contracts.length ? (
+                  workspace.contracts.map((item) => (
                     <Row
                       key={item.id}
                       icon="document-text-outline"
                       title={item.name}
                       subtitle={`${item.provider ?? item.category}${item.monthlyAmount != null ? ` · ${item.monthlyAmount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}/mois` : ''}`}
-                      onPress={data.canManageContracts ? () => open('contracts', item) : undefined}
+                      onPress={
+                        workspace.canManageContracts ? () => open('contracts', item) : undefined
+                      }
                       onDelete={
-                        data.canManageContracts
+                        workspace.canManageContracts
                           ? () => confirmDelete('contracts', item.id, item.name)
                           : undefined
                       }
@@ -525,7 +538,7 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Ajouter un contrat"
-                  disabled={!data.canManageContracts}
+                  disabled={!workspace.canManageContracts}
                   onPress={() => open('contracts')}
                 />
               </>
@@ -533,12 +546,12 @@ export function HouseholdScreen() {
           </>
         )}
       </Page>
-      {data ? (
+      {workspace ? (
         <HouseholdEditor
           key={`${editor ?? 'closed'}-${editing?.id ?? 'new'}`}
           kind={editor}
           editing={editing}
-          data={data}
+          data={workspace}
           bankTransactions={bankTransactions.data ?? []}
           bankTransactionsLoading={bankTransactions.isPending}
           onClose={() => setEditor(null)}
