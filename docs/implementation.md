@@ -31,7 +31,7 @@ Le document `SmartSave_Cahier_des_charges_V1_v2.docx` sert de référence foncti
 | CI                                                 | Workflow de build, TypeScript, format, tests HTTP/métier/PostgreSQL et export des bundles mobiles                                               |
 | Release iOS et Android                             | À configurer et valider avec les comptes développeur                                                                                            |
 | Documents                                          | Import PDF/JPEG/PNG, stockage chiffré PostgreSQL, OCR français/anglais, classement, recherche plein texte, correction, ouverture et suppression |
-| Foyer                                               | Membres avec ou sans compte, invitations sécurisées, droits d’accès, budgets partagés, logements, véhicules et contrats persistés |
+| Foyer                                               | Membres avec ou sans compte, test de liaison entre deux identités, droits détaillés, budgets et dépenses partagés, opérations bancaires affectables, répartition, logements, véhicules, contrats et échéances persistés |
 
 ## Règles implémentées
 
@@ -43,7 +43,7 @@ Pour les économies, les offres inactives, les prix invalides et les gains nuls 
 
 Le schéma exact est généré par `/openapi/v1.json`. Les routes métier exigent `Authorization: Bearer <jeton-démo>`. `POST /api/v1/demo/sessions` crée une session temporaire dans l’environnement Development.
 
-Routes implémentées : profil GET/PATCH, connexions et comptes bancaires GET/POST/DELETE, synchronisation immédiate ou mise en file et état GET, dashboard GET, abonnements GET liste/détail et PATCH préférences, recommandations GET liste/détail/alternatives et suivi vue/clic, documents GET/POST/PATCH/DELETE, échéances GET/POST/PATCH/DELETE, foyer et invitations GET/POST/PATCH/PUT/DELETE, offres GET et administration GET/PUT/DELETE, webhooks Tink, affiliation et Premium, consentements GET/DELETE, notifications GET/lecture POST, appareils push GET/POST/DELETE, Premium GET/vérification POST, export RGPD GET et suppression du compte DELETE.
+Routes implémentées : profil GET/PATCH, connexions et comptes bancaires GET/POST/DELETE, synchronisation immédiate ou mise en file et état GET, dashboard GET, abonnements GET liste/détail et PATCH préférences, recommandations GET liste/détail/alternatives et suivi vue/clic, documents GET/POST/PATCH/DELETE et conversion en contrat, échéances GET/POST/PATCH/DELETE, foyer, invitations, dépenses manuelles, affectation de transactions, budgets et actifs GET/POST/PATCH/PUT/DELETE, offres GET et administration GET/PUT/DELETE, webhooks Tink, affiliation et Premium, consentements GET/DELETE, notifications GET/lecture POST, appareils push GET/POST/DELETE, Premium GET/vérification POST, export RGPD GET et suppression du compte DELETE.
 
 Les créations de connexion, synchronisations, clics et validations Premium exigent `Idempotency-Key` (8 à 128 caractères). Une réservation atomique PostgreSQL conserve la réponse réussie pendant 24 heures et permet son rejeu entre plusieurs réplicas ; un contenu différent avec la même clé renvoie 409. En mode mémoire, le même contrat est appliqué dans le processus. L’import PostgreSQL utilise un verrou transactionnel par connexion et des contraintes d’unicité. La déconnexion et la révocation locale bloquent immédiatement toute nouvelle synchronisation ; la révocation distante passe par l’interface du prestataire Open Banking.
 
@@ -67,7 +67,7 @@ Les dépendances npm sont figées par `package-lock.json`, celles .NET par les v
 
 ## Vérifications locales du premier lot
 
-62 tests métier, sécurité et HTTP réussissent localement ; les 2 tests PostgreSQL et Redis sont ignorés faute de services Docker locaux. La CI démarre les deux services. Le typecheck mobile et le build backend Release passent.
+78 tests métier, sécurité et HTTP réussissent localement ; les 2 tests PostgreSQL et Redis sont ignorés faute de services Docker locaux. La CI démarre les deux services. Le parcours foyer teste notamment la liaison de deux identités authentifiées et la visibilité immédiate d’un budget partagé. Le typecheck mobile, le build Web et le build backend Release passent.
 
 Parcours vérifié dans le navigateur : quatre étapes de présentation, session de test, consentement fictif, connexion/synchronisation, tableau de bord, détail d’une recommandation et enregistrement du clic. Vérification visuelle aux largeurs desktop et 390 px ; ajustement de la taille du montant mensuel pour éviter le retour à la ligne.
 

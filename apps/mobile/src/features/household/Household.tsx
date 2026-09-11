@@ -1,13 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Share, Switch, TextInput, View } from 'react-native';
 import { api } from '../../services/api';
 import { useSession } from '../../store/session';
 import { DEFAULT_ACCENT_COLOR, accentTextColor, normalizeAccentColor } from '../../theme/accent';
 import type {
   HouseholdBudget,
+  HouseholdBankTransaction,
   HouseholdContract,
+  HouseholdExpense,
   HouseholdMember,
   HouseholdResidence,
   HouseholdVehicle,
@@ -15,19 +17,21 @@ import type {
 } from '../../types/api';
 import { Card, Label, Page, State, useColors } from '../../design/ui';
 
-type Section = 'members' | 'budgets' | 'homes' | 'vehicles' | 'contracts';
-type Editor = Section | 'join' | null;
+type Section = 'members' | 'budgets' | 'expenses' | 'homes' | 'vehicles' | 'contracts';
+type Editor = Section | 'join' | 'bank' | 'rename' | null;
 type Editable =
   | HouseholdMember
   | HouseholdBudget
   | HouseholdResidence
   | HouseholdVehicle
   | HouseholdContract
+  | HouseholdExpense
   | null;
 
 const sections: Array<[Section, string, React.ComponentProps<typeof Ionicons>['name']]> = [
   ['members', 'Membres', 'people-outline'],
   ['budgets', 'Budgets', 'wallet-outline'],
+  ['expenses', 'Dépenses', 'receipt-outline'],
   ['homes', 'Logements', 'home-outline'],
   ['vehicles', 'Véhicules', 'car-outline'],
   ['contracts', 'Contrats', 'document-text-outline'],
@@ -122,12 +126,16 @@ function Row({
   icon: React.ComponentProps<typeof Ionicons>['name'];
   title: string;
   subtitle: string;
-  onPress: () => void;
+  onPress?: () => void;
   onDelete?: () => void;
 }) {
   const c = useColors();
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}>
+    <Pressable
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
+    >
       <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
         <View
           style={{
@@ -172,11 +180,18 @@ export function HouseholdScreen() {
   const [editor, setEditor] = useState<Editor>(null);
   const [editing, setEditing] = useState<Editable>(null);
   const household = useQuery({ queryKey: ['household'], queryFn: api.household });
+  const month = new Date().toISOString().slice(0, 7);
+  const bankTransactions = useQuery({
+    queryKey: ['household-bank-transactions', month],
+    queryFn: () => api.householdBankTransactions(month),
+    enabled: editor === 'bank',
+  });
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ['household'] });
   const remove = useMutation({
     mutationFn: async ({ kind, id }: { kind: Section; id: string }) => {
       if (kind === 'members') return api.deleteHouseholdMember(id);
       if (kind === 'budgets') return api.deleteHouseholdBudget(id);
+      if (kind === 'expenses') return api.deleteHouseholdExpense(id);
       if (kind === 'homes') return api.deleteHouseholdResidence(id);
       if (kind === 'vehicles') return api.deleteHouseholdVehicle(id);
       return api.deleteHouseholdContract(id);
@@ -219,9 +234,16 @@ export function HouseholdScreen() {
                   <Label muted style={{ fontSize: 12, fontWeight: '700' }}>
                     MON FOYER
                   </Label>
-                  <Label style={{ fontSize: 22, lineHeight: 28, fontWeight: '900' }}>
-                    {data.name}
-                  </Label>
+                  <Pressable disabled={!data.canManageMembers} onPress={() => open('rename')}>
+                    <Label style={{ fontSize: 22, lineHeight: 28, fontWeight: '900' }}>
+                      {data.name}
+                    </Label>
+                    {data.canManageMembers ? (
+                      <Label muted style={{ fontSize: 11 }}>
+                        Toucher pour renommer
+                      </Label>
+                    ) : null}
+                  </Pressable>
                 </View>
                 <View
                   style={{
@@ -344,10 +366,10 @@ export function HouseholdScreen() {
                       key={item.id}
                       icon="wallet-outline"
                       title={item.name}
-                      subtitle={`${item.monthlyLimit.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} / mois · ${item.memberIds.length ? `${item.memberIds.length} ${item.memberIds.length === 1 ? 'membre' : 'membres'}` : 'Tout le foyer'}`}
-                      onPress={() => open('budgets', item)}
+                      subtitle={`${item.spent.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} sur ${item.monthlyLimit.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${Math.round(item.usagePercent)} %`}
+                      onPress={data.canManageBudgets ? () => open('budgets', item) : undefined}
                       onDelete={
-                        data.canEdit
+                        data.canManageBudgets
                           ? () => confirmDelete('budgets', item.id, item.name)
                           : undefined
                       }
@@ -362,8 +384,49 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Créer un budget partagé"
-                  disabled={!data.canEdit}
+                  disabled={!data.canManageBudgets}
                   onPress={() => open('budgets')}
+                />
+              </>
+            ) : null}
+            {section === 'expenses' ? (
+              <>
+                <Label style={{ fontSize: 19, fontWeight: '900' }}>Dépenses du foyer</Label>
+                {data.expenses.length ? (
+                  data.expenses.map((item) => (
+                    <Row
+                      key={item.id}
+                      icon={item.source === 'bank' ? 'card-outline' : 'create-outline'}
+                      title={item.title}
+                      subtitle={`${item.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${new Date(`${item.occurredOn}T12:00:00`).toLocaleDateString('fr-FR')} · ${item.splits.length} ${item.splits.length === 1 ? 'personne' : 'personnes'}`}
+                      onPress={() =>
+                        item.source === 'manual' && data.canManageBudgets
+                          ? open('expenses', item)
+                          : undefined
+                      }
+                      onDelete={
+                        data.canManageBudgets
+                          ? () => confirmDelete('expenses', item.id, item.title)
+                          : undefined
+                      }
+                    />
+                  ))
+                ) : (
+                  <Empty
+                    icon="receipt-outline"
+                    title="Aucune dépense partagée"
+                    text="Ajoutez une dépense ou affectez une opération bancaire réelle à votre foyer."
+                  />
+                )}
+                <AddButton
+                  label="Ajouter une dépense"
+                  disabled={!data.canManageBudgets}
+                  onPress={() => open('expenses')}
+                />
+                <AddButton
+                  label="Affecter une opération bancaire"
+                  disabled={!data.canManageBudgets}
+                  onPress={() => open('bank')}
                 />
               </>
             ) : null}
@@ -380,9 +443,11 @@ export function HouseholdScreen() {
                         item.address ??
                         (item.kind === 'primary' ? 'Résidence principale' : 'Résidence secondaire')
                       }
-                      onPress={() => open('homes', item)}
+                      onPress={data.canManageAssets ? () => open('homes', item) : undefined}
                       onDelete={
-                        data.canEdit ? () => confirmDelete('homes', item.id, item.name) : undefined
+                        data.canManageAssets
+                          ? () => confirmDelete('homes', item.id, item.name)
+                          : undefined
                       }
                     />
                   ))
@@ -395,7 +460,7 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Ajouter un logement"
-                  disabled={!data.canEdit}
+                  disabled={!data.canManageAssets}
                   onPress={() => open('homes')}
                 />
               </>
@@ -410,9 +475,9 @@ export function HouseholdScreen() {
                       icon="car-outline"
                       title={item.name}
                       subtitle={item.registration ?? 'Immatriculation non renseignée'}
-                      onPress={() => open('vehicles', item)}
+                      onPress={data.canManageAssets ? () => open('vehicles', item) : undefined}
                       onDelete={
-                        data.canEdit
+                        data.canManageAssets
                           ? () => confirmDelete('vehicles', item.id, item.name)
                           : undefined
                       }
@@ -427,7 +492,7 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Ajouter un véhicule"
-                  disabled={!data.canEdit}
+                  disabled={!data.canManageAssets}
                   onPress={() => open('vehicles')}
                 />
               </>
@@ -442,9 +507,9 @@ export function HouseholdScreen() {
                       icon="document-text-outline"
                       title={item.name}
                       subtitle={`${item.provider ?? item.category}${item.monthlyAmount != null ? ` · ${item.monthlyAmount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}/mois` : ''}`}
-                      onPress={() => open('contracts', item)}
+                      onPress={data.canManageContracts ? () => open('contracts', item) : undefined}
                       onDelete={
-                        data.canEdit
+                        data.canManageContracts
                           ? () => confirmDelete('contracts', item.id, item.name)
                           : undefined
                       }
@@ -459,7 +524,7 @@ export function HouseholdScreen() {
                 )}
                 <AddButton
                   label="Ajouter un contrat"
-                  disabled={!data.canEdit}
+                  disabled={!data.canManageContracts}
                   onPress={() => open('contracts')}
                 />
               </>
@@ -473,6 +538,8 @@ export function HouseholdScreen() {
           kind={editor}
           editing={editing}
           data={data}
+          bankTransactions={bankTransactions.data ?? []}
+          bankTransactionsLoading={bankTransactions.isPending}
           onClose={() => setEditor(null)}
           onSaved={async () => {
             setEditor(null);
@@ -569,12 +636,16 @@ function HouseholdEditor({
   kind,
   editing,
   data,
+  bankTransactions,
+  bankTransactionsLoading,
   onClose,
   onSaved,
 }: {
   kind: Editor;
   editing: Editable;
   data: HouseholdWorkspace;
+  bankTransactions: HouseholdBankTransaction[];
+  bankTransactionsLoading: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -585,8 +656,15 @@ function HouseholdEditor({
   const home = kind === 'homes' ? (editing as HouseholdResidence | null) : null;
   const vehicle = kind === 'vehicles' ? (editing as HouseholdVehicle | null) : null;
   const contract = kind === 'contracts' ? (editing as HouseholdContract | null) : null;
+  const expense = kind === 'expenses' ? (editing as HouseholdExpense | null) : null;
   const [name, setName] = useState(
-    member?.displayName ?? budget?.name ?? home?.name ?? vehicle?.name ?? contract?.name ?? '',
+    member?.displayName ??
+      budget?.name ??
+      home?.name ??
+      vehicle?.name ??
+      contract?.name ??
+      expense?.title ??
+      (kind === 'rename' ? data.name : ''),
   );
   const [relation, setRelation] = useState(member?.relationship ?? 'child');
   const [birthDate, setBirthDate] = useState(member?.birthDate ?? '');
@@ -595,12 +673,20 @@ function HouseholdEditor({
     member?.accountStatus === 'invited' || member?.accountStatus === 'linked',
   );
   const [editorAccess, setEditorAccess] = useState(member?.accessRole === 'editor');
+  const [manageBudgets, setManageBudgets] = useState(member?.canManageBudgets ?? false);
+  const [manageAssets, setManageAssets] = useState(member?.canManageAssets ?? false);
+  const [manageContracts, setManageContracts] = useState(member?.canManageContracts ?? false);
   const [amount, setAmount] = useState(
-    budget?.monthlyLimit?.toString() ?? contract?.monthlyAmount?.toString() ?? '',
+    budget?.monthlyLimit?.toString() ??
+      contract?.monthlyAmount?.toString() ??
+      expense?.amount?.toString() ??
+      '',
   );
-  const [category, setCategory] = useState(budget?.category ?? contract?.category ?? 'other');
+  const [category, setCategory] = useState(
+    budget?.category ?? contract?.category ?? expense?.category ?? 'other',
+  );
   const [notes, setNotes] = useState(
-    budget?.notes ?? home?.notes ?? vehicle?.notes ?? contract?.notes ?? '',
+    budget?.notes ?? home?.notes ?? vehicle?.notes ?? contract?.notes ?? expense?.notes ?? '',
   );
   const [address, setAddress] = useState(home?.address ?? '');
   const [homeKind, setHomeKind] = useState(home?.kind ?? 'primary');
@@ -609,11 +695,19 @@ function HouseholdEditor({
   const [renewalDate, setRenewalDate] = useState(contract?.renewalDate ?? '');
   const [residenceId, setResidenceId] = useState(contract?.residenceId ?? '');
   const [vehicleId, setVehicleId] = useState(contract?.vehicleId ?? '');
-  const [members, setMembers] = useState<string[]>(budget?.memberIds ?? contract?.memberIds ?? []);
+  const [members, setMembers] = useState<string[]>(
+    budget?.memberIds ?? contract?.memberIds ?? expense?.splits.map((x) => x.memberId) ?? [],
+  );
+  const [expenseDate, setExpenseDate] = useState(
+    expense?.occurredOn ?? new Date().toISOString().slice(0, 10),
+  );
+  const [budgetId, setBudgetId] = useState(expense?.budgetId ?? '');
+  const [selectedTransactionId, setSelectedTransactionId] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const save = useMutation({
     mutationFn: async () => {
       if (kind === 'join') return api.acceptHouseholdInvitation(joinCode.trim());
+      if (kind === 'rename') return api.renameHousehold(name.trim());
       if (kind === 'members')
         return api.saveHouseholdMember(member?.id ?? null, {
           displayName: name,
@@ -622,6 +716,9 @@ function HouseholdEditor({
           email: email || null,
           inviteToAccount: invite,
           accessRole: editorAccess ? 'editor' : 'viewer',
+          canManageBudgets: !editorAccess && manageBudgets,
+          canManageAssets: !editorAccess && manageAssets,
+          canManageContracts: !editorAccess && manageContracts,
         });
       const id = editing?.id ?? uid();
       if (kind === 'budgets')
@@ -645,6 +742,25 @@ function HouseholdEditor({
           registration: registration || null,
           notes: notes || null,
         });
+      if (kind === 'expenses')
+        return api.saveHouseholdExpense(id, {
+          title: name,
+          category,
+          amount: Number(amount.replace(',', '.')),
+          occurredOn: expenseDate,
+          budgetId: budgetId || null,
+          notes: notes || null,
+          memberIds: members,
+        });
+      if (kind === 'bank') {
+        const selected = bankTransactions.find((x) => x.id === selectedTransactionId);
+        return api.assignHouseholdTransaction({
+          transactionId: selectedTransactionId,
+          budgetId: budgetId || null,
+          notes: notes || null,
+          memberIds: members.length ? members : selected ? [selected.memberId] : [],
+        });
+      }
       return api.saveHouseholdContract(id, {
         name,
         category,
@@ -658,11 +774,18 @@ function HouseholdEditor({
       });
     },
     onSuccess: async (result) => {
-      if (kind === 'members' && 'invitationCode' in result && result.invitationCode)
-        Alert.alert(
-          'Invitation créée',
-          `Transmettez ce code à ${result.displayName} :\n\n${result.invitationCode}\n\nIl expire dans 7 jours.`,
-        );
+      if (kind === 'members' && 'invitationCode' in result && result.invitationCode) {
+        const invitation = `Rejoignez mon foyer dans l’application avec ce code : ${result.invitationCode}. Il expire dans 7 jours.`;
+        if (result.invitationEmailSent)
+          Alert.alert('Invitation envoyée', `L’invitation a été envoyée à ${result.email}.`);
+        else {
+          Alert.alert('Invitation prête à partager', invitation);
+          await Share.share({
+            title: `Invitation pour ${result.displayName}`,
+            message: invitation,
+          });
+        }
+      }
       await onSaved();
     },
     onError: (error) => Alert.alert('Enregistrement impossible', message(error)),
@@ -670,7 +793,11 @@ function HouseholdEditor({
   const title =
     kind === 'join'
       ? 'Rejoindre un foyer'
-      : `${editing ? 'Modifier' : 'Ajouter'} ${kind === 'members' ? 'une personne' : kind === 'budgets' ? 'un budget' : kind === 'homes' ? 'un logement' : kind === 'vehicles' ? 'un véhicule' : 'un contrat'}`;
+      : kind === 'rename'
+        ? 'Renommer le foyer'
+        : kind === 'bank'
+          ? 'Affecter une opération'
+          : `${editing ? 'Modifier' : 'Ajouter'} ${kind === 'members' ? 'une personne' : kind === 'budgets' ? 'un budget' : kind === 'expenses' ? 'une dépense' : kind === 'homes' ? 'un logement' : kind === 'vehicles' ? 'un véhicule' : 'un contrat'}`;
   return (
     <Modal visible={kind !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
@@ -711,14 +838,14 @@ function HouseholdEditor({
                   placeholder="Code de 36 caractères"
                 />
               </>
-            ) : (
+            ) : kind !== 'bank' ? (
               <Input
                 label="Nom"
                 value={name}
                 onChangeText={setName}
                 placeholder={kind === 'members' ? 'Prénom ou surnom' : 'Intitulé'}
               />
-            )}
+            ) : null}
             {kind === 'members' ? (
               <>
                 <Label style={{ fontSize: 12, fontWeight: '800' }}>Lien avec vous</Label>
@@ -760,6 +887,27 @@ function HouseholdEditor({
                       </View>
                       <Switch value={editorAccess} onValueChange={setEditorAccess} />
                     </View>
+                    {!editorAccess ? (
+                      <Card style={{ gap: 12, backgroundColor: c.elevated }}>
+                        <Label style={{ fontWeight: '800' }}>Autorisations précises</Label>
+                        {[
+                          ['Gérer les budgets et dépenses', manageBudgets, setManageBudgets],
+                          ['Gérer les logements et véhicules', manageAssets, setManageAssets],
+                          ['Gérer les contrats', manageContracts, setManageContracts],
+                        ].map(([label, value, setter]) => (
+                          <View
+                            key={label as string}
+                            style={{ flexDirection: 'row', alignItems: 'center' }}
+                          >
+                            <Label style={{ flex: 1, fontSize: 13 }}>{label as string}</Label>
+                            <Switch
+                              value={value as boolean}
+                              onValueChange={setter as (value: boolean) => void}
+                            />
+                          </View>
+                        ))}
+                      </Card>
+                    ) : null}
                   </>
                 ) : null}
               </>
@@ -780,6 +928,86 @@ function HouseholdEditor({
                   placeholder="Enfants, courses, vacances…"
                 />
                 <Label style={{ fontSize: 12, fontWeight: '800' }}>Personnes concernées</Label>
+                <Chips
+                  values={data.members.map((x) => [x.id, x.displayName])}
+                  selected={members}
+                  onToggle={(id) =>
+                    setMembers((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]))
+                  }
+                />
+                <Input label="Note facultative" value={notes} onChangeText={setNotes} />
+              </>
+            ) : null}
+            {kind === 'expenses' ? (
+              <>
+                <Input
+                  label="Montant"
+                  value={amount}
+                  onChangeText={setAmount}
+                  placeholder="42,50"
+                  keyboardType="decimal-pad"
+                />
+                <Input
+                  label="Date"
+                  value={expenseDate}
+                  onChangeText={setExpenseDate}
+                  placeholder="AAAA-MM-JJ"
+                />
+                <Input label="Catégorie" value={category} onChangeText={setCategory} />
+                <Label style={{ fontSize: 12, fontWeight: '800' }}>Budget concerné</Label>
+                <Chips
+                  values={[
+                    ['', 'Sans budget'],
+                    ...data.budgets.map((x) => [x.id, x.name] as [string, string]),
+                  ]}
+                  selected={[budgetId]}
+                  onToggle={setBudgetId}
+                />
+                <Label style={{ fontSize: 12, fontWeight: '800' }}>Répartir entre</Label>
+                <Chips
+                  values={data.members.map((x) => [x.id, x.displayName])}
+                  selected={members}
+                  onToggle={(id) =>
+                    setMembers((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]))
+                  }
+                />
+                <Label muted style={{ fontSize: 12 }}>
+                  Le montant est réparti à parts égales, avec un total exact au centime.
+                </Label>
+                <Input label="Note facultative" value={notes} onChangeText={setNotes} />
+              </>
+            ) : null}
+            {kind === 'bank' ? (
+              <>
+                <Label muted>Sélectionnez une dépense bancaire réelle non encore affectée.</Label>
+                {bankTransactionsLoading ? (
+                  <State loading />
+                ) : bankTransactions.length ? (
+                  <Chips
+                    values={bankTransactions.map((x) => [
+                      x.id,
+                      `${x.title} · ${x.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} · ${x.memberName}`,
+                    ])}
+                    selected={[selectedTransactionId]}
+                    onToggle={setSelectedTransactionId}
+                  />
+                ) : (
+                  <Empty
+                    icon="checkmark-circle-outline"
+                    title="Tout est classé"
+                    text="Aucune dépense bancaire disponible ce mois-ci."
+                  />
+                )}
+                <Label style={{ fontSize: 12, fontWeight: '800' }}>Budget concerné</Label>
+                <Chips
+                  values={[
+                    ['', 'Sans budget'],
+                    ...data.budgets.map((x) => [x.id, x.name] as [string, string]),
+                  ]}
+                  selected={[budgetId]}
+                  onToggle={setBudgetId}
+                />
+                <Label style={{ fontSize: 12, fontWeight: '800' }}>Répartir entre</Label>
                 <Chips
                   values={data.members.map((x) => [x.id, x.displayName])}
                   selected={members}
@@ -840,7 +1068,10 @@ function HouseholdEditor({
                   <>
                     <Label style={{ fontSize: 12, fontWeight: '800' }}>Logement lié</Label>
                     <Chips
-                      values={[['', 'Aucun'], ...data.residences.map((x) => [x.id, x.name] as [string, string])]}
+                      values={[
+                        ['', 'Aucun'],
+                        ...data.residences.map((x) => [x.id, x.name] as [string, string]),
+                      ]}
                       selected={[residenceId]}
                       onToggle={setResidenceId}
                     />
@@ -850,7 +1081,10 @@ function HouseholdEditor({
                   <>
                     <Label style={{ fontSize: 12, fontWeight: '800' }}>Véhicule lié</Label>
                     <Chips
-                      values={[['', 'Aucun'], ...data.vehicles.map((x) => [x.id, x.name] as [string, string])]}
+                      values={[
+                        ['', 'Aucun'],
+                        ...data.vehicles.map((x) => [x.id, x.name] as [string, string]),
+                      ]}
                       selected={[vehicleId]}
                       onToggle={setVehicleId}
                     />

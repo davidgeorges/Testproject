@@ -410,6 +410,23 @@ export function DocumentDetailScreen() {
       nav.goBack();
     },
   });
+  const createContract = useMutation({
+    mutationFn: () =>
+      api.createHouseholdContractFromDocument(route.params.id, {
+        name: value.title,
+        notes: null,
+        memberIds: [],
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['household'] });
+      Alert.alert(
+        'Contrat ajouté',
+        'Le contrat est maintenant relié au foyer et son échéance apparaît dans le calendrier.',
+      );
+    },
+    onError: (error) =>
+      Alert.alert('Ajout impossible', error instanceof Error ? error.message : 'Réessayez.'),
+  });
   const openOriginal = async () => {
     try {
       if (Platform.OS === 'web') {
@@ -600,6 +617,29 @@ export function DocumentDetailScreen() {
               {d.extractedText || 'Aucun texte reconnu.'}
             </Label>
           </Card>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ajouter aux contrats du foyer"
+            disabled={createContract.isPending}
+            onPress={() => createContract.mutate()}
+            style={({ pressed }) => ({
+              minHeight: 48,
+              borderRadius: 24,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              backgroundColor: c.elevated,
+              borderWidth: 1,
+              borderColor: c.border,
+              opacity: createContract.isPending ? 0.5 : pressed ? 0.78 : 1,
+            })}
+          >
+            <Ionicons name="people-outline" size={18} color={c.text} />
+            <Label style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>
+              {createContract.isPending ? 'Ajout en cours…' : 'Ajouter aux contrats du foyer'}
+            </Label>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Ouvrir le document original"

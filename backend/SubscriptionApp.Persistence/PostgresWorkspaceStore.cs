@@ -308,6 +308,9 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
     public async Task<bool> RemoveDeadline(string userId, Guid id, CancellationToken ct) =>
         await db.Deadlines.Where(d => d.UserId == userId && d.Id == id).ExecuteDeleteAsync(ct) > 0;
 
+    public async Task<int> RemoveDeadlinesBySource(string sourceType, string sourceId, CancellationToken ct) =>
+        await db.Deadlines.Where(d => d.SourceType == sourceType && d.SourceId == sourceId).ExecuteDeleteAsync(ct);
+
     public async Task<IReadOnlyList<UserDeadline>> DueDeadlineReminders(
         DateTimeOffset now,
         int limit,
@@ -827,8 +830,23 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         if (household.OwnerUserId == userId) return household;
         var member = await db.HouseholdMembers.AsNoTracking().SingleAsync(
             m => m.HouseholdId == household.Id && m.LinkedUserId == userId, ct);
-        if (ownerOnly || member.AccessRole != "editor") throw new UnauthorizedAccessException("HOUSEHOLD_READ_ONLY");
+        if (ownerOnly) throw new UnauthorizedAccessException("HOUSEHOLD_OWNER_REQUIRED");
         return household;
+    }
+
+    private async Task RequirePermission(string userId, Household household, string permission, CancellationToken ct)
+    {
+        if (household.OwnerUserId == userId) return;
+        var member = await db.HouseholdMembers.AsNoTracking().SingleAsync(
+            m => m.HouseholdId == household.Id && m.LinkedUserId == userId, ct);
+        var allowed = member.AccessRole == "editor" || permission switch
+        {
+            "budgets" => member.CanManageBudgets,
+            "assets" => member.CanManageAssets,
+            "contracts" => member.CanManageContracts,
+            _ => false,
+        };
+        if (!allowed) throw new UnauthorizedAccessException("HOUSEHOLD_READ_ONLY");
     }
 
     public async Task<HouseholdSnapshot> Household(string userId, CancellationToken ct)
@@ -847,6 +865,9 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
                 LinkedUserId = userId,
                 AccountStatus = "owner",
                 AccessRole = "owner",
+                CanManageBudgets = true,
+                CanManageAssets = true,
+                CanManageContracts = true,
             });
             try { await db.SaveChangesAsync(ct); }
             catch (DbUpdateException exception) when (IsUniqueViolation(exception))
@@ -865,14 +886,30 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         var contracts = await db.HouseholdContracts.AsNoTracking().Where(x => x.HouseholdId == household.Id).OrderBy(x => x.Name).ToListAsync(ct);
         var contractIds = contracts.Select(x => x.Id).ToArray();
         var contractLinks = await db.HouseholdContractMembers.AsNoTracking().Where(x => contractIds.Contains(x.ContractId)).ToListAsync(ct);
+        var expenses = await db.HouseholdExpenses.AsNoTracking().Where(x => x.HouseholdId == household.Id)
+            .OrderByDescending(x => x.OccurredOn).ThenByDescending(x => x.CreatedAt).Take(500).ToListAsync(ct);
+        var expenseIds = expenses.Select(x => x.Id).ToArray();
+        var expenseSplits = await db.HouseholdExpenseSplits.AsNoTracking().Where(x => expenseIds.Contains(x.ExpenseId)).ToListAsync(ct);
         var current = members.FirstOrDefault(x => x.LinkedUserId == userId);
         return new HouseholdSnapshot(
             household, members, budgets,
             budgetLinks.GroupBy(x => x.BudgetId).ToDictionary(x => x.Key, x => x.Select(y => y.MemberId).ToArray()),
             residences, vehicles, contracts,
             contractLinks.GroupBy(x => x.ContractId).ToDictionary(x => x.Key, x => x.Select(y => y.MemberId).ToArray()),
+            expenses,
+            expenseSplits.GroupBy(x => x.ExpenseId).ToDictionary(x => x.Key, x => (IReadOnlyList<HouseholdExpenseSplit>)x.ToArray()),
             household.OwnerUserId == userId,
-            household.OwnerUserId == userId || current?.AccessRole == "editor");
+            household.OwnerUserId == userId || current?.AccessRole == "editor",
+            household.OwnerUserId == userId || current?.AccessRole == "editor" || current?.CanManageBudgets == true,
+            household.OwnerUserId == userId || current?.AccessRole == "editor" || current?.CanManageAssets == true,
+            household.OwnerUserId == userId || current?.AccessRole == "editor" || current?.CanManageContracts == true);
+    }
+
+    public async Task<Household> RenameHousehold(string userId, string name, CancellationToken ct)
+    {
+        var household = await EditableHousehold(userId, true, ct);
+        household.Name = name; household.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct); return household;
     }
 
     public async Task<HouseholdMember> SaveHouseholdMember(string userId, HouseholdMember member, CancellationToken ct)
@@ -887,6 +924,8 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             existing.DisplayName = member.DisplayName; existing.Relationship = member.Relationship;
             existing.BirthDate = member.BirthDate; existing.Email = member.Email;
             existing.AccessRole = member.AccessRole; existing.AccountStatus = member.AccountStatus;
+            existing.CanManageBudgets = member.CanManageBudgets; existing.CanManageAssets = member.CanManageAssets;
+            existing.CanManageContracts = member.CanManageContracts;
             existing.InvitationTokenHash = member.InvitationTokenHash; existing.InvitationExpiresAt = member.InvitationExpiresAt;
             existing.UpdatedAt = member.UpdatedAt; member = existing;
         }
@@ -934,6 +973,7 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
     public async Task<HouseholdBudget> SaveHouseholdBudget(string userId, HouseholdBudget budget, IReadOnlyList<Guid> memberIds, CancellationToken ct)
     {
         var household = await EditableHousehold(userId, false, ct);
+        await RequirePermission(userId, household, "budgets", ct);
         if (budget.HouseholdId != household.Id) throw new UnauthorizedAccessException();
         var existing = await db.HouseholdBudgets.SingleOrDefaultAsync(x => x.Id == budget.Id && x.HouseholdId == household.Id, ct);
         if (existing is null) { db.HouseholdBudgets.Add(budget); await db.SaveChangesAsync(ct); }
@@ -943,36 +983,70 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
     }
 
     public async Task<bool> RemoveHouseholdBudget(string userId, Guid id, CancellationToken ct)
-    { var h = await EditableHousehold(userId, false, ct); return await db.HouseholdBudgets.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
+    { var h = await EditableHousehold(userId, false, ct); await RequirePermission(userId, h, "budgets", ct); return await db.HouseholdBudgets.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
+
+    public async Task<HouseholdExpense> SaveHouseholdExpense(string userId, HouseholdExpense value, IReadOnlyList<HouseholdExpenseSplit> splits, CancellationToken ct)
+    {
+        var h = await EditableHousehold(userId, false, ct); await RequirePermission(userId, h, "budgets", ct);
+        if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException();
+        if (value.BudgetId is Guid budgetId && !await db.HouseholdBudgets.AnyAsync(x => x.Id == budgetId && x.HouseholdId == h.Id, ct)) throw new InvalidOperationException("INVALID_BUDGET");
+        if (value.BankTransactionId is Guid transactionId)
+        {
+            var memberUserIds = await db.HouseholdMembers.Where(x => x.HouseholdId == h.Id && x.LinkedUserId != null).Select(x => x.LinkedUserId!).ToListAsync(ct);
+            if (!await db.Transactions.AnyAsync(x => x.Id == transactionId && memberUserIds.Contains(x.UserId), ct)) throw new InvalidOperationException("INVALID_TRANSACTION");
+            if (await db.HouseholdExpenses.AnyAsync(x => x.BankTransactionId == transactionId && x.Id != value.Id, ct)) throw new InvalidOperationException("TRANSACTION_ALREADY_ASSIGNED");
+        }
+        var memberIds = splits.Select(x => x.MemberId).Distinct().ToArray();
+        var validCount = await db.HouseholdMembers.CountAsync(x => x.HouseholdId == h.Id && memberIds.Contains(x.Id), ct);
+        if (validCount != memberIds.Length || Math.Abs(splits.Sum(x => x.Amount) - value.Amount) > 0.01m) throw new InvalidOperationException("INVALID_SPLIT");
+        var existing = await db.HouseholdExpenses.SingleOrDefaultAsync(x => x.Id == value.Id && x.HouseholdId == h.Id, ct);
+        if (existing is null) db.HouseholdExpenses.Add(value);
+        else
+        {
+            existing.BudgetId = value.BudgetId; existing.Title = value.Title; existing.Category = value.Category;
+            existing.Amount = value.Amount; existing.OccurredOn = value.OccurredOn; existing.Notes = value.Notes; existing.UpdatedAt = value.UpdatedAt;
+            value = existing;
+        }
+        await db.SaveChangesAsync(ct);
+        await db.HouseholdExpenseSplits.Where(x => x.ExpenseId == value.Id).ExecuteDeleteAsync(ct);
+        db.HouseholdExpenseSplits.AddRange(splits.Select(x => new HouseholdExpenseSplit { ExpenseId = value.Id, MemberId = x.MemberId, Amount = x.Amount }));
+        await db.SaveChangesAsync(ct); return value;
+    }
+
+    public async Task<bool> RemoveHouseholdExpense(string userId, Guid id, CancellationToken ct)
+    { var h = await EditableHousehold(userId, false, ct); await RequirePermission(userId, h, "budgets", ct); return await db.HouseholdExpenses.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
 
     public async Task<HouseholdResidence> SaveHouseholdResidence(string userId, HouseholdResidence value, CancellationToken ct)
     {
         var h = await EditableHousehold(userId, false, ct); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException();
+        await RequirePermission(userId, h, "assets", ct);
         var existing = await db.HouseholdResidences.SingleOrDefaultAsync(x => x.Id == value.Id && x.HouseholdId == h.Id, ct);
         if (existing is null) db.HouseholdResidences.Add(value); else { existing.Name = value.Name; existing.Kind = value.Kind; existing.Address = value.Address; existing.Notes = value.Notes; existing.UpdatedAt = value.UpdatedAt; value = existing; }
         await db.SaveChangesAsync(ct); return value;
     }
     public async Task<bool> RemoveHouseholdResidence(string userId, Guid id, CancellationToken ct)
-    { var h = await EditableHousehold(userId, false, ct); return await db.HouseholdResidences.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
+    { var h = await EditableHousehold(userId, false, ct); await RequirePermission(userId, h, "assets", ct); return await db.HouseholdResidences.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
 
     public async Task<HouseholdVehicle> SaveHouseholdVehicle(string userId, HouseholdVehicle value, CancellationToken ct)
     {
         var h = await EditableHousehold(userId, false, ct); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException();
+        await RequirePermission(userId, h, "assets", ct);
         var existing = await db.HouseholdVehicles.SingleOrDefaultAsync(x => x.Id == value.Id && x.HouseholdId == h.Id, ct);
         if (existing is null) db.HouseholdVehicles.Add(value); else { existing.Name = value.Name; existing.Registration = value.Registration; existing.Notes = value.Notes; existing.UpdatedAt = value.UpdatedAt; value = existing; }
         await db.SaveChangesAsync(ct); return value;
     }
     public async Task<bool> RemoveHouseholdVehicle(string userId, Guid id, CancellationToken ct)
-    { var h = await EditableHousehold(userId, false, ct); return await db.HouseholdVehicles.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
+    { var h = await EditableHousehold(userId, false, ct); await RequirePermission(userId, h, "assets", ct); return await db.HouseholdVehicles.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
 
     public async Task<HouseholdContract> SaveHouseholdContract(string userId, HouseholdContract value, IReadOnlyList<Guid> memberIds, CancellationToken ct)
     {
         var h = await EditableHousehold(userId, false, ct); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException();
+        await RequirePermission(userId, h, "contracts", ct);
         if (value.ResidenceId is Guid rid && !await db.HouseholdResidences.AnyAsync(x => x.Id == rid && x.HouseholdId == h.Id, ct)) throw new InvalidOperationException("INVALID_RESIDENCE");
         if (value.VehicleId is Guid vid && !await db.HouseholdVehicles.AnyAsync(x => x.Id == vid && x.HouseholdId == h.Id, ct)) throw new InvalidOperationException("INVALID_VEHICLE");
         var existing = await db.HouseholdContracts.SingleOrDefaultAsync(x => x.Id == value.Id && x.HouseholdId == h.Id, ct);
         if (existing is null) { db.HouseholdContracts.Add(value); await db.SaveChangesAsync(ct); }
-        else { existing.Name = value.Name; existing.Category = value.Category; existing.Provider = value.Provider; existing.MonthlyAmount = value.MonthlyAmount; existing.RenewalDate = value.RenewalDate; existing.ResidenceId = value.ResidenceId; existing.VehicleId = value.VehicleId; existing.Notes = value.Notes; existing.UpdatedAt = value.UpdatedAt; value = existing; }
+        else { existing.Name = value.Name; existing.Category = value.Category; existing.Provider = value.Provider; existing.MonthlyAmount = value.MonthlyAmount; existing.RenewalDate = value.RenewalDate; existing.ResidenceId = value.ResidenceId; existing.VehicleId = value.VehicleId; existing.SourceDocumentId = value.SourceDocumentId; existing.Notes = value.Notes; existing.UpdatedAt = value.UpdatedAt; value = existing; }
         var valid = await db.HouseholdMembers.Where(x => x.HouseholdId == h.Id && memberIds.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
         if (valid.Count != memberIds.Distinct().Count()) throw new InvalidOperationException("INVALID_MEMBER");
         await db.HouseholdContractMembers.Where(x => x.ContractId == value.Id).ExecuteDeleteAsync(ct);
@@ -980,5 +1054,5 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         await db.SaveChangesAsync(ct); return value;
     }
     public async Task<bool> RemoveHouseholdContract(string userId, Guid id, CancellationToken ct)
-    { var h = await EditableHousehold(userId, false, ct); return await db.HouseholdContracts.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
+    { var h = await EditableHousehold(userId, false, ct); await RequirePermission(userId, h, "contracts", ct); return await db.HouseholdContracts.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
 }

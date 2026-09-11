@@ -19,6 +19,7 @@ import type {
   DocumentCategory,
   HouseholdWorkspace,
   HouseholdMember,
+  HouseholdBankTransaction,
 } from '../types/api';
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ??
@@ -292,6 +293,8 @@ export const api = {
   deleteDeadline: (id: string) =>
     request(`/deadlines/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   household: () => request<HouseholdWorkspace>('/household'),
+  renameHousehold: (name: string) =>
+    request<HouseholdWorkspace>('/household', { method: 'PATCH', body: JSON.stringify({ name }) }),
   saveHouseholdMember: (
     id: string | null,
     value: {
@@ -301,6 +304,9 @@ export const api = {
       email: string | null;
       inviteToAccount: boolean;
       accessRole: 'viewer' | 'editor';
+      canManageBudgets?: boolean;
+      canManageAssets?: boolean;
+      canManageContracts?: boolean;
     },
   ) =>
     request<HouseholdMember>(
@@ -324,6 +330,22 @@ export const api = {
     }),
   deleteHouseholdBudget: (id: string) =>
     request(`/household/budgets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  householdBankTransactions: (month: string) =>
+    request<HouseholdBankTransaction[]>(
+      `/household/bank-transactions?month=${encodeURIComponent(month)}`,
+    ),
+  saveHouseholdExpense: (id: string, value: object) =>
+    request<HouseholdWorkspace>(`/household/expenses/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(value),
+    }),
+  assignHouseholdTransaction: (value: object) =>
+    request<HouseholdWorkspace>('/household/expenses/from-transaction', {
+      method: 'POST',
+      body: JSON.stringify(value),
+    }),
+  deleteHouseholdExpense: (id: string) =>
+    request(`/household/expenses/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   saveHouseholdResidence: (id: string, value: object) =>
     request<HouseholdWorkspace>(`/household/residences/${encodeURIComponent(id)}`, {
       method: 'PUT',
@@ -345,6 +367,11 @@ export const api = {
     }),
   deleteHouseholdContract: (id: string) =>
     request(`/household/contracts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createHouseholdContractFromDocument: (id: string, value: object) =>
+    request<HouseholdWorkspace>(`/documents/${encodeURIComponent(id)}/household-contract`, {
+      method: 'POST',
+      body: JSON.stringify(value),
+    }),
   verifyRevenueCat: (productId: string, transactionId: string, key: string) =>
     request<PremiumStatus>('/premium/verify-purchase', {
       method: 'POST',

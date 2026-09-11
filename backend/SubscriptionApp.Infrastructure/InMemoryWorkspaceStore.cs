@@ -33,6 +33,8 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     private readonly List<HouseholdMember> householdMembers = [];
     private readonly List<HouseholdBudget> householdBudgets = [];
     private readonly List<HouseholdBudgetMember> householdBudgetMembers = [];
+    private readonly List<HouseholdExpense> householdExpenses = [];
+    private readonly List<HouseholdExpenseSplit> householdExpenseSplits = [];
     private readonly List<HouseholdResidence> householdResidences = [];
     private readonly List<HouseholdVehicle> householdVehicles = [];
     private readonly List<HouseholdContract> householdContracts = [];
@@ -109,6 +111,8 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     {
         lock (gate) return Task.FromResult(deadlines.RemoveAll(d => d.UserId == userId && d.Id == id) > 0);
     }
+    public Task<int> RemoveDeadlinesBySource(string sourceType, string sourceId, CancellationToken ct)
+    { lock (gate) return Task.FromResult(deadlines.RemoveAll(d => d.SourceType == sourceType && d.SourceId == sourceId)); }
 
     public Task<IReadOnlyList<UserDeadline>> DueDeadlineReminders(DateTimeOffset now, int limit, CancellationToken ct)
     {
@@ -943,8 +947,16 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
         var household = AccessibleHousehold(userId) ?? throw new InvalidOperationException("HOUSEHOLD_NOT_FOUND");
         if (household.OwnerUserId == userId) return household;
         var member = householdMembers.Single(m => m.HouseholdId == household.Id && m.LinkedUserId == userId);
-        if (ownerOnly || member.AccessRole != "editor") throw new UnauthorizedAccessException("HOUSEHOLD_READ_ONLY");
+        if (ownerOnly) throw new UnauthorizedAccessException("HOUSEHOLD_OWNER_REQUIRED");
         return household;
+    }
+
+    private void RequirePermission(string userId, Household h, string permission)
+    {
+        if (h.OwnerUserId == userId) return;
+        var member = householdMembers.Single(x => x.HouseholdId == h.Id && x.LinkedUserId == userId);
+        var allowed = member.AccessRole == "editor" || permission switch { "budgets" => member.CanManageBudgets, "assets" => member.CanManageAssets, "contracts" => member.CanManageContracts, _ => false };
+        if (!allowed) throw new UnauthorizedAccessException("HOUSEHOLD_READ_ONLY");
     }
 
     public Task<HouseholdSnapshot> Household(string userId, CancellationToken ct)
@@ -957,7 +969,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
                 var profile = profiles.TryGetValue(userId, out var p) ? p : profiles[userId] = new() { Id = userId, FirstName = "Utilisateur" };
                 household = new Household { OwnerUserId = userId };
                 households.Add(household);
-                householdMembers.Add(new HouseholdMember { HouseholdId = household.Id, DisplayName = profile.FirstName, Relationship = "self", LinkedUserId = userId, AccountStatus = "owner", AccessRole = "owner" });
+                householdMembers.Add(new HouseholdMember { HouseholdId = household.Id, DisplayName = profile.FirstName, Relationship = "self", LinkedUserId = userId, AccountStatus = "owner", AccessRole = "owner", CanManageBudgets = true, CanManageAssets = true, CanManageContracts = true });
             }
             var members = householdMembers.Where(x => x.HouseholdId == household.Id).OrderBy(x => x.CreatedAt).ToArray();
             var budgets = householdBudgets.Where(x => x.HouseholdId == household.Id).OrderBy(x => x.Name).ToArray();
@@ -970,10 +982,18 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
                 householdVehicles.Where(x => x.HouseholdId == household.Id).OrderBy(x => x.Name).ToArray(),
                 contracts,
                 householdContractMembers.Where(x => contracts.Any(c => c.Id == x.ContractId)).GroupBy(x => x.ContractId).ToDictionary(x => x.Key, x => x.Select(y => y.MemberId).ToArray()),
+                householdExpenses.Where(x => x.HouseholdId == household.Id).OrderByDescending(x => x.OccurredOn).Take(500).ToArray(),
+                householdExpenseSplits.Where(x => householdExpenses.Any(e => e.HouseholdId == household.Id && e.Id == x.ExpenseId)).GroupBy(x => x.ExpenseId).ToDictionary(x => x.Key, x => (IReadOnlyList<HouseholdExpenseSplit>)x.ToArray()),
                 household.OwnerUserId == userId,
-                household.OwnerUserId == userId || current?.AccessRole == "editor"));
+                household.OwnerUserId == userId || current?.AccessRole == "editor",
+                household.OwnerUserId == userId || current?.AccessRole == "editor" || current?.CanManageBudgets == true,
+                household.OwnerUserId == userId || current?.AccessRole == "editor" || current?.CanManageAssets == true,
+                household.OwnerUserId == userId || current?.AccessRole == "editor" || current?.CanManageContracts == true));
         }
     }
+
+    public Task<Household> RenameHousehold(string userId, string name, CancellationToken ct)
+    { lock (gate) { var h = EditableHousehold(userId, true); h.Name = name; h.UpdatedAt = DateTimeOffset.UtcNow; return Task.FromResult(h); } }
 
     public Task<HouseholdMember> SaveHouseholdMember(string userId, HouseholdMember value, CancellationToken ct)
     {
@@ -987,19 +1007,23 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     { lock (gate) { var m = householdMembers.FirstOrDefault(x => x.InvitationTokenHash == tokenHash && x.InvitationExpiresAt > now); if (m is null) return Task.FromResult(false); var current = AccessibleHousehold(userId); if (current is not null) { var empty = householdMembers.Count(x => x.HouseholdId == current.Id) == 1 && !householdBudgets.Any(x => x.HouseholdId == current.Id) && !householdResidences.Any(x => x.HouseholdId == current.Id) && !householdVehicles.Any(x => x.HouseholdId == current.Id) && !householdContracts.Any(x => x.HouseholdId == current.Id); if (!empty || current.OwnerUserId != userId) return Task.FromResult(false); householdMembers.RemoveAll(x => x.HouseholdId == current.Id); households.Remove(current); } if (!profiles.ContainsKey(userId)) profiles[userId] = new() { Id = userId, FirstName = "Utilisateur" }; m.LinkedUserId = userId; m.AccountStatus = "linked"; m.InvitationTokenHash = null; m.InvitationExpiresAt = null; m.UpdatedAt = now; return Task.FromResult(true); } }
 
     public Task<HouseholdBudget> SaveHouseholdBudget(string userId, HouseholdBudget value, IReadOnlyList<Guid> memberIds, CancellationToken ct)
-    { lock (gate) { var h = EditableHousehold(userId, false); if (value.HouseholdId != h.Id || memberIds.Any(id => !householdMembers.Any(m => m.Id == id && m.HouseholdId == h.Id))) throw new InvalidOperationException("INVALID_MEMBER"); householdBudgets.RemoveAll(x => x.Id == value.Id); householdBudgets.Add(value); householdBudgetMembers.RemoveAll(x => x.BudgetId == value.Id); householdBudgetMembers.AddRange(memberIds.Distinct().Select(id => new HouseholdBudgetMember { BudgetId = value.Id, MemberId = id })); return Task.FromResult(value); } }
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "budgets"); if (value.HouseholdId != h.Id || memberIds.Any(id => !householdMembers.Any(m => m.Id == id && m.HouseholdId == h.Id))) throw new InvalidOperationException("INVALID_MEMBER"); householdBudgets.RemoveAll(x => x.Id == value.Id); householdBudgets.Add(value); householdBudgetMembers.RemoveAll(x => x.BudgetId == value.Id); householdBudgetMembers.AddRange(memberIds.Distinct().Select(id => new HouseholdBudgetMember { BudgetId = value.Id, MemberId = id })); return Task.FromResult(value); } }
     public Task<bool> RemoveHouseholdBudget(string userId, Guid id, CancellationToken ct)
-    { lock (gate) { var h = EditableHousehold(userId, false); var removed = householdBudgets.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdBudgetMembers.RemoveAll(x => x.BudgetId == id); return Task.FromResult(removed); } }
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "budgets"); var removed = householdBudgets.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdBudgetMembers.RemoveAll(x => x.BudgetId == id); return Task.FromResult(removed); } }
+    public Task<HouseholdExpense> SaveHouseholdExpense(string userId, HouseholdExpense value, IReadOnlyList<HouseholdExpenseSplit> splits, CancellationToken ct)
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "budgets"); if (value.HouseholdId != h.Id || splits.Any(s => !householdMembers.Any(m => m.Id == s.MemberId && m.HouseholdId == h.Id)) || Math.Abs(splits.Sum(s => s.Amount) - value.Amount) > 0.01m) throw new InvalidOperationException("INVALID_SPLIT"); householdExpenses.RemoveAll(x => x.Id == value.Id); householdExpenses.Add(value); householdExpenseSplits.RemoveAll(x => x.ExpenseId == value.Id); householdExpenseSplits.AddRange(splits); return Task.FromResult(value); } }
+    public Task<bool> RemoveHouseholdExpense(string userId, Guid id, CancellationToken ct)
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "budgets"); var removed = householdExpenses.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdExpenseSplits.RemoveAll(x => x.ExpenseId == id); return Task.FromResult(removed); } }
     public Task<HouseholdResidence> SaveHouseholdResidence(string userId, HouseholdResidence value, CancellationToken ct)
-    { lock (gate) { var h = EditableHousehold(userId, false); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException(); householdResidences.RemoveAll(x => x.Id == value.Id); householdResidences.Add(value); return Task.FromResult(value); } }
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "assets"); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException(); householdResidences.RemoveAll(x => x.Id == value.Id); householdResidences.Add(value); return Task.FromResult(value); } }
     public Task<bool> RemoveHouseholdResidence(string userId, Guid id, CancellationToken ct)
-    { lock (gate) { var h = EditableHousehold(userId, false); var removed = householdResidences.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdContracts.Where(x => x.ResidenceId == id).ToList().ForEach(x => x.ResidenceId = null); return Task.FromResult(removed); } }
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "assets"); var removed = householdResidences.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdContracts.Where(x => x.ResidenceId == id).ToList().ForEach(x => x.ResidenceId = null); return Task.FromResult(removed); } }
     public Task<HouseholdVehicle> SaveHouseholdVehicle(string userId, HouseholdVehicle value, CancellationToken ct)
-    { lock (gate) { var h = EditableHousehold(userId, false); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException(); householdVehicles.RemoveAll(x => x.Id == value.Id); householdVehicles.Add(value); return Task.FromResult(value); } }
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "assets"); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException(); householdVehicles.RemoveAll(x => x.Id == value.Id); householdVehicles.Add(value); return Task.FromResult(value); } }
     public Task<bool> RemoveHouseholdVehicle(string userId, Guid id, CancellationToken ct)
-    { lock (gate) { var h = EditableHousehold(userId, false); var removed = householdVehicles.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdContracts.Where(x => x.VehicleId == id).ToList().ForEach(x => x.VehicleId = null); return Task.FromResult(removed); } }
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "assets"); var removed = householdVehicles.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdContracts.Where(x => x.VehicleId == id).ToList().ForEach(x => x.VehicleId = null); return Task.FromResult(removed); } }
     public Task<HouseholdContract> SaveHouseholdContract(string userId, HouseholdContract value, IReadOnlyList<Guid> memberIds, CancellationToken ct)
-    { lock (gate) { var h = EditableHousehold(userId, false); if (value.HouseholdId != h.Id || memberIds.Any(id => !householdMembers.Any(m => m.Id == id && m.HouseholdId == h.Id))) throw new InvalidOperationException("INVALID_MEMBER"); householdContracts.RemoveAll(x => x.Id == value.Id); householdContracts.Add(value); householdContractMembers.RemoveAll(x => x.ContractId == value.Id); householdContractMembers.AddRange(memberIds.Distinct().Select(id => new HouseholdContractMember { ContractId = value.Id, MemberId = id })); return Task.FromResult(value); } }
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "contracts"); if (value.HouseholdId != h.Id || memberIds.Any(id => !householdMembers.Any(m => m.Id == id && m.HouseholdId == h.Id))) throw new InvalidOperationException("INVALID_MEMBER"); householdContracts.RemoveAll(x => x.Id == value.Id); householdContracts.Add(value); householdContractMembers.RemoveAll(x => x.ContractId == value.Id); householdContractMembers.AddRange(memberIds.Distinct().Select(id => new HouseholdContractMember { ContractId = value.Id, MemberId = id })); return Task.FromResult(value); } }
     public Task<bool> RemoveHouseholdContract(string userId, Guid id, CancellationToken ct)
-    { lock (gate) { var h = EditableHousehold(userId, false); var removed = householdContracts.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdContractMembers.RemoveAll(x => x.ContractId == id); return Task.FromResult(removed); } }
+    { lock (gate) { var h = EditableHousehold(userId, false); RequirePermission(userId, h, "contracts"); var removed = householdContracts.RemoveAll(x => x.Id == id && x.HouseholdId == h.Id) > 0; if (removed) householdContractMembers.RemoveAll(x => x.ContractId == id); return Task.FromResult(removed); } }
 }

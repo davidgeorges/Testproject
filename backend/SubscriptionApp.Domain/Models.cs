@@ -261,6 +261,8 @@ public sealed class UserDeadline
     public int ReminderMinutesBefore { get; set; } = 1440;
     public DateTimeOffset? ReminderSentAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
+    public string SourceType { get; set; } = "manual";
+    public string? SourceId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
@@ -285,6 +287,9 @@ public sealed class HouseholdMember
     public string? LinkedUserId { get; set; }
     public string AccountStatus { get; set; } = "managed";
     public string AccessRole { get; set; } = "viewer";
+    public bool CanManageBudgets { get; set; }
+    public bool CanManageAssets { get; set; }
+    public bool CanManageContracts { get; set; }
     public string? InvitationTokenHash { get; set; }
     public DateTimeOffset? InvitationExpiresAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -301,6 +306,30 @@ public sealed class HouseholdBudget
     public string? Notes { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class HouseholdExpense
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid HouseholdId { get; set; }
+    public Guid? BudgetId { get; set; }
+    public Guid? BankTransactionId { get; set; }
+    public string CreatedByUserId { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Category { get; set; } = "other";
+    public decimal Amount { get; set; }
+    public DateOnly OccurredOn { get; set; }
+    public string Source { get; set; } = "manual";
+    public string? Notes { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class HouseholdExpenseSplit
+{
+    public Guid ExpenseId { get; set; }
+    public Guid MemberId { get; set; }
+    public decimal Amount { get; set; }
 }
 
 public sealed class HouseholdBudgetMember
@@ -343,6 +372,7 @@ public sealed class HouseholdContract
     public DateOnly? RenewalDate { get; set; }
     public Guid? ResidenceId { get; set; }
     public Guid? VehicleId { get; set; }
+    public Guid? SourceDocumentId { get; set; }
     public string? Notes { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -363,8 +393,13 @@ public sealed record HouseholdSnapshot(
     IReadOnlyList<HouseholdVehicle> Vehicles,
     IReadOnlyList<HouseholdContract> Contracts,
     IReadOnlyDictionary<Guid, Guid[]> ContractMemberIds,
+    IReadOnlyList<HouseholdExpense> Expenses,
+    IReadOnlyDictionary<Guid, IReadOnlyList<HouseholdExpenseSplit>> ExpenseSplits,
     bool CanManageMembers,
-    bool CanEdit
+    bool CanEdit,
+    bool CanManageBudgets,
+    bool CanManageAssets,
+    bool CanManageContracts
 );
 
 public sealed class StoredRecurringPayment

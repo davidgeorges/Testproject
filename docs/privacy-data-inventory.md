@@ -13,7 +13,7 @@ Ce document décrit le traitement technique observé. Les bases légales, respon
 | Jeton de notification                          | Livraison des notifications                     | Expo/FCM, PostgreSQL                           | logout, jeton invalide ou suppression du compte  |
 | Documents, texte OCR et informations extraites | Classement, recherche et rappels administratifs | PostgreSQL, traitement local Tesseract/Poppler | suppression du document ou suppression du compte |
 | Échéances, notes et préférences de rappel        | Calendrier et notifications choisies            | PostgreSQL, Expo/FCM pour le push               | suppression de l’échéance ou suppression du compte |
-| Membres du foyer, invitations, budgets, logements, véhicules et contrats | Organisation partagée du foyer | PostgreSQL ; code d’invitation stocké uniquement sous forme d’empreinte | suppression de l’élément, retrait du membre ou suppression du compte propriétaire |
+| Membres, e-mails d’invitation, budgets, dépenses réparties, logements, véhicules et contrats du foyer | Organisation partagée ; calcul du budget par membre | PostgreSQL ; code d’invitation stocké uniquement sous forme d’empreinte ; SMTP configuré pour l’envoi | suppression de l’élément, retrait du membre ou suppression du compte propriétaire |
 | Audits et identifiants de corrélation          | Sécurité et diagnostic                          | PostgreSQL, journaux hébergeur                 | purge actuelle après deux ans ; durée à valider  |
 
 Il reste à renseigner : identité et contact du responsable de traitement, DPO, bases légales, durées exactes, pays de traitement, mécanismes de transfert, liste contractuelle des sous-traitants, destinataires, exercice des droits et décision d’AIPD.

@@ -215,7 +215,7 @@ export interface Deadline {
   reminderMinutesBefore: number | null;
   reminderSentAt: string | null;
   completedAt: string | null;
-  sourceType: 'manual' | 'document';
+  sourceType: 'manual' | 'document' | 'household_contract';
   sourceId: string | null;
   editable: boolean;
 }
@@ -232,6 +232,10 @@ export interface HouseholdMember {
   invitationPending: boolean;
   invitationExpiresAt: string | null;
   invitationCode?: string | null;
+  invitationEmailSent?: boolean;
+  canManageBudgets: boolean;
+  canManageAssets: boolean;
+  canManageContracts: boolean;
 }
 export interface HouseholdBudget {
   id: string;
@@ -240,6 +244,9 @@ export interface HouseholdBudget {
   monthlyLimit: number;
   notes: string | null;
   memberIds: string[];
+  spent: number;
+  remaining: number;
+  usagePercent: number;
 }
 export interface HouseholdResidence {
   id: string;
@@ -263,17 +270,48 @@ export interface HouseholdContract {
   renewalDate: string | null;
   residenceId: string | null;
   vehicleId: string | null;
+  sourceDocumentId: string | null;
   notes: string | null;
   memberIds: string[];
+}
+export interface HouseholdExpenseSplit {
+  expenseId: string;
+  memberId: string;
+  amount: number;
+}
+export interface HouseholdExpense {
+  id: string;
+  budgetId: string | null;
+  bankTransactionId: string | null;
+  title: string;
+  category: string;
+  amount: number;
+  occurredOn: string;
+  source: 'manual' | 'bank';
+  notes: string | null;
+  splits: HouseholdExpenseSplit[];
+}
+export interface HouseholdBankTransaction {
+  id: string;
+  memberId: string;
+  memberName: string;
+  title: string;
+  amount: number;
+  category: string;
+  bookedAt: string;
 }
 export interface HouseholdWorkspace {
   id: string;
   name: string;
   canManageMembers: boolean;
   canEdit: boolean;
+  canManageBudgets: boolean;
+  canManageAssets: boolean;
+  canManageContracts: boolean;
   members: HouseholdMember[];
   budgets: HouseholdBudget[];
   residences: HouseholdResidence[];
   vehicles: HouseholdVehicle[];
   contracts: HouseholdContract[];
+  expenses: HouseholdExpense[];
 }

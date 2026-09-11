@@ -125,6 +125,14 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Single(search);
         Assert.Equal(id, search[0].GetProperty("id").GetGuid());
 
+        var convertedResponse = await c.PostAsJsonAsync($"/api/v1/documents/{id}/household-contract", new
+        { name = (string?)null, notes = (string?)null, memberIds = Array.Empty<Guid>() });
+        convertedResponse.EnsureSuccessStatusCode();
+        var converted = await convertedResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var contract = converted.GetProperty("contracts").EnumerateArray().Single(x => x.GetProperty("sourceDocumentId").GetGuid() == id);
+        Assert.Equal("Facture électricité", contract.GetProperty("name").GetString());
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/household/contracts/{contract.GetProperty("id").GetGuid()}")).StatusCode);
+
         Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/documents/{id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/v1/documents/{id}")).StatusCode);
     }
@@ -199,6 +207,20 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
             x.GetProperty("id").GetGuid() == budgetId
             && x.GetProperty("memberIds")[0].GetGuid() == childId);
 
+        var expenseId = Guid.NewGuid();
+        var expense = await c.PutAsJsonAsync($"/api/v1/household/expenses/{expenseId}", new
+        {
+            title = "Vêtements rentrée", category = "children", amount = 72.35m,
+            occurredOn = DateOnly.FromDateTime(DateTime.UtcNow), budgetId, notes = (string?)null,
+            memberIds = new[] { childId },
+        });
+        expense.EnsureSuccessStatusCode();
+        var expenseJson = await expense.Content.ReadFromJsonAsync<JsonElement>();
+        var trackedBudget = expenseJson.GetProperty("budgets").EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == budgetId);
+        Assert.Equal(72.35m, trackedBudget.GetProperty("spent").GetDecimal());
+        Assert.Equal(227.65m, trackedBudget.GetProperty("remaining").GetDecimal());
+        Assert.Single(expenseJson.GetProperty("expenses").EnumerateArray(), x => x.GetProperty("id").GetGuid() == expenseId);
+
         var homeId = Guid.NewGuid();
         (await c.PutAsJsonAsync($"/api/v1/household/residences/{homeId}", new
         { name = "Maison", kind = "primary", address = "Versailles", notes = (string?)null })).EnsureSuccessStatusCode();
@@ -212,6 +234,8 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
             monthlyAmount = 24.50m, renewalDate = "2027-01-15", residenceId = homeId,
             vehicleId = (Guid?)null, notes = (string?)null, memberIds = new[] { childId },
         })).EnsureSuccessStatusCode();
+        var deadlines = (await c.GetFromJsonAsync<JsonElement[]>("/api/v1/deadlines"))!;
+        Assert.Contains(deadlines, x => x.GetProperty("sourceType").GetString() == "household_contract" && x.GetProperty("sourceId").GetString() == contractId.ToString());
 
         var final = await c.GetFromJsonAsync<JsonElement>("/api/v1/household");
         Assert.Equal(2, final.GetProperty("members").GetArrayLength());
@@ -220,8 +244,47 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Single(final.GetProperty("contracts").EnumerateArray());
 
         Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/household/contracts/{contractId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/household/expenses/{expenseId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/household/budgets/{budgetId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/household/members/{childId}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task HouseholdInvitationLinksTwoAuthenticatedAccountsAndSharesPersistedChanges()
+    {
+        using var owner = await Session();
+        using var guest = await Session();
+        await owner.GetAsync("/api/v1/household");
+        await guest.GetAsync("/api/v1/household");
+        var invitationResponse = await owner.PostAsJsonAsync("/api/v1/household/members", new
+        {
+            displayName = "Compte invité", relationship = "partner", birthDate = (string?)null,
+            email = $"invite-{Guid.NewGuid():N}@example.fr", inviteToAccount = true, accessRole = "viewer",
+            canManageBudgets = true, canManageAssets = false, canManageContracts = false,
+        });
+        invitationResponse.EnsureSuccessStatusCode();
+        var invitation = await invitationResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var code = invitation.GetProperty("invitationCode").GetString();
+        var accepted = await guest.PostAsJsonAsync("/api/v1/household/invitations/accept", new { code });
+        accepted.EnsureSuccessStatusCode();
+        Assert.True((await accepted.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("canManageBudgets").GetBoolean());
+
+        var budgetId = Guid.NewGuid();
+        (await guest.PutAsJsonAsync($"/api/v1/household/budgets/{budgetId}", new
+        { name = "Courses communes", category = "groceries", monthlyLimit = 450m, notes = (string?)null, memberIds = Array.Empty<Guid>() })).EnsureSuccessStatusCode();
+        var ownerView = await owner.GetFromJsonAsync<JsonElement>("/api/v1/household");
+        Assert.Contains(ownerView.GetProperty("budgets").EnumerateArray(), x => x.GetProperty("id").GetGuid() == budgetId);
+        var memberIds = ownerView.GetProperty("members").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToArray();
+        var expenseId = Guid.NewGuid();
+        (await guest.PutAsJsonAsync($"/api/v1/household/expenses/{expenseId}", new
+        { title = "Courses", category = "groceries", amount = 400m, occurredOn = DateOnly.FromDateTime(DateTime.UtcNow), budgetId, notes = (string?)null, memberIds })).EnsureSuccessStatusCode();
+        var ownerNotifications = (await owner.GetFromJsonAsync<JsonElement[]>("/api/v1/notifications"))!;
+        var guestNotifications = (await guest.GetFromJsonAsync<JsonElement[]>("/api/v1/notifications"))!;
+        Assert.Contains(ownerNotifications, x => x.GetProperty("type").GetString() == "household_budget");
+        Assert.Contains(guestNotifications, x => x.GetProperty("type").GetString() == "household_budget");
+        Assert.Equal(HttpStatusCode.NoContent, (await guest.DeleteAsync($"/api/v1/household/expenses/{expenseId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.DeleteAsync($"/api/v1/household/budgets/{budgetId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.DeleteAsync($"/api/v1/household/members/{invitation.GetProperty("id").GetGuid()}")).StatusCode);
     }
 
     [Fact]

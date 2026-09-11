@@ -42,6 +42,7 @@ public interface IWorkspaceStore
     Task AddDeadline(UserDeadline deadline, CancellationToken ct);
     Task SaveDeadline(UserDeadline deadline, CancellationToken ct);
     Task<bool> RemoveDeadline(string userId, Guid id, CancellationToken ct);
+    Task<int> RemoveDeadlinesBySource(string sourceType, string sourceId, CancellationToken ct);
     Task<IReadOnlyList<UserDeadline>> DueDeadlineReminders(DateTimeOffset now, int limit, CancellationToken ct);
     Task MarkDeadlineReminderSent(Guid id, DateTimeOffset sentAt, CancellationToken ct);
     Task<IReadOnlyList<UserDocument>> DueDocumentDeadlines(DateOnly from, DateOnly until, CancellationToken ct);
@@ -102,12 +103,15 @@ public interface IWorkspaceStore
     Task DeleteAccount(string userId, CancellationToken ct);
     Task<int> PurgeExpiredData(DateTimeOffset now, CancellationToken ct);
     Task<HouseholdSnapshot> Household(string userId, CancellationToken ct);
+    Task<Household> RenameHousehold(string userId, string name, CancellationToken ct);
     Task<HouseholdMember> SaveHouseholdMember(string userId, HouseholdMember member, CancellationToken ct);
     Task<bool> RemoveHouseholdMember(string userId, Guid id, CancellationToken ct);
     Task<HouseholdMember?> HouseholdInvitation(string tokenHash, CancellationToken ct);
     Task<bool> AcceptHouseholdInvitation(string userId, string tokenHash, DateTimeOffset now, CancellationToken ct);
     Task<HouseholdBudget> SaveHouseholdBudget(string userId, HouseholdBudget budget, IReadOnlyList<Guid> memberIds, CancellationToken ct);
     Task<bool> RemoveHouseholdBudget(string userId, Guid id, CancellationToken ct);
+    Task<HouseholdExpense> SaveHouseholdExpense(string userId, HouseholdExpense expense, IReadOnlyList<HouseholdExpenseSplit> splits, CancellationToken ct);
+    Task<bool> RemoveHouseholdExpense(string userId, Guid id, CancellationToken ct);
     Task<HouseholdResidence> SaveHouseholdResidence(string userId, HouseholdResidence residence, CancellationToken ct);
     Task<bool> RemoveHouseholdResidence(string userId, Guid id, CancellationToken ct);
     Task<HouseholdVehicle> SaveHouseholdVehicle(string userId, HouseholdVehicle vehicle, CancellationToken ct);
@@ -235,6 +239,12 @@ public interface ITransactionNormalizer
 public interface IDocumentTextExtractor
 {
     Task<DocumentExtraction> Extract(string fileName, string contentType, byte[] content, CancellationToken ct);
+}
+
+public interface IHouseholdInvitationSender
+{
+    bool IsConfigured { get; }
+    Task<bool> Send(string email, string displayName, string code, DateTimeOffset expiresAt, CancellationToken ct);
 }
 
 public sealed record DocumentExtraction(

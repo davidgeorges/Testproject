@@ -36,6 +36,8 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
     public DbSet<HouseholdBudget> HouseholdBudgets => Set<HouseholdBudget>();
     public DbSet<HouseholdBudgetMember> HouseholdBudgetMembers => Set<HouseholdBudgetMember>();
+    public DbSet<HouseholdExpense> HouseholdExpenses => Set<HouseholdExpense>();
+    public DbSet<HouseholdExpenseSplit> HouseholdExpenseSplits => Set<HouseholdExpenseSplit>();
     public DbSet<HouseholdResidence> HouseholdResidences => Set<HouseholdResidence>();
     public DbSet<HouseholdVehicle> HouseholdVehicles => Set<HouseholdVehicle>();
     public DbSet<HouseholdContract> HouseholdContracts => Set<HouseholdContract>();
@@ -268,6 +270,9 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<UserDeadline>().Property(d => d.Title).HasMaxLength(160);
         b.Entity<UserDeadline>().Property(d => d.Category).HasMaxLength(40);
         b.Entity<UserDeadline>().Property(d => d.Notes).HasMaxLength(1000);
+        b.Entity<UserDeadline>().Property(d => d.SourceType).HasMaxLength(40);
+        b.Entity<UserDeadline>().Property(d => d.SourceId).HasMaxLength(80);
+        b.Entity<UserDeadline>().HasIndex(d => new { d.UserId, d.SourceType, d.SourceId }).IsUnique();
         b.Entity<UserDeadline>()
             .HasOne<UserProfile>()
             .WithMany()
@@ -298,6 +303,22 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<HouseholdBudgetMember>().ToTable("household_budget_members").HasKey(x => new { x.BudgetId, x.MemberId });
         b.Entity<HouseholdBudgetMember>().HasOne<HouseholdBudget>().WithMany().HasForeignKey(x => x.BudgetId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<HouseholdBudgetMember>().HasOne<HouseholdMember>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<HouseholdExpense>().ToTable("household_expenses").HasKey(x => x.Id);
+        b.Entity<HouseholdExpense>().HasIndex(x => new { x.HouseholdId, x.OccurredOn });
+        b.Entity<HouseholdExpense>().HasIndex(x => x.BankTransactionId).IsUnique();
+        b.Entity<HouseholdExpense>().Property(x => x.Title).HasMaxLength(160);
+        b.Entity<HouseholdExpense>().Property(x => x.Category).HasMaxLength(40);
+        b.Entity<HouseholdExpense>().Property(x => x.Source).HasMaxLength(20);
+        b.Entity<HouseholdExpense>().Property(x => x.Notes).HasMaxLength(500);
+        b.Entity<HouseholdExpense>().Property(x => x.Amount).HasPrecision(18, 2);
+        b.Entity<HouseholdExpense>().HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<HouseholdExpense>().HasOne<HouseholdBudget>().WithMany().HasForeignKey(x => x.BudgetId).OnDelete(DeleteBehavior.SetNull);
+        b.Entity<HouseholdExpense>().HasOne<BankTransaction>().WithMany().HasForeignKey(x => x.BankTransactionId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<HouseholdExpense>().HasOne<UserProfile>().WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<HouseholdExpenseSplit>().ToTable("household_expense_splits").HasKey(x => new { x.ExpenseId, x.MemberId });
+        b.Entity<HouseholdExpenseSplit>().Property(x => x.Amount).HasPrecision(18, 2);
+        b.Entity<HouseholdExpenseSplit>().HasOne<HouseholdExpense>().WithMany().HasForeignKey(x => x.ExpenseId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<HouseholdExpenseSplit>().HasOne<HouseholdMember>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<HouseholdResidence>().ToTable("household_residences").HasKey(x => x.Id);
         b.Entity<HouseholdResidence>().HasIndex(x => x.HouseholdId);
         b.Entity<HouseholdResidence>().Property(x => x.Name).HasMaxLength(80);
@@ -313,6 +334,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<HouseholdVehicle>().HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<HouseholdContract>().ToTable("household_contracts").HasKey(x => x.Id);
         b.Entity<HouseholdContract>().HasIndex(x => new { x.HouseholdId, x.Category });
+        b.Entity<HouseholdContract>().HasIndex(x => x.SourceDocumentId).IsUnique();
         b.Entity<HouseholdContract>().Property(x => x.Name).HasMaxLength(100);
         b.Entity<HouseholdContract>().Property(x => x.Category).HasMaxLength(40);
         b.Entity<HouseholdContract>().Property(x => x.Provider).HasMaxLength(100);
@@ -321,6 +343,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<HouseholdContract>().HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<HouseholdContract>().HasOne<HouseholdResidence>().WithMany().HasForeignKey(x => x.ResidenceId).OnDelete(DeleteBehavior.SetNull);
         b.Entity<HouseholdContract>().HasOne<HouseholdVehicle>().WithMany().HasForeignKey(x => x.VehicleId).OnDelete(DeleteBehavior.SetNull);
+        b.Entity<HouseholdContract>().HasOne<UserDocument>().WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.SetNull);
         b.Entity<HouseholdContractMember>().ToTable("household_contract_members").HasKey(x => new { x.ContractId, x.MemberId });
         b.Entity<HouseholdContractMember>().HasOne<HouseholdContract>().WithMany().HasForeignKey(x => x.ContractId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<HouseholdContractMember>().HasOne<HouseholdMember>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Cascade);

@@ -110,4 +110,8 @@ Le suivi détaillé des exigences et les décisions sont dans [docs/implementati
 
 ## Foyer partagé
 
-L’écran **Foyer** gère des membres avec ou sans compte, des invitations temporaires, des budgets mensuels affectés à plusieurs personnes, les logements, les véhicules et les contrats. Les enfants et proches peuvent rester de simples profils gérés : aucune inscription n’est nécessaire pour les inclure dans un budget. Toutes les données sont persistées dans PostgreSQL et incluses dans l’export du compte.
+L’écran **Foyer** gère des membres avec ou sans compte, des invitations temporaires partageables par e-mail, des droits détaillés, des budgets mensuels, les logements, les véhicules et les contrats. Les enfants et proches peuvent rester de simples profils gérés : aucune inscription n’est nécessaire pour les inclure dans un budget.
+
+Les budgets utilisent un grand livre PostgreSQL réel. Une dépense peut être saisie manuellement ou provenir d’une transaction bancaire d’un membre lié, puis être affectée à un budget et répartie entre plusieurs personnes. L’API calcule le consommé, le restant et le taux mensuel ; un franchissement de 80 % ou 100 % crée une notification unique pour tous les comptes liés. Un document peut être confirmé comme contrat du foyer et sa date de renouvellement devient une échéance partagée avec rappel.
+
+L’envoi automatique des invitations utilise SMTP lorsqu’il est configuré avec `InvitationEmail__SmtpHost`, `InvitationEmail__SmtpPort`, `InvitationEmail__SmtpUser`, `InvitationEmail__SmtpPassword`, `InvitationEmail__From` et `InvitationEmail__EnableSsl`. Sans serveur SMTP, l’application ouvre le partage natif avec le code temporaire au lieu de perdre l’invitation.

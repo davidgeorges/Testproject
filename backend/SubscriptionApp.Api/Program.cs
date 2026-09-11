@@ -158,6 +158,21 @@ builder.Services.AddSingleton<SavingsEngine>();
 builder.Services.AddSingleton<ITransactionNormalizer, TransactionNormalizer>();
 builder.Services.AddScoped<FinanceService>();
 builder.Services.AddSingleton<IDocumentTextExtractor, LocalDocumentTextExtractor>();
+var invitationHost = builder.Configuration["InvitationEmail:SmtpHost"];
+var invitationUser = builder.Configuration["InvitationEmail:SmtpUser"];
+var invitationPassword = builder.Configuration["InvitationEmail:SmtpPassword"];
+var invitationFrom = builder.Configuration["InvitationEmail:From"];
+if (!string.IsNullOrWhiteSpace(invitationHost) && !string.IsNullOrWhiteSpace(invitationUser)
+    && !string.IsNullOrWhiteSpace(invitationPassword) && !string.IsNullOrWhiteSpace(invitationFrom))
+{
+    builder.Services.AddSingleton(new HouseholdInvitationEmailOptions(
+        invitationHost,
+        builder.Configuration.GetValue("InvitationEmail:SmtpPort", 587),
+        invitationUser, invitationPassword, invitationFrom,
+        builder.Configuration.GetValue("InvitationEmail:EnableSsl", true)));
+    builder.Services.AddSingleton<IHouseholdInvitationSender, SmtpHouseholdInvitationSender>();
+}
+else builder.Services.AddSingleton<IHouseholdInvitationSender, DisabledHouseholdInvitationSender>();
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"];
 var openAiModel = builder.Configuration["OpenAI:Model"];
 if (!string.IsNullOrWhiteSpace(openAiApiKey) && !string.IsNullOrWhiteSpace(openAiModel))
@@ -748,22 +763,74 @@ static bool ValidMember(HouseholdMemberRequest request, out string error)
     { error = request.InviteToAccount ? "Un nom et une adresse e-mail valide sont nécessaires pour inviter cette personne." : "Vérifiez le nom et le lien avec cette personne."; return false; }
     error = ""; return true;
 }
-static object HouseholdMemberResponse(HouseholdMember member, string? invitationCode = null) => new
+static object HouseholdMemberResponse(HouseholdMember member, string? invitationCode = null, bool invitationEmailSent = false) => new
 {
     member.Id, member.DisplayName, member.Relationship, member.BirthDate, member.Email,
     member.AccountStatus, member.AccessRole, HasAccount = member.LinkedUserId is not null,
     InvitationPending = member.AccountStatus == "invited" && member.InvitationExpiresAt > DateTimeOffset.UtcNow,
     member.InvitationExpiresAt, InvitationCode = invitationCode,
+    InvitationEmailSent = invitationEmailSent,
+    member.CanManageBudgets, member.CanManageAssets, member.CanManageContracts,
 };
 static object HouseholdResponse(HouseholdSnapshot value) => new
 {
     id = value.Household.Id, name = value.Household.Name, value.CanManageMembers, value.CanEdit,
+    value.CanManageBudgets, value.CanManageAssets, value.CanManageContracts,
     members = value.Members.Select(x => HouseholdMemberResponse(x)),
-    budgets = value.Budgets.Select(x => new { x.Id, x.Name, x.Category, x.MonthlyLimit, x.Notes, MemberIds = value.BudgetMemberIds.GetValueOrDefault(x.Id) ?? [] }),
+    budgets = value.Budgets.Select(x =>
+    {
+        var now = DateTimeOffset.UtcNow;
+        var spent = value.Expenses.Where(e => e.BudgetId == x.Id && e.OccurredOn.Year == now.Year && e.OccurredOn.Month == now.Month).Sum(e => e.Amount);
+        return new { x.Id, x.Name, x.Category, x.MonthlyLimit, x.Notes, Spent = spent, Remaining = x.MonthlyLimit - spent, UsagePercent = x.MonthlyLimit == 0 ? 0 : Math.Round(spent / x.MonthlyLimit * 100, 1), MemberIds = value.BudgetMemberIds.GetValueOrDefault(x.Id) ?? [] };
+    }),
     residences = value.Residences.Select(x => new { x.Id, x.Name, x.Kind, x.Address, x.Notes }),
     vehicles = value.Vehicles.Select(x => new { x.Id, x.Name, x.Registration, x.Notes }),
-    contracts = value.Contracts.Select(x => new { x.Id, x.Name, x.Category, x.Provider, x.MonthlyAmount, x.RenewalDate, x.ResidenceId, x.VehicleId, x.Notes, MemberIds = value.ContractMemberIds.GetValueOrDefault(x.Id) ?? [] }),
+    contracts = value.Contracts.Select(x => new { x.Id, x.Name, x.Category, x.Provider, x.MonthlyAmount, x.RenewalDate, x.ResidenceId, x.VehicleId, x.SourceDocumentId, x.Notes, MemberIds = value.ContractMemberIds.GetValueOrDefault(x.Id) ?? [] }),
+    expenses = value.Expenses.Select(x => new { x.Id, x.BudgetId, x.BankTransactionId, x.Title, x.Category, x.Amount, x.OccurredOn, x.Source, x.Notes, Splits = value.ExpenseSplits.GetValueOrDefault(x.Id) ?? [] }),
 };
+static IReadOnlyList<HouseholdExpenseSplit> EqualSplits(decimal amount, IReadOnlyList<Guid> memberIds)
+{
+    if (memberIds.Count == 0) return [];
+    var cents = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+    var baseAmount = decimal.Floor(cents / memberIds.Count * 100) / 100;
+    var result = memberIds.Distinct().Select((id, index) => new HouseholdExpenseSplit
+    {
+        MemberId = id,
+        Amount = index == memberIds.Distinct().Count() - 1
+            ? cents - baseAmount * (memberIds.Distinct().Count() - 1)
+            : baseAmount,
+    }).ToArray();
+    return result;
+}
+static async Task NotifyBudgetThreshold(IWorkspaceStore store, HouseholdSnapshot snapshot, Guid? budgetId, TimeProvider time, CancellationToken ct)
+{
+    if (budgetId is not Guid id) return;
+    var budget = snapshot.Budgets.FirstOrDefault(x => x.Id == id);
+    if (budget is null) return;
+    var now = time.GetUtcNow();
+    var spent = snapshot.Expenses.Where(x => x.BudgetId == id && x.OccurredOn.Year == now.Year && x.OccurredOn.Month == now.Month).Sum(x => x.Amount);
+    var level = spent >= budget.MonthlyLimit ? "exceeded" : spent >= budget.MonthlyLimit * 0.8m ? "near" : null;
+    if (level is null) return;
+    foreach (var userId in snapshot.Members.Select(x => x.LinkedUserId).Where(x => x is not null).Distinct()!)
+        await store.AddNotification(new UserNotification
+        {
+            UserId = userId!, Type = "household_budget", Title = level == "exceeded" ? $"Budget {budget.Name} dépassé" : $"Budget {budget.Name} bientôt atteint",
+            Body = $"{spent:0.00} € dépensés sur {budget.MonthlyLimit:0.00} € ce mois-ci.", ResourceId = budget.Id.ToString(),
+            SourceKey = $"household-budget:{budget.Id}:{now:yyyy-MM}:{level}", CreatedAt = now,
+        }, ct);
+}
+static async Task SyncContractDeadlines(IWorkspaceStore store, HouseholdSnapshot snapshot, HouseholdContract contract, TimeProvider time, CancellationToken ct)
+{
+    var sourceId = contract.Id.ToString();
+    if (contract.RenewalDate is null) { await store.RemoveDeadlinesBySource("household_contract", sourceId, ct); return; }
+    foreach (var userId in snapshot.Members.Select(x => x.LinkedUserId).Where(x => x is not null).Distinct()!)
+    {
+        var existing = (await store.Deadlines(userId!, ct)).FirstOrDefault(x => x.SourceType == "household_contract" && x.SourceId == sourceId);
+        var due = new DateTimeOffset(contract.RenewalDate.Value.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero);
+        if (existing is null) await store.AddDeadline(new UserDeadline { UserId = userId!, Title = $"Renouvellement · {contract.Name}", Category = contract.Category, Notes = contract.Provider, DueAt = due, ReminderMinutesBefore = 10080, SourceType = "household_contract", SourceId = sourceId, CreatedAt = time.GetUtcNow(), UpdatedAt = time.GetUtcNow() }, ct);
+        else { existing.Title = $"Renouvellement · {contract.Name}"; existing.Category = contract.Category; existing.Notes = contract.Provider; existing.DueAt = due; existing.ReminderSentAt = null; existing.UpdatedAt = time.GetUtcNow(); await store.SaveDeadline(existing, ct); }
+    }
+}
 static bool HasRecentAuthentication(HttpContext context, TimeProvider time, bool isDemo)
 {
     if (isDemo) return true;
@@ -950,6 +1017,25 @@ api.MapPatch(
         return Results.Ok(SafeDocument(document, true));
     }
 );
+api.MapPost(
+    "/documents/{id:guid}/household-contract",
+    async (Guid id, DocumentContractRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        var document = await store.Document(User(c), id, ct); if (document is null) return Missing(c);
+        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanManageContracts) return Results.Forbid();
+        var existing = snapshot.Contracts.FirstOrDefault(x => x.SourceDocumentId == id);
+        var contract = existing ?? new HouseholdContract { HouseholdId = snapshot.Household.Id, SourceDocumentId = id, CreatedAt = time.GetUtcNow() };
+        contract.Name = string.IsNullOrWhiteSpace(request.Name) ? document.Title : request.Name.Trim();
+        contract.Category = document.Category; contract.Provider = document.Issuer; contract.RenewalDate = document.DueDate;
+        contract.Notes = string.IsNullOrWhiteSpace(request.Notes) ? $"Créé depuis {document.OriginalFileName}" : request.Notes.Trim(); contract.UpdatedAt = time.GetUtcNow();
+        var memberIds = request.MemberIds?.Distinct().ToArray() ?? [];
+        try { await store.SaveHouseholdContract(User(c), contract, memberIds, ct); }
+        catch (InvalidOperationException) { return Results.BadRequest(new { code = "INVALID_CONTRACT_LINK", message = "Un membre sélectionné est invalide." }); }
+        var updated = await store.Household(User(c), ct); await SyncContractDeadlines(store, updated, contract, time, ct);
+        await Audit(store, c, existing is null ? "document.converted_to_contract" : "document.contract_updated", "document", id.ToString(), ct);
+        return Results.Ok(HouseholdResponse(updated));
+    }
+);
 api.MapDelete(
     "/documents/{id:guid}",
     async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
@@ -966,7 +1052,7 @@ api.MapGet(
         var manual = (await store.Deadlines(User(c), ct)).Select(d => new DeadlineResponse(
             d.Id.ToString(), d.Title, d.Category, d.Notes, d.DueAt,
             d.ReminderMinutesBefore, d.ReminderSentAt, d.CompletedAt,
-            "manual", null, true));
+            d.SourceType, d.SourceId, d.SourceType == "manual"));
         var documents = (await store.Documents(User(c), ct))
             .Where(d => d.DueDate is not null)
             .Select(d => new DeadlineResponse(
@@ -1052,9 +1138,20 @@ api.MapGet(
         return Results.Ok(HouseholdResponse(value));
     }
 );
+api.MapPatch(
+    "/household",
+    async (HouseholdUpdateRequest request, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+    {
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 80)
+            return Results.BadRequest(new { code = "INVALID_HOUSEHOLD_NAME", message = "Le nom du foyer est invalide." });
+        await store.RenameHousehold(User(c), request.Name.Trim(), ct);
+        await Audit(store, c, "household.renamed", "household", null, ct);
+        return Results.Ok(HouseholdResponse(await store.Household(User(c), ct)));
+    }
+);
 api.MapPost(
     "/household/members",
-    async (HouseholdMemberRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    async (HouseholdMemberRequest request, HttpContext c, IWorkspaceStore store, IHouseholdInvitationSender invitationSender, TimeProvider time, CancellationToken ct) =>
     {
         var snapshot = await store.Household(User(c), ct);
         if (!snapshot.CanManageMembers) return Results.Forbid();
@@ -1068,18 +1165,23 @@ api.MapPost(
             BirthDate = request.BirthDate, Email = Clean(request.Email),
             AccountStatus = invite ? "invited" : "managed",
             AccessRole = invite ? request.AccessRole : "viewer",
+            CanManageBudgets = invite && request.CanManageBudgets,
+            CanManageAssets = invite && request.CanManageAssets,
+            CanManageContracts = invite && request.CanManageContracts,
             InvitationTokenHash = token is null ? null : TokenHash(token),
             InvitationExpiresAt = token is null ? null : time.GetUtcNow().AddDays(7),
             CreatedAt = time.GetUtcNow(), UpdatedAt = time.GetUtcNow(),
         };
         await store.SaveHouseholdMember(User(c), member, ct);
+        var emailSent = token is not null && member.Email is not null
+            && await invitationSender.Send(member.Email, member.DisplayName, token, member.InvitationExpiresAt!.Value, ct);
         await Audit(store, c, "household.member.created", "household_member", member.Id.ToString(), ct);
-        return Results.Created($"/api/v1/household/members/{member.Id}", HouseholdMemberResponse(member, token));
+        return Results.Created($"/api/v1/household/members/{member.Id}", HouseholdMemberResponse(member, token, emailSent));
     }
 );
 api.MapPatch(
     "/household/members/{id:guid}",
-    async (Guid id, HouseholdMemberRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    async (Guid id, HouseholdMemberRequest request, HttpContext c, IWorkspaceStore store, IHouseholdInvitationSender invitationSender, TimeProvider time, CancellationToken ct) =>
     {
         var snapshot = await store.Household(User(c), ct);
         if (!snapshot.CanManageMembers) return Results.Forbid();
@@ -1092,13 +1194,18 @@ api.MapPatch(
         existing.DisplayName = request.DisplayName.Trim(); existing.Relationship = request.Relationship;
         existing.BirthDate = request.BirthDate; existing.Email = Clean(request.Email);
         existing.AccessRole = existing.AccountStatus == "linked" ? request.AccessRole : request.InviteToAccount ? request.AccessRole : "viewer";
+        existing.CanManageBudgets = request.InviteToAccount || existing.AccountStatus == "linked" ? request.CanManageBudgets : false;
+        existing.CanManageAssets = request.InviteToAccount || existing.AccountStatus == "linked" ? request.CanManageAssets : false;
+        existing.CanManageContracts = request.InviteToAccount || existing.AccountStatus == "linked" ? request.CanManageContracts : false;
         if (existing.AccountStatus != "linked") existing.AccountStatus = request.InviteToAccount ? "invited" : "managed";
         existing.InvitationTokenHash = token is null ? existing.AccountStatus == "invited" ? existing.InvitationTokenHash : null : TokenHash(token);
         existing.InvitationExpiresAt = token is null ? existing.AccountStatus == "invited" ? existing.InvitationExpiresAt : null : time.GetUtcNow().AddDays(7);
         existing.UpdatedAt = time.GetUtcNow();
         await store.SaveHouseholdMember(User(c), existing, ct);
+        var emailSent = token is not null && existing.Email is not null
+            && await invitationSender.Send(existing.Email, existing.DisplayName, token, existing.InvitationExpiresAt!.Value, ct);
         await Audit(store, c, "household.member.updated", "household_member", id.ToString(), ct);
-        return Results.Ok(HouseholdMemberResponse(existing, token));
+        return Results.Ok(HouseholdMemberResponse(existing, token, emailSent));
     }
 );
 api.MapDelete(
@@ -1119,15 +1226,17 @@ api.MapPost(
         if (token.Length != 36 || !token.All(Uri.IsHexDigit)) return Results.BadRequest(new { code = "INVALID_INVITATION", message = "Ce code d’invitation est invalide." });
         if (!await store.AcceptHouseholdInvitation(User(c), TokenHash(token), time.GetUtcNow(), ct))
             return Results.BadRequest(new { code = "INVITATION_UNAVAILABLE", message = "Cette invitation a expiré ou ce compte appartient déjà à un foyer actif." });
+        var joined = await store.Household(User(c), ct);
+        foreach (var contract in joined.Contracts) await SyncContractDeadlines(store, joined, contract, time, ct);
         await Audit(store, c, "household.invitation.accepted", "household", null, ct);
-        return Results.Ok(HouseholdResponse(await store.Household(User(c), ct)));
+        return Results.Ok(HouseholdResponse(joined));
     }
 );
 api.MapPut(
     "/household/budgets/{id:guid}",
     async (Guid id, HouseholdBudgetRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
     {
-        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanEdit) return Results.Forbid();
+        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanManageBudgets) return Results.Forbid();
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 80 || request.MonthlyLimit <= 0 || request.MonthlyLimit > 1_000_000 || request.Notes?.Length > 500)
             return Results.BadRequest(new { code = "INVALID_HOUSEHOLD_BUDGET", message = "Vérifiez le nom et le montant mensuel." });
         var existing = snapshot.Budgets.FirstOrDefault(x => x.Id == id);
@@ -1135,17 +1244,80 @@ api.MapPut(
         value.Name = request.Name.Trim(); value.Category = string.IsNullOrWhiteSpace(request.Category) ? "other" : request.Category.Trim()[..Math.Min(request.Category.Trim().Length, 40)];
         value.MonthlyLimit = request.MonthlyLimit; value.Notes = Clean(request.Notes); value.UpdatedAt = time.GetUtcNow();
         await store.SaveHouseholdBudget(User(c), value, (request.MemberIds ?? []).Distinct().ToArray(), ct);
+        var updated = await store.Household(User(c), ct); await NotifyBudgetThreshold(store, updated, value.Id, time, ct);
         await Audit(store, c, existing is null ? "household.budget.created" : "household.budget.updated", "household_budget", id.ToString(), ct);
-        return Results.Ok(HouseholdResponse(await store.Household(User(c), ct)));
+        return Results.Ok(HouseholdResponse(updated));
     }
 );
 api.MapDelete("/household/budgets/{id:guid}", async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
-{ if (!(await store.Household(User(c), ct)).CanEdit) return Results.Forbid(); if (!await store.RemoveHouseholdBudget(User(c), id, ct)) return Missing(c); await Audit(store, c, "household.budget.deleted", "household_budget", id.ToString(), ct); return Results.NoContent(); });
+{ if (!(await store.Household(User(c), ct)).CanManageBudgets) return Results.Forbid(); if (!await store.RemoveHouseholdBudget(User(c), id, ct)) return Missing(c); await Audit(store, c, "household.budget.deleted", "household_budget", id.ToString(), ct); return Results.NoContent(); });
+api.MapGet(
+    "/household/bank-transactions",
+    async (string? month, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+    {
+        var snapshot = await store.Household(User(c), ct);
+        if (!snapshot.CanManageBudgets) return Results.Forbid();
+        var parsed = DateOnly.TryParseExact($"{month}-01", "yyyy-MM-dd", out var first) ? first : DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1 - DateTime.UtcNow.Day);
+        var last = parsed.AddMonths(1).AddDays(-1);
+        var assigned = snapshot.Expenses.Where(x => x.BankTransactionId is not null).Select(x => x.BankTransactionId!.Value).ToHashSet();
+        var rows = new List<object>();
+        foreach (var member in snapshot.Members.Where(x => x.LinkedUserId is not null))
+            rows.AddRange((await store.Transactions(member.LinkedUserId!, ct))
+                .Where(x => x.BookedAt >= parsed && x.BookedAt <= last && x.Amount < 0 && !x.IsInternalTransfer && !assigned.Contains(x.Id))
+                .Select(x => (object)new { x.Id, MemberId = member.Id, MemberName = member.DisplayName, Title = x.MerchantName, Amount = Math.Abs(x.Amount), x.Category, x.BookedAt }));
+        return Results.Ok(rows);
+    }
+);
+api.MapPut(
+    "/household/expenses/{id:guid}",
+    async (Guid id, HouseholdExpenseRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanManageBudgets) return Results.Forbid();
+        if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Trim().Length > 160 || request.Amount <= 0 || request.Amount > 1_000_000 || request.Notes?.Length > 500
+            || request.OccurredOn > DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime) || request.OccurredOn < DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).AddYears(-10))
+            return Results.BadRequest(new { code = "INVALID_HOUSEHOLD_EXPENSE", message = "Vérifiez l’intitulé et le montant de la dépense." });
+        var existing = snapshot.Expenses.FirstOrDefault(x => x.Id == id);
+        if (existing?.Source == "bank") return Results.BadRequest(new { code = "BANK_EXPENSE_IMMUTABLE", message = "Supprimez puis réaffectez cette opération bancaire pour la modifier." });
+        var memberIds = (request.MemberIds ?? []).Distinct().ToArray();
+        if (memberIds.Length == 0) return Results.BadRequest(new { code = "EXPENSE_MEMBER_REQUIRED", message = "Sélectionnez au moins une personne concernée." });
+        var value = existing ?? new HouseholdExpense { Id = id, HouseholdId = snapshot.Household.Id, CreatedByUserId = User(c), CreatedAt = time.GetUtcNow() };
+        value.BudgetId = request.BudgetId; value.Title = request.Title.Trim(); value.Category = string.IsNullOrWhiteSpace(request.Category) ? "other" : request.Category.Trim();
+        value.Amount = decimal.Round(request.Amount, 2); value.OccurredOn = request.OccurredOn; value.Notes = Clean(request.Notes); value.Source = existing?.Source ?? "manual"; value.UpdatedAt = time.GetUtcNow();
+        try { await store.SaveHouseholdExpense(User(c), value, EqualSplits(value.Amount, memberIds), ct); }
+        catch (InvalidOperationException) { return Results.BadRequest(new { code = "INVALID_HOUSEHOLD_EXPENSE_LINK", message = "Un budget, membre ou montant sélectionné est invalide." }); }
+        var updated = await store.Household(User(c), ct); await NotifyBudgetThreshold(store, updated, value.BudgetId, time, ct);
+        await Audit(store, c, existing is null ? "household.expense.created" : "household.expense.updated", "household_expense", id.ToString(), ct);
+        return Results.Ok(HouseholdResponse(updated));
+    }
+);
+api.MapPost(
+    "/household/expenses/from-transaction",
+    async (HouseholdTransactionExpenseRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanManageBudgets) return Results.Forbid();
+        BankTransaction? transaction = null; HouseholdMember? owner = null;
+        foreach (var member in snapshot.Members.Where(x => x.LinkedUserId is not null))
+        {
+            transaction = (await store.Transactions(member.LinkedUserId!, ct)).FirstOrDefault(x => x.Id == request.TransactionId);
+            if (transaction is not null) { owner = member; break; }
+        }
+        if (transaction is null || transaction.Amount >= 0 || transaction.IsInternalTransfer) return Missing(c);
+        var memberIds = (request.MemberIds?.Length > 0 ? request.MemberIds : owner is null ? [] : [owner.Id]).Distinct().ToArray();
+        var value = new HouseholdExpense { HouseholdId = snapshot.Household.Id, BudgetId = request.BudgetId, BankTransactionId = transaction.Id, CreatedByUserId = User(c), Title = transaction.MerchantName, Category = transaction.Category, Amount = Math.Abs(transaction.Amount), OccurredOn = transaction.BookedAt, Source = "bank", Notes = Clean(request.Notes), CreatedAt = time.GetUtcNow(), UpdatedAt = time.GetUtcNow() };
+        try { await store.SaveHouseholdExpense(User(c), value, EqualSplits(value.Amount, memberIds), ct); }
+        catch (InvalidOperationException) { return Results.BadRequest(new { code = "INVALID_HOUSEHOLD_TRANSACTION", message = "Cette opération ne peut pas être affectée au foyer." }); }
+        var updated = await store.Household(User(c), ct); await NotifyBudgetThreshold(store, updated, value.BudgetId, time, ct);
+        await Audit(store, c, "household.expense.assigned", "transaction", transaction.Id.ToString(), ct);
+        return Results.Ok(HouseholdResponse(updated));
+    }
+);
+api.MapDelete("/household/expenses/{id:guid}", async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+{ if (!(await store.Household(User(c), ct)).CanManageBudgets) return Results.Forbid(); if (!await store.RemoveHouseholdExpense(User(c), id, ct)) return Missing(c); await Audit(store, c, "household.expense.deleted", "household_expense", id.ToString(), ct); return Results.NoContent(); });
 api.MapPut(
     "/household/residences/{id:guid}",
     async (Guid id, HouseholdResidenceRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
     {
-        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanEdit) return Results.Forbid();
+        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanManageAssets) return Results.Forbid();
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 80 || request.Address?.Length > 300 || request.Notes?.Length > 500)
             return Results.BadRequest(new { code = "INVALID_RESIDENCE", message = "Vérifiez les informations du logement." });
         var value = snapshot.Residences.FirstOrDefault(x => x.Id == id) ?? new HouseholdResidence { Id = id, HouseholdId = snapshot.Household.Id, CreatedAt = time.GetUtcNow() };
@@ -1155,12 +1327,12 @@ api.MapPut(
     }
 );
 api.MapDelete("/household/residences/{id:guid}", async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
-{ if (!(await store.Household(User(c), ct)).CanEdit) return Results.Forbid(); if (!await store.RemoveHouseholdResidence(User(c), id, ct)) return Missing(c); await Audit(store, c, "household.residence.deleted", "household_residence", id.ToString(), ct); return Results.NoContent(); });
+{ if (!(await store.Household(User(c), ct)).CanManageAssets) return Results.Forbid(); if (!await store.RemoveHouseholdResidence(User(c), id, ct)) return Missing(c); await Audit(store, c, "household.residence.deleted", "household_residence", id.ToString(), ct); return Results.NoContent(); });
 api.MapPut(
     "/household/vehicles/{id:guid}",
     async (Guid id, HouseholdVehicleRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
     {
-        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanEdit) return Results.Forbid();
+        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanManageAssets) return Results.Forbid();
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 80 || request.Registration?.Length > 30 || request.Notes?.Length > 500)
             return Results.BadRequest(new { code = "INVALID_VEHICLE", message = "Vérifiez les informations du véhicule." });
         var value = snapshot.Vehicles.FirstOrDefault(x => x.Id == id) ?? new HouseholdVehicle { Id = id, HouseholdId = snapshot.Household.Id, CreatedAt = time.GetUtcNow() };
@@ -1170,12 +1342,12 @@ api.MapPut(
     }
 );
 api.MapDelete("/household/vehicles/{id:guid}", async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
-{ if (!(await store.Household(User(c), ct)).CanEdit) return Results.Forbid(); if (!await store.RemoveHouseholdVehicle(User(c), id, ct)) return Missing(c); await Audit(store, c, "household.vehicle.deleted", "household_vehicle", id.ToString(), ct); return Results.NoContent(); });
+{ if (!(await store.Household(User(c), ct)).CanManageAssets) return Results.Forbid(); if (!await store.RemoveHouseholdVehicle(User(c), id, ct)) return Missing(c); await Audit(store, c, "household.vehicle.deleted", "household_vehicle", id.ToString(), ct); return Results.NoContent(); });
 api.MapPut(
     "/household/contracts/{id:guid}",
     async (Guid id, HouseholdContractRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
     {
-        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanEdit) return Results.Forbid();
+        var snapshot = await store.Household(User(c), ct); if (!snapshot.CanManageContracts) return Results.Forbid();
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 100 || request.Provider?.Length > 100 || request.MonthlyAmount is < 0 or > 1_000_000 || request.Notes?.Length > 500)
             return Results.BadRequest(new { code = "INVALID_CONTRACT", message = "Vérifiez les informations du contrat." });
         var value = snapshot.Contracts.FirstOrDefault(x => x.Id == id) ?? new HouseholdContract { Id = id, HouseholdId = snapshot.Household.Id, CreatedAt = time.GetUtcNow() };
@@ -1183,12 +1355,13 @@ api.MapPut(
         value.MonthlyAmount = request.MonthlyAmount; value.RenewalDate = request.RenewalDate; value.ResidenceId = request.ResidenceId; value.VehicleId = request.VehicleId; value.Notes = Clean(request.Notes); value.UpdatedAt = time.GetUtcNow();
         try { await store.SaveHouseholdContract(User(c), value, (request.MemberIds ?? []).Distinct().ToArray(), ct); }
         catch (InvalidOperationException) { return Results.BadRequest(new { code = "INVALID_CONTRACT_LINK", message = "Un membre, logement ou véhicule sélectionné est invalide." }); }
+        var updated = await store.Household(User(c), ct); await SyncContractDeadlines(store, updated, value, time, ct);
         await Audit(store, c, "household.contract.saved", "household_contract", id.ToString(), ct);
-        return Results.Ok(HouseholdResponse(await store.Household(User(c), ct)));
+        return Results.Ok(HouseholdResponse(updated));
     }
 );
 api.MapDelete("/household/contracts/{id:guid}", async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
-{ if (!(await store.Household(User(c), ct)).CanEdit) return Results.Forbid(); if (!await store.RemoveHouseholdContract(User(c), id, ct)) return Missing(c); await Audit(store, c, "household.contract.deleted", "household_contract", id.ToString(), ct); return Results.NoContent(); });
+{ if (!(await store.Household(User(c), ct)).CanManageContracts) return Results.Forbid(); if (!await store.RemoveHouseholdContract(User(c), id, ct)) return Missing(c); await store.RemoveDeadlinesBySource("household_contract", id.ToString(), ct); await Audit(store, c, "household.contract.deleted", "household_contract", id.ToString(), ct); return Results.NoContent(); });
 api.MapGet(
     "/bank/connections",
     async (HttpContext c, IWorkspaceStore s, CancellationToken ct) =>
@@ -2190,10 +2363,16 @@ public sealed record HouseholdMemberRequest(
     DateOnly? BirthDate,
     string? Email,
     bool InviteToAccount,
-    string AccessRole
+    string AccessRole,
+    bool CanManageBudgets = false,
+    bool CanManageAssets = false,
+    bool CanManageContracts = false
 );
+public sealed record HouseholdUpdateRequest(string Name);
 public sealed record HouseholdInvitationRequest(string Code);
 public sealed record HouseholdBudgetRequest(string Name, string Category, decimal MonthlyLimit, string? Notes, Guid[] MemberIds);
+public sealed record HouseholdExpenseRequest(string Title, string Category, decimal Amount, DateOnly OccurredOn, Guid? BudgetId, string? Notes, Guid[] MemberIds);
+public sealed record HouseholdTransactionExpenseRequest(Guid TransactionId, Guid? BudgetId, string? Notes, Guid[] MemberIds);
 public sealed record HouseholdResidenceRequest(string Name, string Kind, string? Address, string? Notes);
 public sealed record HouseholdVehicleRequest(string Name, string? Registration, string? Notes);
 public sealed record HouseholdContractRequest(
@@ -2207,6 +2386,7 @@ public sealed record HouseholdContractRequest(
     string? Notes,
     Guid[] MemberIds
 );
+public sealed record DocumentContractRequest(string? Name, string? Notes, Guid[] MemberIds);
 
 public sealed record OfferRequest(
     string Category,
