@@ -259,7 +259,29 @@ export function DocumentsScreen() {
           <State
             title="Aucun document"
             description="Importez une facture, un contrat ou une photo. Le texte sera extrait et classé automatiquement."
-            action={<Button title="Ajouter un document" onPress={() => setSheet(true)} />}
+            action={
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter un document"
+                onPress={() => setSheet(true)}
+                style={({ pressed }) => ({
+                  minHeight: 44,
+                  paddingHorizontal: 18,
+                  borderRadius: 22,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  backgroundColor: c.text,
+                  opacity: pressed ? 0.78 : 1,
+                })}
+              >
+                <Ionicons name="add" size={18} color={c.background} />
+                <Label style={{ color: c.background, fontSize: 14, fontWeight: '800' }}>
+                  Ajouter un document
+                </Label>
+              </Pressable>
+            }
           />
         ) : (
           <View style={{ gap: 10 }}>
