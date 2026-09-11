@@ -407,7 +407,7 @@ app.MapGet(
     () => Results.Ok(new { status = "ok" })
 );
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok" }));
-app.MapGet("/health/ready", async (IServiceScopeFactory scopeFactory, IBankingProvider banking, IIdentityLifecycle identity, IPushSender push, IPremiumPurchaseVerifier purchase, IPremiumEventVerifier premiumEvents, CancellationToken ct) =>
+app.MapGet("/health/ready", async (IServiceScopeFactory scopeFactory, IBankingProvider banking, IIdentityLifecycle identity, IPushSender push, IPremiumPurchaseVerifier purchase, IPremiumEventVerifier premiumEvents, IHouseholdInvitationSender invitationSender, CancellationToken ct) =>
 {
     var databaseReady = true;
     if (connectionString is not null)
@@ -428,7 +428,7 @@ app.MapGet("/health/ready", async (IServiceScopeFactory scopeFactory, IBankingPr
             && (builder.Configuration["RevenueCat:WebhookSigningSecret"]?.Length ?? 0) >= 32);
     var integrationsReady = demo || (banking.IsConfigured && tinkWebhookReady && bankingEncryptionReady
         && nativeBankingReady && identityReady && push.IsConfigured && purchase.IsConfigured
-        && premiumProductsReady && premiumEventsReady);
+        && premiumProductsReady && premiumEventsReady && invitationSender.IsConfigured);
     var ready = databaseReady && integrationsReady;
     return Results.Json(new
     {
@@ -442,7 +442,8 @@ app.MapGet("/health/ready", async (IServiceScopeFactory scopeFactory, IBankingPr
         push = push.IsConfigured,
         premiumPurchase = purchase.IsConfigured,
         premiumProducts = premiumProductsReady,
-        premiumEvents = premiumEventsReady
+        premiumEvents = premiumEventsReady,
+        invitationEmail = invitationSender.IsConfigured
     }, statusCode: ready ? 200 : 503);
 });
 if (app.Environment.IsDevelopment() || demo) app.MapOpenApi();
