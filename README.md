@@ -2,6 +2,68 @@
 
 Assistant personnel de budget, de documents et de foyer issu du cahier des charges fourni. Le nom commercial visible est **Clarysio**. Les identifiants techniques historiques `SubscriptionApp`, `subscription-project` et `subscriptionapp` restent stables afin de préserver les connexions Firebase, Expo et Tink déjà configurées.
 
+## État de transmission du projet
+
+**Dernière mise à jour : 11 septembre 2026**
+
+Le dépôt contient une V1 intégrée et persistante, utilisable comme bêta technique. Elle n’est pas encore prête pour une publication publique sur l’App Store ou Google Play. Le fournisseur bancaire actuellement livré reste **Tink**. La migration envisagée vers Enable Banking a été arrêtée avant intégration et ne fait pas partie de la version stable.
+
+### Ce qui est réalisé
+
+| Domaine | État livré |
+| --- | --- |
+| Application | Expo SDK 57, React Native, TypeScript, navigation Web/iOS/Android et interface responsive |
+| Design | Identité Clarysio, splash natif, thèmes clair/sombre, couleur d’accent personnalisable et écrans harmonisés |
+| Authentification | Firebase e-mail, inscription, réinitialisation, Google Web, Expo Go et clients OAuth natifs configurés |
+| Backend | API ASP.NET Core .NET 10, validation, limitation de débit, idempotence, audit et traitements en arrière-plan |
+| Données | PostgreSQL Neon avec migrations automatiques contrôlables et clés Data Protection persistées |
+| Banque | Plusieurs connexions Tink, consentement OAuth signé, callback Web/natif, comptes, transactions, pagination, synchronisation durable, webhook et révocation |
+| Finances | Soldes, revenus/dépenses, cashflow, catégories, recherche, filtres par période, export CSV et règles de reclassement |
+| Budgets | Budgets libres par catégorie ou intitulé personnalisé, suivi réel/prévu, alertes et suppression |
+| Abonnements | Détection de récurrences, liste, détail, recherche, historique, correction et exclusion persistée |
+| Économies | Calcul déterministe, recommandations explicables, alternatives, suivi des clics et économies réalisées |
+| Documents | Import PDF/JPEG/PNG, chiffrement, OCR Tesseract français/anglais, recherche, classement, correction, ouverture et suppression |
+| Échéances | Calendrier, rappels persistés, échéances manuelles ou extraites des documents et notifications |
+| Foyer | Membres avec ou sans compte, invitations, droits, budgets/dépenses partagés, logements, véhicules et contrats |
+| Notifications | Centre in-app, préférences, Expo Push/FCM, file d’envoi, reçus, reprises et retrait des jetons invalides |
+| Premium | RevenueCat, entitlement `premium`, offres mensuelle/annuelle Test Store, restauration et webhooks signés |
+| Suppression/export | Export autorisé sans secrets et suppression durable PostgreSQL/Firebase avec reprise après panne |
+| Exploitation | Docker, Render, Redis Upstash, health checks, OpenTelemetry, Dependabot et CI GitHub complète |
+| Qualité | Tests métier/API/sécurité, tests PostgreSQL/Redis en CI, format .NET, TypeScript, Expo Doctor et exports Web/Android/iOS |
+
+### Services déjà configurés
+
+- L’API est hébergée sur Render et utilise PostgreSQL Neon.
+- Le mot de passe Neon précédemment exposé a été renouvelé ; l’ancien n’est plus valide.
+- Firebase Admin est configuré pour l’identité et les notifications.
+- Tink est configuré avec le callback `subscriptionapp://banking/callback`, le chiffrement séparé et son webhook signé.
+- RevenueCat fonctionne avec les produits gratuits du Test Store `monthly` et `yearly`.
+- L’envoi SMTP des invitations de foyer est prévu par configuration ; le partage natif reste disponible sans SMTP.
+
+### Ce qui manque avant une bêta publique
+
+1. **Choisir définitivement le fournisseur Open Banking.** Tink fonctionne en sandbox. Pour de vraies données publiques, il faut signer un contrat de production avec Tink, Powens, Bridge ou Enable Banking. Un changement de fournisseur nécessitera un nouvel adaptateur et la reconnexion des banques existantes.
+2. **Tester sur de vrais appareils.** Valider Google, le deep link bancaire, plusieurs banques, les notifications, la reconnexion et la persistance sur un iPhone et un Android physiques.
+3. **Créer un staging séparé.** Utiliser des projets et secrets distincts de la production, puis tester sauvegarde, restauration et rollback.
+4. **Brancher l’observabilité.** Envoyer OpenTelemetry vers un collecteur, créer des tableaux de bord et des alertes sur les erreurs d’authentification, de banque, de push et de base.
+5. **Finaliser les partenaires.** Signer les accords commerciaux, vérifier les offres, leurs frais et leur date de validité, puis autoriser uniquement les domaines contractuels.
+6. **Finaliser le Premium des stores.** Créer les produits dans App Store Connect et Google Play Console, les associer à RevenueCat et tester achat, restauration, renouvellement, annulation et remboursement.
+7. **Fournir l’identité juridique.** Compléter l’éditeur, le responsable de traitement, le support, le médiateur éventuel et les durées de conservation.
+8. **Publier les textes juridiques.** Faire valider puis publier les CGU, la politique de confidentialité, les mentions légales, les conditions Premium et la transparence d’affiliation.
+9. **Faire la recette de sortie.** Tests E2E mobiles, accessibilité, charge, panne fournisseur, test d’intrusion et validation des déclarations Apple/Google.
+10. **Décider du périmètre IA.** L’adaptateur explicatif est optionnel ; aucun assistant intelligent général ne doit être activé avant la définition des usages, du budget et des évaluations.
+
+### Décisions à conserver
+
+- L’application ne réalise aucun paiement ni virement vers un tiers ; seul l’achat Premium passe par les stores.
+- Les données de production ne doivent jamais être remplacées par des données de démonstration.
+- Les enfants ou proches peuvent appartenir à un foyer sans créer de compte.
+- Une information déduite doit être proposée à l’utilisateur pour confirmation, jamais présentée comme certaine.
+- Les offres commerciales restent inactives sans partenariat et validation juridique.
+- Les secrets doivent être enregistrés dans Render/EAS, jamais dans Git ou dans un fichier `.env` commité.
+
+Les preuves et procédures détaillées sont disponibles dans [le suivi d’implémentation](docs/implementation.md), [la remédiation de sécurité](docs/remediation-apres-audit-2026-09-10.md), [la recette mobile](docs/recette-mobile-2026-09-11.md), [la checklist de publication](docs/release-checklist.md) et [le formulaire d’identité juridique](docs/identite-juridique-a-renseigner.md).
+
 L’application Expo communique avec une API ASP.NET Core .NET 10. Son interface reproduit la composition mobile de la maquette sombre fournie. En production, les données viennent exclusivement de Firebase, Tink, PostgreSQL et RevenueCat. Les données de présentation ne sont accessibles que si `EXPO_PUBLIC_ENABLE_PREVIEW=true` est explicitement défini en développement. Les détails de l’interface sont dans [docs/ui-reference.md](docs/ui-reference.md).
 
 ## Démarrer en local
