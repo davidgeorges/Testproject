@@ -30,7 +30,7 @@ Le backend exige Firebase et PostgreSQL hors du mode de développement. Le mode 
 npm start
 ```
 
-Le code cible Expo SDK 55 / React Native 0.83.10. Firebase conserve la session native dans AsyncStorage, Expo enregistre les appareils pour le push et RevenueCat gère Premium. Google fonctionne sur le Web ; les builds Android/iOS exigent leurs identifiants OAuth propres dans les variables décrites par `.env.example`.
+Le code cible Expo SDK 57 / React Native 0.86.3. Firebase conserve la session native dans AsyncStorage, Expo enregistre les appareils pour le push et RevenueCat gère Premium. Google fonctionne sur le Web, dans Expo Go et dans les builds signés ; les builds Android/iOS utilisent leurs identifiants OAuth propres décrits par `.env.example`.
 
 ### Premium avec RevenueCat
 
