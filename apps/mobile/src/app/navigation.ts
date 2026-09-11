@@ -27,4 +27,5 @@ export type RootStackParams = {
   Documents: undefined;
   Document: { id: string };
   Deadlines: undefined;
+  Household: undefined;
 };

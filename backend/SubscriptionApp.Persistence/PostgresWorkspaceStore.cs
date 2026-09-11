@@ -595,6 +595,7 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             d.Issuer, d.ExtractedText, d.Amount, d.DocumentDate, d.DueDate, d.ContractNumber,
             d.CreatedAt, d.UpdatedAt)).ToArray();
         var deadlines = await Deadlines(userId, ct);
+        var household = await Household(userId, ct);
         return new(
             DateTimeOffset.UtcNow,
             profile,
@@ -616,7 +617,8 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             storedPayments,
             storedRecommendations,
             documents,
-            deadlines
+            deadlines,
+            household
         );
     }
 
@@ -813,4 +815,170 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             && (j.Status == "completed" || j.Status == "data_deleted")).ExecuteDeleteAsync(ct);
         return count;
     }
+
+    private async Task<Household?> AccessibleHousehold(string userId, CancellationToken ct) =>
+        await db.Households.FirstOrDefaultAsync(h =>
+            h.OwnerUserId == userId
+            || db.HouseholdMembers.Any(m => m.HouseholdId == h.Id && m.LinkedUserId == userId), ct);
+
+    private async Task<Household> EditableHousehold(string userId, bool ownerOnly, CancellationToken ct)
+    {
+        var household = await AccessibleHousehold(userId, ct) ?? throw new InvalidOperationException("HOUSEHOLD_NOT_FOUND");
+        if (household.OwnerUserId == userId) return household;
+        var member = await db.HouseholdMembers.AsNoTracking().SingleAsync(
+            m => m.HouseholdId == household.Id && m.LinkedUserId == userId, ct);
+        if (ownerOnly || member.AccessRole != "editor") throw new UnauthorizedAccessException("HOUSEHOLD_READ_ONLY");
+        return household;
+    }
+
+    public async Task<HouseholdSnapshot> Household(string userId, CancellationToken ct)
+    {
+        var household = await AccessibleHousehold(userId, ct);
+        if (household is null)
+        {
+            var profile = await Profile(userId, ct);
+            household = new Household { OwnerUserId = userId };
+            db.Households.Add(household);
+            db.HouseholdMembers.Add(new HouseholdMember
+            {
+                HouseholdId = household.Id,
+                DisplayName = string.IsNullOrWhiteSpace(profile.FirstName) ? "Moi" : profile.FirstName,
+                Relationship = "self",
+                LinkedUserId = userId,
+                AccountStatus = "owner",
+                AccessRole = "owner",
+            });
+            try { await db.SaveChangesAsync(ct); }
+            catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+            {
+                db.ChangeTracker.Clear();
+                household = await AccessibleHousehold(userId, ct)
+                    ?? throw new InvalidOperationException("HOUSEHOLD_CREATION_FAILED");
+            }
+        }
+        var members = await db.HouseholdMembers.AsNoTracking().Where(x => x.HouseholdId == household.Id).OrderBy(x => x.CreatedAt).ToListAsync(ct);
+        var budgets = await db.HouseholdBudgets.AsNoTracking().Where(x => x.HouseholdId == household.Id).OrderBy(x => x.Name).ToListAsync(ct);
+        var budgetIds = budgets.Select(x => x.Id).ToArray();
+        var budgetLinks = await db.HouseholdBudgetMembers.AsNoTracking().Where(x => budgetIds.Contains(x.BudgetId)).ToListAsync(ct);
+        var residences = await db.HouseholdResidences.AsNoTracking().Where(x => x.HouseholdId == household.Id).OrderBy(x => x.Name).ToListAsync(ct);
+        var vehicles = await db.HouseholdVehicles.AsNoTracking().Where(x => x.HouseholdId == household.Id).OrderBy(x => x.Name).ToListAsync(ct);
+        var contracts = await db.HouseholdContracts.AsNoTracking().Where(x => x.HouseholdId == household.Id).OrderBy(x => x.Name).ToListAsync(ct);
+        var contractIds = contracts.Select(x => x.Id).ToArray();
+        var contractLinks = await db.HouseholdContractMembers.AsNoTracking().Where(x => contractIds.Contains(x.ContractId)).ToListAsync(ct);
+        var current = members.FirstOrDefault(x => x.LinkedUserId == userId);
+        return new HouseholdSnapshot(
+            household, members, budgets,
+            budgetLinks.GroupBy(x => x.BudgetId).ToDictionary(x => x.Key, x => x.Select(y => y.MemberId).ToArray()),
+            residences, vehicles, contracts,
+            contractLinks.GroupBy(x => x.ContractId).ToDictionary(x => x.Key, x => x.Select(y => y.MemberId).ToArray()),
+            household.OwnerUserId == userId,
+            household.OwnerUserId == userId || current?.AccessRole == "editor");
+    }
+
+    public async Task<HouseholdMember> SaveHouseholdMember(string userId, HouseholdMember member, CancellationToken ct)
+    {
+        var household = await EditableHousehold(userId, true, ct);
+        if (member.HouseholdId != household.Id) throw new UnauthorizedAccessException();
+        var existing = await db.HouseholdMembers.SingleOrDefaultAsync(x => x.Id == member.Id && x.HouseholdId == household.Id, ct);
+        if (existing is null) db.HouseholdMembers.Add(member);
+        else
+        {
+            if (existing.AccountStatus == "owner") throw new InvalidOperationException("OWNER_IMMUTABLE");
+            existing.DisplayName = member.DisplayName; existing.Relationship = member.Relationship;
+            existing.BirthDate = member.BirthDate; existing.Email = member.Email;
+            existing.AccessRole = member.AccessRole; existing.AccountStatus = member.AccountStatus;
+            existing.InvitationTokenHash = member.InvitationTokenHash; existing.InvitationExpiresAt = member.InvitationExpiresAt;
+            existing.UpdatedAt = member.UpdatedAt; member = existing;
+        }
+        await db.SaveChangesAsync(ct); return member;
+    }
+
+    public async Task<bool> RemoveHouseholdMember(string userId, Guid id, CancellationToken ct)
+    {
+        var household = await EditableHousehold(userId, true, ct);
+        return await db.HouseholdMembers.Where(x => x.Id == id && x.HouseholdId == household.Id && x.AccountStatus != "owner").ExecuteDeleteAsync(ct) > 0;
+    }
+
+    public async Task<HouseholdMember?> HouseholdInvitation(string tokenHash, CancellationToken ct) =>
+        await db.HouseholdMembers.FirstOrDefaultAsync(x => x.InvitationTokenHash == tokenHash, ct);
+
+    public async Task<bool> AcceptHouseholdInvitation(string userId, string tokenHash, DateTimeOffset now, CancellationToken ct)
+    {
+        await Profile(userId, ct);
+        var member = await db.HouseholdMembers.FirstOrDefaultAsync(x => x.InvitationTokenHash == tokenHash && x.InvitationExpiresAt > now, ct);
+        if (member is null || await db.HouseholdMembers.AnyAsync(x => x.LinkedUserId == userId && x.AccountStatus != "owner", ct)) return false;
+        var owned = await db.Households.FirstOrDefaultAsync(x => x.OwnerUserId == userId, ct);
+        if (owned is not null)
+        {
+            var empty = !await db.HouseholdBudgets.AnyAsync(x => x.HouseholdId == owned.Id, ct)
+                && !await db.HouseholdResidences.AnyAsync(x => x.HouseholdId == owned.Id, ct)
+                && !await db.HouseholdVehicles.AnyAsync(x => x.HouseholdId == owned.Id, ct)
+                && !await db.HouseholdContracts.AnyAsync(x => x.HouseholdId == owned.Id, ct)
+                && await db.HouseholdMembers.CountAsync(x => x.HouseholdId == owned.Id, ct) == 1;
+            if (!empty) return false;
+            db.Households.Remove(owned);
+        }
+        member.LinkedUserId = userId; member.AccountStatus = "linked";
+        member.InvitationTokenHash = null; member.InvitationExpiresAt = null; member.UpdatedAt = now;
+        await db.SaveChangesAsync(ct); return true;
+    }
+
+    private async Task ReplaceBudgetMembers(Household household, Guid budgetId, IReadOnlyList<Guid> memberIds, CancellationToken ct)
+    {
+        var valid = await db.HouseholdMembers.Where(x => x.HouseholdId == household.Id && memberIds.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
+        if (valid.Count != memberIds.Distinct().Count()) throw new InvalidOperationException("INVALID_MEMBER");
+        await db.HouseholdBudgetMembers.Where(x => x.BudgetId == budgetId).ExecuteDeleteAsync(ct);
+        db.HouseholdBudgetMembers.AddRange(valid.Select(x => new HouseholdBudgetMember { BudgetId = budgetId, MemberId = x }));
+    }
+
+    public async Task<HouseholdBudget> SaveHouseholdBudget(string userId, HouseholdBudget budget, IReadOnlyList<Guid> memberIds, CancellationToken ct)
+    {
+        var household = await EditableHousehold(userId, false, ct);
+        if (budget.HouseholdId != household.Id) throw new UnauthorizedAccessException();
+        var existing = await db.HouseholdBudgets.SingleOrDefaultAsync(x => x.Id == budget.Id && x.HouseholdId == household.Id, ct);
+        if (existing is null) { db.HouseholdBudgets.Add(budget); await db.SaveChangesAsync(ct); }
+        else { existing.Name = budget.Name; existing.Category = budget.Category; existing.MonthlyLimit = budget.MonthlyLimit; existing.Notes = budget.Notes; existing.UpdatedAt = budget.UpdatedAt; budget = existing; }
+        await ReplaceBudgetMembers(household, budget.Id, memberIds.Distinct().ToArray(), ct);
+        await db.SaveChangesAsync(ct); return budget;
+    }
+
+    public async Task<bool> RemoveHouseholdBudget(string userId, Guid id, CancellationToken ct)
+    { var h = await EditableHousehold(userId, false, ct); return await db.HouseholdBudgets.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
+
+    public async Task<HouseholdResidence> SaveHouseholdResidence(string userId, HouseholdResidence value, CancellationToken ct)
+    {
+        var h = await EditableHousehold(userId, false, ct); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException();
+        var existing = await db.HouseholdResidences.SingleOrDefaultAsync(x => x.Id == value.Id && x.HouseholdId == h.Id, ct);
+        if (existing is null) db.HouseholdResidences.Add(value); else { existing.Name = value.Name; existing.Kind = value.Kind; existing.Address = value.Address; existing.Notes = value.Notes; existing.UpdatedAt = value.UpdatedAt; value = existing; }
+        await db.SaveChangesAsync(ct); return value;
+    }
+    public async Task<bool> RemoveHouseholdResidence(string userId, Guid id, CancellationToken ct)
+    { var h = await EditableHousehold(userId, false, ct); return await db.HouseholdResidences.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
+
+    public async Task<HouseholdVehicle> SaveHouseholdVehicle(string userId, HouseholdVehicle value, CancellationToken ct)
+    {
+        var h = await EditableHousehold(userId, false, ct); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException();
+        var existing = await db.HouseholdVehicles.SingleOrDefaultAsync(x => x.Id == value.Id && x.HouseholdId == h.Id, ct);
+        if (existing is null) db.HouseholdVehicles.Add(value); else { existing.Name = value.Name; existing.Registration = value.Registration; existing.Notes = value.Notes; existing.UpdatedAt = value.UpdatedAt; value = existing; }
+        await db.SaveChangesAsync(ct); return value;
+    }
+    public async Task<bool> RemoveHouseholdVehicle(string userId, Guid id, CancellationToken ct)
+    { var h = await EditableHousehold(userId, false, ct); return await db.HouseholdVehicles.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
+
+    public async Task<HouseholdContract> SaveHouseholdContract(string userId, HouseholdContract value, IReadOnlyList<Guid> memberIds, CancellationToken ct)
+    {
+        var h = await EditableHousehold(userId, false, ct); if (value.HouseholdId != h.Id) throw new UnauthorizedAccessException();
+        if (value.ResidenceId is Guid rid && !await db.HouseholdResidences.AnyAsync(x => x.Id == rid && x.HouseholdId == h.Id, ct)) throw new InvalidOperationException("INVALID_RESIDENCE");
+        if (value.VehicleId is Guid vid && !await db.HouseholdVehicles.AnyAsync(x => x.Id == vid && x.HouseholdId == h.Id, ct)) throw new InvalidOperationException("INVALID_VEHICLE");
+        var existing = await db.HouseholdContracts.SingleOrDefaultAsync(x => x.Id == value.Id && x.HouseholdId == h.Id, ct);
+        if (existing is null) { db.HouseholdContracts.Add(value); await db.SaveChangesAsync(ct); }
+        else { existing.Name = value.Name; existing.Category = value.Category; existing.Provider = value.Provider; existing.MonthlyAmount = value.MonthlyAmount; existing.RenewalDate = value.RenewalDate; existing.ResidenceId = value.ResidenceId; existing.VehicleId = value.VehicleId; existing.Notes = value.Notes; existing.UpdatedAt = value.UpdatedAt; value = existing; }
+        var valid = await db.HouseholdMembers.Where(x => x.HouseholdId == h.Id && memberIds.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
+        if (valid.Count != memberIds.Distinct().Count()) throw new InvalidOperationException("INVALID_MEMBER");
+        await db.HouseholdContractMembers.Where(x => x.ContractId == value.Id).ExecuteDeleteAsync(ct);
+        db.HouseholdContractMembers.AddRange(valid.Select(x => new HouseholdContractMember { ContractId = value.Id, MemberId = x }));
+        await db.SaveChangesAsync(ct); return value;
+    }
+    public async Task<bool> RemoveHouseholdContract(string userId, Guid id, CancellationToken ct)
+    { var h = await EditableHousehold(userId, false, ct); return await db.HouseholdContracts.Where(x => x.Id == id && x.HouseholdId == h.Id).ExecuteDeleteAsync(ct) > 0; }
 }

@@ -17,6 +17,8 @@ import type {
   UserDocument,
   Deadline,
   DocumentCategory,
+  HouseholdWorkspace,
+  HouseholdMember,
 } from '../types/api';
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ??
@@ -289,6 +291,60 @@ export const api = {
     }),
   deleteDeadline: (id: string) =>
     request(`/deadlines/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  household: () => request<HouseholdWorkspace>('/household'),
+  saveHouseholdMember: (
+    id: string | null,
+    value: {
+      displayName: string;
+      relationship: string;
+      birthDate: string | null;
+      email: string | null;
+      inviteToAccount: boolean;
+      accessRole: 'viewer' | 'editor';
+    },
+  ) =>
+    request<HouseholdMember>(
+      id ? `/household/members/${encodeURIComponent(id)}` : '/household/members',
+      {
+        method: id ? 'PATCH' : 'POST',
+        body: JSON.stringify(value),
+      },
+    ),
+  deleteHouseholdMember: (id: string) =>
+    request(`/household/members/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  acceptHouseholdInvitation: (code: string) =>
+    request<HouseholdWorkspace>('/household/invitations/accept', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  saveHouseholdBudget: (id: string, value: object) =>
+    request<HouseholdWorkspace>(`/household/budgets/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(value),
+    }),
+  deleteHouseholdBudget: (id: string) =>
+    request(`/household/budgets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  saveHouseholdResidence: (id: string, value: object) =>
+    request<HouseholdWorkspace>(`/household/residences/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(value),
+    }),
+  deleteHouseholdResidence: (id: string) =>
+    request(`/household/residences/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  saveHouseholdVehicle: (id: string, value: object) =>
+    request<HouseholdWorkspace>(`/household/vehicles/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(value),
+    }),
+  deleteHouseholdVehicle: (id: string) =>
+    request(`/household/vehicles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  saveHouseholdContract: (id: string, value: object) =>
+    request<HouseholdWorkspace>(`/household/contracts/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(value),
+    }),
+  deleteHouseholdContract: (id: string) =>
+    request(`/household/contracts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   verifyRevenueCat: (productId: string, transactionId: string, key: string) =>
     request<PremiumStatus>('/premium/verify-purchase', {
       method: 'POST',

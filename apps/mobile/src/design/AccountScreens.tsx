@@ -171,6 +171,12 @@ export function ProfileScreen() {
       onPress: () => nav.navigate('Deadlines'),
     },
     {
+      icon: 'people-outline',
+      title: 'Mon foyer',
+      subtitle: 'Membres, budgets et biens partagés',
+      onPress: () => nav.navigate('Household'),
+    },
+    {
       icon: 'notifications-outline',
       title: 'Notifications',
       subtitle: profile.data?.notificationsEnabled ? 'Activées' : 'Désactivées',

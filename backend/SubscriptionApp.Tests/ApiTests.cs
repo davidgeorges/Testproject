@@ -166,6 +166,65 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task HouseholdSupportsManagedChildrenSharedBudgetsAndAssets()
+    {
+        using var c = await Session();
+        var household = (await c.GetFromJsonAsync<JsonElement>("/api/v1/household"));
+        Assert.Single(household.GetProperty("members").EnumerateArray());
+
+        var childResponse = await c.PostAsJsonAsync("/api/v1/household/members", new
+        {
+            displayName = "Emma",
+            relationship = "child",
+            birthDate = "2018-05-12",
+            email = (string?)null,
+            inviteToAccount = false,
+            accessRole = "viewer",
+        });
+        Assert.Equal(HttpStatusCode.Created, childResponse.StatusCode);
+        var child = await childResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var childId = child.GetProperty("id").GetGuid();
+        Assert.Equal("managed", child.GetProperty("accountStatus").GetString());
+        Assert.False(child.GetProperty("hasAccount").GetBoolean());
+
+        var budgetId = Guid.NewGuid();
+        var budget = await c.PutAsJsonAsync($"/api/v1/household/budgets/{budgetId}", new
+        {
+            name = "Budget enfants", category = "children", monthlyLimit = 300m,
+            notes = "Activités et vêtements", memberIds = new[] { childId },
+        });
+        budget.EnsureSuccessStatusCode();
+        var budgetJson = await budget.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains(budgetJson.GetProperty("budgets").EnumerateArray(), x =>
+            x.GetProperty("id").GetGuid() == budgetId
+            && x.GetProperty("memberIds")[0].GetGuid() == childId);
+
+        var homeId = Guid.NewGuid();
+        (await c.PutAsJsonAsync($"/api/v1/household/residences/{homeId}", new
+        { name = "Maison", kind = "primary", address = "Versailles", notes = (string?)null })).EnsureSuccessStatusCode();
+        var vehicleId = Guid.NewGuid();
+        (await c.PutAsJsonAsync($"/api/v1/household/vehicles/{vehicleId}", new
+        { name = "Voiture familiale", registration = "AB-123-CD", notes = (string?)null })).EnsureSuccessStatusCode();
+        var contractId = Guid.NewGuid();
+        (await c.PutAsJsonAsync($"/api/v1/household/contracts/{contractId}", new
+        {
+            name = "Assurance habitation", category = "insurance", provider = "Assureur",
+            monthlyAmount = 24.50m, renewalDate = "2027-01-15", residenceId = homeId,
+            vehicleId = (Guid?)null, notes = (string?)null, memberIds = new[] { childId },
+        })).EnsureSuccessStatusCode();
+
+        var final = await c.GetFromJsonAsync<JsonElement>("/api/v1/household");
+        Assert.Equal(2, final.GetProperty("members").GetArrayLength());
+        Assert.Single(final.GetProperty("residences").EnumerateArray());
+        Assert.Single(final.GetProperty("vehicles").EnumerateArray());
+        Assert.Single(final.GetProperty("contracts").EnumerateArray());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/household/contracts/{contractId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/household/budgets/{budgetId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/household/members/{childId}")).StatusCode);
+    }
+
+    [Fact]
     public async Task ProfileAccentColorIsValidatedNormalizedAndPersisted()
     {
         using var c = await Session();

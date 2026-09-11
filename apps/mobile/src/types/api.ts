@@ -219,3 +219,61 @@ export interface Deadline {
   sourceId: string | null;
   editable: boolean;
 }
+
+export interface HouseholdMember {
+  id: string;
+  displayName: string;
+  relationship: 'self' | 'partner' | 'child' | 'parent' | 'relative' | 'other';
+  birthDate: string | null;
+  email: string | null;
+  accountStatus: 'owner' | 'managed' | 'invited' | 'linked';
+  accessRole: 'owner' | 'editor' | 'viewer';
+  hasAccount: boolean;
+  invitationPending: boolean;
+  invitationExpiresAt: string | null;
+  invitationCode?: string | null;
+}
+export interface HouseholdBudget {
+  id: string;
+  name: string;
+  category: string;
+  monthlyLimit: number;
+  notes: string | null;
+  memberIds: string[];
+}
+export interface HouseholdResidence {
+  id: string;
+  name: string;
+  kind: 'primary' | 'secondary';
+  address: string | null;
+  notes: string | null;
+}
+export interface HouseholdVehicle {
+  id: string;
+  name: string;
+  registration: string | null;
+  notes: string | null;
+}
+export interface HouseholdContract {
+  id: string;
+  name: string;
+  category: string;
+  provider: string | null;
+  monthlyAmount: number | null;
+  renewalDate: string | null;
+  residenceId: string | null;
+  vehicleId: string | null;
+  notes: string | null;
+  memberIds: string[];
+}
+export interface HouseholdWorkspace {
+  id: string;
+  name: string;
+  canManageMembers: boolean;
+  canEdit: boolean;
+  members: HouseholdMember[];
+  budgets: HouseholdBudget[];
+  residences: HouseholdResidence[];
+  vehicles: HouseholdVehicle[];
+  contracts: HouseholdContract[];
+}

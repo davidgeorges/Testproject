@@ -107,3 +107,7 @@ Pour inclure le test PostgreSQL, définir `TEST_POSTGRES` vers une **base dédi�
 La V1 technique relie Firebase, Tink, Neon PostgreSQL, Upstash Redis, RevenueCat et Expo Push. Le catalogue de production démarre vide et s’administre via les routes réservées aux comptes portant le claim Firebase `admin=true`. Les produits réels App Store/Google Play, les contrats de partenaires et la publication sur les stores demandent des comptes commerciaux et restent hors de ce lot.
 
 Le suivi détaillé des exigences et les décisions sont dans [docs/implementation.md](docs/implementation.md).
+
+## Foyer partagé
+
+L’écran **Foyer** gère des membres avec ou sans compte, des invitations temporaires, des budgets mensuels affectés à plusieurs personnes, les logements, les véhicules et les contrats. Les enfants et proches peuvent rester de simples profils gérés : aucune inscription n’est nécessaire pour les inclure dans un budget. Toutes les données sont persistées dans PostgreSQL et incluses dans l’export du compte.

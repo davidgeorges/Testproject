@@ -265,6 +265,108 @@ public sealed class UserDeadline
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
+public sealed class Household
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string OwnerUserId { get; set; } = "";
+    public string Name { get; set; } = "Mon foyer";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class HouseholdMember
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid HouseholdId { get; set; }
+    public string DisplayName { get; set; } = "";
+    public string Relationship { get; set; } = "other";
+    public DateOnly? BirthDate { get; set; }
+    public string? Email { get; set; }
+    public string? LinkedUserId { get; set; }
+    public string AccountStatus { get; set; } = "managed";
+    public string AccessRole { get; set; } = "viewer";
+    public string? InvitationTokenHash { get; set; }
+    public DateTimeOffset? InvitationExpiresAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class HouseholdBudget
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid HouseholdId { get; set; }
+    public string Name { get; set; } = "";
+    public string Category { get; set; } = "other";
+    public decimal MonthlyLimit { get; set; }
+    public string? Notes { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class HouseholdBudgetMember
+{
+    public Guid BudgetId { get; set; }
+    public Guid MemberId { get; set; }
+}
+
+public sealed class HouseholdResidence
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid HouseholdId { get; set; }
+    public string Name { get; set; } = "";
+    public string Kind { get; set; } = "primary";
+    public string? Address { get; set; }
+    public string? Notes { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class HouseholdVehicle
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid HouseholdId { get; set; }
+    public string Name { get; set; } = "";
+    public string? Registration { get; set; }
+    public string? Notes { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class HouseholdContract
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid HouseholdId { get; set; }
+    public string Name { get; set; } = "";
+    public string Category { get; set; } = "other";
+    public string? Provider { get; set; }
+    public decimal? MonthlyAmount { get; set; }
+    public DateOnly? RenewalDate { get; set; }
+    public Guid? ResidenceId { get; set; }
+    public Guid? VehicleId { get; set; }
+    public string? Notes { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class HouseholdContractMember
+{
+    public Guid ContractId { get; set; }
+    public Guid MemberId { get; set; }
+}
+
+public sealed record HouseholdSnapshot(
+    Household Household,
+    IReadOnlyList<HouseholdMember> Members,
+    IReadOnlyList<HouseholdBudget> Budgets,
+    IReadOnlyDictionary<Guid, Guid[]> BudgetMemberIds,
+    IReadOnlyList<HouseholdResidence> Residences,
+    IReadOnlyList<HouseholdVehicle> Vehicles,
+    IReadOnlyList<HouseholdContract> Contracts,
+    IReadOnlyDictionary<Guid, Guid[]> ContractMemberIds,
+    bool CanManageMembers,
+    bool CanEdit
+);
+
 public sealed class StoredRecurringPayment
 {
     public string Id { get; set; } = "";

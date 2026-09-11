@@ -101,6 +101,19 @@ public interface IWorkspaceStore
     Task FailAccountDeletion(Guid id, string error, DateTimeOffset now, CancellationToken ct);
     Task DeleteAccount(string userId, CancellationToken ct);
     Task<int> PurgeExpiredData(DateTimeOffset now, CancellationToken ct);
+    Task<HouseholdSnapshot> Household(string userId, CancellationToken ct);
+    Task<HouseholdMember> SaveHouseholdMember(string userId, HouseholdMember member, CancellationToken ct);
+    Task<bool> RemoveHouseholdMember(string userId, Guid id, CancellationToken ct);
+    Task<HouseholdMember?> HouseholdInvitation(string tokenHash, CancellationToken ct);
+    Task<bool> AcceptHouseholdInvitation(string userId, string tokenHash, DateTimeOffset now, CancellationToken ct);
+    Task<HouseholdBudget> SaveHouseholdBudget(string userId, HouseholdBudget budget, IReadOnlyList<Guid> memberIds, CancellationToken ct);
+    Task<bool> RemoveHouseholdBudget(string userId, Guid id, CancellationToken ct);
+    Task<HouseholdResidence> SaveHouseholdResidence(string userId, HouseholdResidence residence, CancellationToken ct);
+    Task<bool> RemoveHouseholdResidence(string userId, Guid id, CancellationToken ct);
+    Task<HouseholdVehicle> SaveHouseholdVehicle(string userId, HouseholdVehicle vehicle, CancellationToken ct);
+    Task<bool> RemoveHouseholdVehicle(string userId, Guid id, CancellationToken ct);
+    Task<HouseholdContract> SaveHouseholdContract(string userId, HouseholdContract contract, IReadOnlyList<Guid> memberIds, CancellationToken ct);
+    Task<bool> RemoveHouseholdContract(string userId, Guid id, CancellationToken ct);
 }
 
 public interface IBankingProvider
@@ -268,7 +281,8 @@ public sealed record UserDataExport(
     IReadOnlyList<StoredRecurringPayment> StoredPayments,
     IReadOnlyList<StoredRecommendation> StoredRecommendations,
     IReadOnlyList<ExportedDocument> Documents,
-    IReadOnlyList<UserDeadline> Deadlines
+    IReadOnlyList<UserDeadline> Deadlines,
+    HouseholdSnapshot Household
 );
 
 public sealed record ExportedDocument(
