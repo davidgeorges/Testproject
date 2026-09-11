@@ -100,7 +100,12 @@ export function useGoogleSignIn() {
   const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const usesExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-  const expoProxyRedirectUri = usesExpoGo ? AuthSession.getRedirectUrl() : undefined;
+  const expoOwner = Constants.expoConfig?.owner;
+  const expoSlug = Constants.expoConfig?.slug;
+  const expoProxyRedirectUri =
+    usesExpoGo && expoOwner && expoSlug
+      ? `https://auth.expo.io/@${expoOwner}/${expoSlug}`
+      : undefined;
   const webRedirectUri =
     Platform.OS === 'web' ? AuthSession.makeRedirectUri({ path: 'Login' }) : undefined;
   const iosRedirectScheme = iosClientId
