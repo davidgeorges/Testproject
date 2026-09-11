@@ -70,6 +70,12 @@ npm run api
 
 Les migrations créent notamment les profils, connexions, comptes et transactions bancaires, consentements, analyses, notifications, appareils push, clés d’idempotence, abonnements et événements Premium, et événements d’audit. En production elles sont appliquées au démarrage avant l’ouverture de l’API. `Database__ApplyMigrationsOnStartup=false` permet de déléguer cette étape à une procédure externe.
 
+## Documents et OCR
+
+Le coffre documentaire accepte les PDF, JPEG et PNG jusqu’à 10 Mo. Les fichiers sont chiffrés avec ASP.NET Data Protection avant leur stockage dans PostgreSQL ; les réponses de liste et l’export de données ne contiennent jamais les octets du fichier. Le conteneur exécute Poppler pour lire ou convertir les PDF et Tesseract 5 avec les modèles français et anglais pour les pages scannées. L’analyse est limitée à dix pages et 45 secondes afin de protéger la mémoire du service gratuit. Le titre, la catégorie, l’organisme, le montant, les dates et le numéro de contrat détectés restent modifiables par l’utilisateur.
+
+Les clés Data Protection persistées sont indispensables pour relire les documents après un redéploiement. Leur perte rend les fichiers stockés illisibles.
+
 ## Vérifier le code
 
 ```powershell

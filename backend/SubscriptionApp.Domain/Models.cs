@@ -227,6 +227,29 @@ public sealed class AccountDeletionJob
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
+public sealed class UserDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string UserId { get; set; } = "";
+    public string OriginalFileName { get; set; } = "";
+    public string ContentType { get; set; } = "";
+    public long Size { get; set; }
+    public string Sha256 { get; set; } = "";
+    public byte[] ProtectedContent { get; set; } = [];
+    public string Status { get; set; } = "processing";
+    public string Category { get; set; } = "other";
+    public string Title { get; set; } = "Document";
+    public string? Issuer { get; set; }
+    public string ExtractedText { get; set; } = "";
+    public decimal? Amount { get; set; }
+    public DateOnly? DocumentDate { get; set; }
+    public DateOnly? DueDate { get; set; }
+    public string? ContractNumber { get; set; }
+    public string? ProcessingError { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 public sealed class StoredRecurringPayment
 {
     public string Id { get; set; } = "";

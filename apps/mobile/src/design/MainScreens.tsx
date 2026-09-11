@@ -505,6 +505,11 @@ export function DashboardScreen() {
       icon: 'stats-chart',
       onPress: () => nav.navigate('Main', { screen: 'Savings' }),
     },
+    {
+      label: 'Documents',
+      icon: 'folder-open',
+      onPress: () => nav.navigate('Documents'),
+    },
   ];
 
   return (

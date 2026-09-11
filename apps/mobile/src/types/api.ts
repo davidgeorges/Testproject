@@ -176,3 +176,32 @@ export interface PremiumStatus {
   provider: string | null;
   isDemo: boolean;
 }
+
+export type DocumentCategory =
+  | 'invoice'
+  | 'insurance'
+  | 'bank'
+  | 'work'
+  | 'housing'
+  | 'vehicle'
+  | 'tax'
+  | 'other';
+
+export interface UserDocument {
+  id: string;
+  originalFileName: string;
+  contentType: string;
+  size: number;
+  status: 'processing' | 'ready' | 'confirmed' | 'failed' | string;
+  category: DocumentCategory;
+  title: string;
+  issuer: string | null;
+  extractedText: string | null;
+  amount: number | null;
+  documentDate: string | null;
+  dueDate: string | null;
+  contractNumber: string | null;
+  processingError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

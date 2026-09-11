@@ -24,4 +24,6 @@ export type RootStackParams = {
   System: { kind: 'error' | 'empty' | 'success' };
   Menu: undefined;
   Info: { kind: 'security' | 'privacy' | 'support' };
+  Documents: undefined;
+  Document: { id: string };
 };

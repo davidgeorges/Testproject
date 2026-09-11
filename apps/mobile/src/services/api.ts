@@ -14,6 +14,8 @@ import type {
   Profile,
   PremiumStatus,
   Recommendation,
+  UserDocument,
+  DocumentCategory,
 } from '../types/api';
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ??
@@ -78,6 +80,24 @@ async function requestText(path: string, init: ApiRequestInit = {}): Promise<str
     throw new ApiError(response.status, 'EXPORT_FAILED', 'L’export des transactions a échoué.');
   }
   return response.text();
+}
+async function requestForm<T>(path: string, form: FormData): Promise<T> {
+  const token = useSession.getState().token;
+  const response = await fetch(`${API_URL}/api/v1${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    if (response.status === 401) useSession.getState().setToken(null);
+    throw new ApiError(
+      response.status,
+      body.code ?? 'UPLOAD_FAILED',
+      body.message ?? 'L’import a échoué.',
+    );
+  }
+  return (await response.json()) as T;
 }
 const financeQuery = (filters: FinanceFilters = {}) => {
   const query = new URLSearchParams();
@@ -202,6 +222,46 @@ export const api = {
   removePushDevice: (id: string) =>
     request(`/push/devices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   premiumStatus: () => request<PremiumStatus>('/premium/status'),
+  documents: (search = '', category = 'all') => {
+    const query = new URLSearchParams();
+    if (search.trim()) query.set('search', search.trim());
+    if (category !== 'all') query.set('category', category);
+    const encoded = query.toString();
+    return request<UserDocument[]>(`/documents${encoded ? `?${encoded}` : ''}`);
+  },
+  document: (id: string) => request<UserDocument>(`/documents/${encodeURIComponent(id)}`),
+  uploadDocument: (form: FormData) => requestForm<UserDocument>('/documents', form),
+  updateDocument: (
+    id: string,
+    value: {
+      title: string;
+      category: DocumentCategory;
+      issuer: string | null;
+      amount: number | null;
+      documentDate: string | null;
+      dueDate: string | null;
+      contractNumber: string | null;
+    },
+  ) =>
+    request<UserDocument>(`/documents/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(value),
+    }),
+  deleteDocument: (id: string) =>
+    request(`/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  documentContent: async (id: string) => {
+    const token = useSession.getState().token;
+    const response = await fetch(`${API_URL}/api/v1/documents/${encodeURIComponent(id)}/content`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok)
+      throw new ApiError(
+        response.status,
+        'DOCUMENT_OPEN_FAILED',
+        'Le document ne peut pas être ouvert.',
+      );
+    return response.blob();
+  },
   verifyRevenueCat: (productId: string, transactionId: string, key: string) =>
     request<PremiumStatus>('/premium/verify-purchase', {
       method: 'POST',

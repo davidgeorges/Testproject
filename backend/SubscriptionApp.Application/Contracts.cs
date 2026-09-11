@@ -32,6 +32,11 @@ public interface IWorkspaceStore
     Task SaveCategoryBudget(CategoryBudget budget, CancellationToken ct);
     Task<bool> RemoveCategoryBudget(string userId, string category, CancellationToken ct);
     Task<CategoryBudget?> CategoryBudget(string userId, string category, CancellationToken ct);
+    Task<IReadOnlyList<UserDocument>> Documents(string userId, CancellationToken ct);
+    Task<UserDocument?> Document(string userId, Guid id, CancellationToken ct);
+    Task AddDocument(UserDocument document, CancellationToken ct);
+    Task SaveDocument(UserDocument document, CancellationToken ct);
+    Task<bool> RemoveDocument(string userId, Guid id, CancellationToken ct);
     Task Synchronize(
         BankConnection connection,
         IReadOnlyList<BankTransaction> transactions,
@@ -206,6 +211,24 @@ public interface ITransactionNormalizer
     IReadOnlyList<BankTransaction> Normalize(IReadOnlyList<BankTransaction> transactions);
 }
 
+public interface IDocumentTextExtractor
+{
+    Task<DocumentExtraction> Extract(string fileName, string contentType, byte[] content, CancellationToken ct);
+}
+
+public sealed record DocumentExtraction(
+    string Text,
+    string Category,
+    string Title,
+    string? Issuer,
+    decimal? Amount,
+    DateOnly? DocumentDate,
+    DateOnly? DueDate,
+    string? ContractNumber,
+    string Status,
+    string? ErrorCode
+);
+
 public sealed record Dashboard(
     int SubscriptionCount,
     decimal MonthlyRecurringCost,
@@ -235,7 +258,26 @@ public sealed record UserDataExport(
     PremiumSubscription? PremiumSubscription,
     IReadOnlyList<PremiumWebhookEvent> PremiumWebhookEvents,
     IReadOnlyList<StoredRecurringPayment> StoredPayments,
-    IReadOnlyList<StoredRecommendation> StoredRecommendations
+    IReadOnlyList<StoredRecommendation> StoredRecommendations,
+    IReadOnlyList<ExportedDocument> Documents
+);
+
+public sealed record ExportedDocument(
+    Guid Id,
+    string OriginalFileName,
+    string ContentType,
+    long Size,
+    string Status,
+    string Category,
+    string Title,
+    string? Issuer,
+    string ExtractedText,
+    decimal? Amount,
+    DateOnly? DocumentDate,
+    DateOnly? DueDate,
+    string? ContractNumber,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt
 );
 
 public sealed record ExportedBankConnection(

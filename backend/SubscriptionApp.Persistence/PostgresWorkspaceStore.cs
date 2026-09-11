@@ -232,6 +232,57 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         .OrderByDescending(e => e.OccurredAt)
         .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<UserDocument>> Documents(string userId, CancellationToken ct) =>
+        await db.Documents.AsNoTracking()
+            .Where(d => d.UserId == userId)
+            .OrderByDescending(d => d.CreatedAt)
+            .Select(d => new UserDocument
+            {
+                Id = d.Id,
+                UserId = d.UserId,
+                OriginalFileName = d.OriginalFileName,
+                ContentType = d.ContentType,
+                Size = d.Size,
+                Sha256 = d.Sha256,
+                Status = d.Status,
+                Category = d.Category,
+                Title = d.Title,
+                Issuer = d.Issuer,
+                ExtractedText = d.ExtractedText,
+                Amount = d.Amount,
+                DocumentDate = d.DocumentDate,
+                DueDate = d.DueDate,
+                ContractNumber = d.ContractNumber,
+                ProcessingError = d.ProcessingError,
+                CreatedAt = d.CreatedAt,
+                UpdatedAt = d.UpdatedAt,
+            })
+            .ToListAsync(ct);
+
+    public async Task<UserDocument?> Document(string userId, Guid id, CancellationToken ct) =>
+        await db.Documents.SingleOrDefaultAsync(d => d.UserId == userId && d.Id == id, ct);
+
+    public async Task AddDocument(UserDocument document, CancellationToken ct)
+    {
+        await Profile(document.UserId, ct);
+        db.Documents.Add(document);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+        {
+            db.Entry(document).State = EntityState.Detached;
+            throw new InvalidOperationException("DOCUMENT_EXISTS", exception);
+        }
+    }
+
+    public async Task SaveDocument(UserDocument document, CancellationToken ct)
+    {
+        db.Documents.Update(document);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> RemoveDocument(string userId, Guid id, CancellationToken ct) =>
+        await db.Documents.Where(d => d.UserId == userId && d.Id == id).ExecuteDeleteAsync(ct) > 0;
+
     public async Task<bool> SaveAffiliateConversion(AffiliateConversion conversion, CancellationToken ct)
     {
         if (await db.AffiliateConversions.AnyAsync(c => c.Provider == conversion.Provider && c.ExternalConversionId == conversion.ExternalConversionId, ct)) return false;
@@ -490,6 +541,10 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
         var premiumEvents = await db.PremiumWebhookEvents.AsNoTracking().Where(e => e.UserId == userId).ToListAsync(ct);
         var storedPayments = await StoredPayments(userId, ct);
         var storedRecommendations = await StoredRecommendations(userId, ct);
+        var documents = (await Documents(userId, ct)).Select(d => new ExportedDocument(
+            d.Id, d.OriginalFileName, d.ContentType, d.Size, d.Status, d.Category, d.Title,
+            d.Issuer, d.ExtractedText, d.Amount, d.DocumentDate, d.DueDate, d.ContractNumber,
+            d.CreatedAt, d.UpdatedAt)).ToArray();
         return new(
             DateTimeOffset.UtcNow,
             profile,
@@ -509,7 +564,8 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             premium,
             premiumEvents,
             storedPayments,
-            storedRecommendations
+            storedRecommendations,
+            documents
         );
     }
 

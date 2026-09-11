@@ -19,7 +19,7 @@ using SubscriptionApp.Infrastructure;
 using SubscriptionApp.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 64 * 1024);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 11 * 1024 * 1024);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 var demo = builder.Configuration.GetValue<bool>("Demo:Enabled");
@@ -157,6 +157,7 @@ builder.Services.AddSingleton(
 builder.Services.AddSingleton<SavingsEngine>();
 builder.Services.AddSingleton<ITransactionNormalizer, TransactionNormalizer>();
 builder.Services.AddScoped<FinanceService>();
+builder.Services.AddSingleton<IDocumentTextExtractor, LocalDocumentTextExtractor>();
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"];
 var openAiModel = builder.Configuration["OpenAI:Model"];
 if (!string.IsNullOrWhiteSpace(openAiApiKey) && !string.IsNullOrWhiteSpace(openAiModel))
@@ -308,7 +309,7 @@ app.Use(
         ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
         ctx.Response.Headers["X-Frame-Options"] = "DENY";
         ctx.Response.Headers["Referrer-Policy"] = "no-referrer";
-        ctx.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        ctx.Response.Headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()";
         ctx.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
         ctx.Response.Headers["X-Correlation-ID"] = ctx.TraceIdentifier;
         ctx.Response.Headers.CacheControl = "no-store";
@@ -713,6 +714,25 @@ static IResult Unavailable(HttpContext c, string code, string message) =>
         statusCode: StatusCodes.Status503ServiceUnavailable
     );
 static BankConnectionResponse SafeBank(BankConnection bank) => new(bank.Id, bank.BankName, bank.Provider, bank.Status, bank.LastSyncAt, bank.ConsentExpiresAt, bank.AuthorizationUrl);
+static object SafeDocument(UserDocument document, bool includeText = false) => new
+{
+    document.Id,
+    document.OriginalFileName,
+    document.ContentType,
+    document.Size,
+    document.Status,
+    document.Category,
+    document.Title,
+    document.Issuer,
+    ExtractedText = includeText ? document.ExtractedText : null,
+    document.Amount,
+    document.DocumentDate,
+    document.DueDate,
+    document.ContractNumber,
+    document.ProcessingError,
+    document.CreatedAt,
+    document.UpdatedAt,
+};
 static bool HasRecentAuthentication(HttpContext context, TimeProvider time, bool isDemo)
 {
     if (isDemo) return true;
@@ -770,6 +790,142 @@ api.MapPatch(
         await s.SaveProfile(p, ct);
         await Audit(s, c, "profile.updated", "profile", p.Id, ct);
         return Results.Ok(p);
+    }
+);
+api.MapGet(
+    "/documents",
+    async (string? search, string? category, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+    {
+        var documents = await store.Documents(User(c), ct);
+        if (!string.IsNullOrWhiteSpace(category) && category != "all")
+            documents = documents.Where(d => d.Category == category).ToArray();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            documents = documents.Where(d =>
+                d.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || d.OriginalFileName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (d.Issuer?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                || d.ExtractedText.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (d.ContractNumber?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+            ).ToArray();
+        }
+        return Results.Ok(documents.Select(d => SafeDocument(d)));
+    }
+);
+api.MapGet(
+    "/documents/{id:guid}",
+    async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+    {
+        var document = await store.Document(User(c), id, ct);
+        return document is null ? Missing(c) : Results.Ok(SafeDocument(document, true));
+    }
+);
+api.MapGet(
+    "/documents/{id:guid}/content",
+    async (Guid id, HttpContext c, IWorkspaceStore store, IDataProtectionProvider protection, CancellationToken ct) =>
+    {
+        var document = await store.Document(User(c), id, ct);
+        if (document is null) return Missing(c);
+        byte[] content;
+        try { content = protection.CreateProtector("documents:v1").Unprotect(document.ProtectedContent); }
+        catch (CryptographicException) { return Unavailable(c, "DOCUMENT_DECRYPTION_FAILED", "Le document ne peut pas être ouvert."); }
+        return Results.File(content, document.ContentType, document.OriginalFileName, enableRangeProcessing: true);
+    }
+);
+api.MapPost(
+    "/documents",
+    async (HttpContext c, IWorkspaceStore store, IDocumentTextExtractor extractor,
+        IDataProtectionProvider protection, TimeProvider time, CancellationToken ct) =>
+    {
+        if (!c.Request.HasFormContentType)
+            return Results.BadRequest(new { code = "INVALID_DOCUMENT", message = "Sélectionnez un fichier PDF ou une image." });
+        var form = await c.Request.ReadFormAsync(ct);
+        var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
+        if (file is null || file.Length is <= 0 or > 10 * 1024 * 1024)
+            return Results.BadRequest(new { code = "INVALID_DOCUMENT_SIZE", message = "Le fichier doit faire moins de 10 Mo." });
+        var contentType = file.ContentType.ToLowerInvariant();
+        if (contentType is not ("application/pdf" or "image/jpeg" or "image/png"))
+            return Results.BadRequest(new { code = "INVALID_DOCUMENT_TYPE", message = "Formats acceptés : PDF, JPEG et PNG." });
+        await using var input = file.OpenReadStream();
+        using var memory = new MemoryStream();
+        await input.CopyToAsync(memory, ct);
+        var content = memory.ToArray();
+        var signatureValid = contentType switch
+        {
+            "application/pdf" => content.AsSpan().StartsWith("%PDF-"u8),
+            "image/png" => content.AsSpan().StartsWith(new byte[] { 0x89, 0x50, 0x4E, 0x47 }),
+            "image/jpeg" => content.AsSpan().StartsWith(new byte[] { 0xFF, 0xD8, 0xFF }),
+            _ => false,
+        };
+        if (!signatureValid)
+            return Results.BadRequest(new { code = "INVALID_DOCUMENT_CONTENT", message = "Le contenu du fichier ne correspond pas à son format." });
+        var userId = User(c);
+        var sha = Convert.ToHexString(SHA256.HashData(content));
+        if ((await store.Documents(userId, ct)).Any(d => d.Sha256 == sha))
+            return Results.Conflict(new { code = "DOCUMENT_ALREADY_EXISTS", message = "Ce document a déjà été importé." });
+        var now = time.GetUtcNow();
+        var analysis = await extractor.Extract(file.FileName, contentType, content, ct);
+        var document = new UserDocument
+        {
+            UserId = userId,
+            OriginalFileName = Path.GetFileName(file.FileName)[..Math.Min(Path.GetFileName(file.FileName).Length, 255)],
+            ContentType = contentType,
+            Size = file.Length,
+            Sha256 = sha,
+            ProtectedContent = protection.CreateProtector("documents:v1").Protect(content),
+            Status = analysis.Status,
+            Category = analysis.Category,
+            Title = analysis.Title,
+            Issuer = analysis.Issuer,
+            ExtractedText = analysis.Text,
+            Amount = analysis.Amount,
+            DocumentDate = analysis.DocumentDate,
+            DueDate = analysis.DueDate,
+            ContractNumber = analysis.ContractNumber,
+            ProcessingError = analysis.ErrorCode,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        try { await store.AddDocument(document, ct); }
+        catch (InvalidOperationException exception) when (exception.Message == "DOCUMENT_EXISTS")
+        {
+            return Results.Conflict(new { code = "DOCUMENT_ALREADY_EXISTS", message = "Ce document a déjà été importé." });
+        }
+        await Audit(store, c, "document.imported", "document", document.Id.ToString(), ct);
+        return Results.Created($"/api/v1/documents/{document.Id}", SafeDocument(document, true));
+    }
+).DisableAntiforgery();
+api.MapPatch(
+    "/documents/{id:guid}",
+    async (Guid id, DocumentUpdateRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        var document = await store.Document(User(c), id, ct);
+        if (document is null) return Missing(c);
+        string[] categories = ["invoice", "insurance", "bank", "work", "housing", "vehicle", "tax", "other"];
+        if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Length > 160 || !categories.Contains(request.Category))
+            return Results.BadRequest(new { code = "INVALID_DOCUMENT", message = "Vérifiez le titre et la catégorie." });
+        document.Title = request.Title.Trim();
+        document.Category = request.Category;
+        document.Issuer = string.IsNullOrWhiteSpace(request.Issuer) ? null : request.Issuer.Trim()[..Math.Min(request.Issuer.Trim().Length, 160)];
+        document.Amount = request.Amount;
+        document.DocumentDate = request.DocumentDate;
+        document.DueDate = request.DueDate;
+        document.ContractNumber = string.IsNullOrWhiteSpace(request.ContractNumber) ? null : request.ContractNumber.Trim()[..Math.Min(request.ContractNumber.Trim().Length, 120)];
+        document.Status = "confirmed";
+        document.UpdatedAt = time.GetUtcNow();
+        await store.SaveDocument(document, ct);
+        await Audit(store, c, "document.updated", "document", id.ToString(), ct);
+        return Results.Ok(SafeDocument(document, true));
+    }
+);
+api.MapDelete(
+    "/documents/{id:guid}",
+    async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+    {
+        if (!await store.RemoveDocument(User(c), id, ct)) return Missing(c);
+        await Audit(store, c, "document.deleted", "document", id.ToString(), ct);
+        return Results.NoContent();
     }
 );
 api.MapGet(
@@ -1737,6 +1893,15 @@ public sealed record ProfileRequest(
 public sealed record SubscriptionPreferenceRequest(string? Category, string Status);
 public sealed record CategoryBudgetRequest(decimal MonthlyLimit, string? CategoryType, string? DisplayName = null);
 public sealed record TransactionCategoryRequest(string Category);
+public sealed record DocumentUpdateRequest(
+    string Title,
+    string Category,
+    string? Issuer,
+    decimal? Amount,
+    DateOnly? DocumentDate,
+    DateOnly? DueDate,
+    string? ContractNumber
+);
 
 public sealed record OfferRequest(
     string Category,

@@ -87,6 +87,49 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task DocumentsArePrivatePersistedEditableAndDeletable()
+    {
+        using var c = await Session();
+        using var form = new MultipartFormDataContent();
+        var bytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(file, "file", "facture-test.png");
+
+        var createdResponse = await c.PostAsync("/api/v1/documents", form);
+        Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
+        var created = await createdResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var id = created.GetProperty("id").GetGuid();
+
+        var list = (await c.GetFromJsonAsync<JsonElement[]>("/api/v1/documents"))!;
+        Assert.Contains(list, item => item.GetProperty("id").GetGuid() == id);
+
+        var content = await c.GetAsync($"/api/v1/documents/{id}/content");
+        content.EnsureSuccessStatusCode();
+        Assert.Equal(bytes, await content.Content.ReadAsByteArrayAsync());
+
+        var updated = await c.PatchAsJsonAsync($"/api/v1/documents/{id}", new
+        {
+            title = "Facture électricité",
+            category = "invoice",
+            issuer = "EDF",
+            amount = 89.45m,
+            documentDate = "2026-09-01",
+            dueDate = "2026-09-20",
+            contractNumber = "CLIENT-123",
+        });
+        updated.EnsureSuccessStatusCode();
+        Assert.Equal("confirmed", (await updated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("status").GetString());
+
+        var search = (await c.GetFromJsonAsync<JsonElement[]>("/api/v1/documents?search=EDF&category=invoice"))!;
+        Assert.Single(search);
+        Assert.Equal(id, search[0].GetProperty("id").GetGuid());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/documents/{id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/v1/documents/{id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task ProfileAccentColorIsValidatedNormalizedAndPersisted()
     {
         using var c = await Session();

@@ -159,6 +159,12 @@ export function ProfileScreen() {
       onPress: () => nav.navigate('Bank'),
     },
     {
+      icon: 'folder-open-outline',
+      title: 'Mes documents',
+      subtitle: 'Imports, analyses et échéances',
+      onPress: () => nav.navigate('Documents'),
+    },
+    {
       icon: 'notifications-outline',
       title: 'Notifications',
       subtitle: profile.data?.notificationsEnabled ? 'Activées' : 'Désactivées',

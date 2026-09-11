@@ -4,32 +4,33 @@
 
 Le document `SmartSave_Cahier_des_charges_V1_v2.docx` sert de référence fonctionnelle. Son nom commercial n’est pas repris dans le produit, conformément à la demande. L’interface a ensuite été reconstruite à partir de la planche sombre fournie : les 23 vues et les limites des assets sont décrites dans [Interface de référence](ui-reference.md).
 
-| Exigence | État actuel |
-| --- | --- |
-| Expo, TypeScript, React Navigation, TanStack Query | Implémenté |
-| Thèmes centralisés sombre et clair | Implémenté ; sombre au premier lancement |
-| Splash et quatre étapes d’onboarding | Accueil de présentation et onboarding implémentés |
-| Authentification Firebase | E-mail, inscription, réinitialisation, Google Web, persistance native et validation JWT serveur |
-| Connexion bancaire et consentement | Tink Transactions, jeton fournisseur chiffré, synchronisation, révocation distante et reconnexion |
-| Synchronisation | Synchrone pour le parcours mobile et file durable avec baux, reprises et états consultables |
-| Récurrences | Détection configurable mensuelle, trimestrielle, annuelle ; calculs `decimal` |
-| Dashboard et abonnements | Listes, détails, recherche, filtres, historique et prochaine date estimée |
-| Corrections d’abonnement | Catégorie modifiable et retrait des analyses, persistés par utilisateur |
-| Recommandations | Calcul, sélection du meilleur gain par paiement, frais inclus, hypothèses explicites |
-| Offres et affiliation | Catalogue derrière interface ; clic traçable et conversions reçues par webhook HMAC dédupliqué |
-| Profil et suppression | Prénom, thème, export, suppression serveur et suppression Firebase côté client ou compte de service |
-| Premium | Achat mensuel/annuel et restauration via le SDK RevenueCat sur les builds natifs ; statut serveur affiché dans l’application |
-| PostgreSQL | Comptes, transactions, analyses, offres, préférences, consentements, notifications, appareils push, Premium et audit persistés |
-| Redis | Cache partagé du catalogue pendant 5 minutes, invalidation sur écriture et repli PostgreSQL |
-| Notifications | Succès, opportunité et échec de synchronisation, historique in-app, lecture, registre iOS/Android et isolation utilisateur |
-| Catalogue / back-office API | Offres administrables ; clé dédiée en démo, claim Firebase `admin` en production |
-| Premium backend | Vérification de l’entitlement via l’API RevenueCat, anti-rejeu, statut persistant et webhook autorisé pour renouvellement/annulation/expiration |
-| IA explicative | Adaptateur Responses API optionnel, entrée limitée aux faits, `store: false`, validation et repli déterministe |
-| Push | Registre Expo, permissions mobiles, worker, préférences, tentatives, invalidation des jetons ; FCM direct reste disponible |
-| Rétention | Purge quotidienne : idempotence expirée, jobs à 90 jours, notifications et audit à 2 ans |
-| Stores réels, export métriques | Les adaptateurs sont prêts ; produits Apple/Google et collecteur OTLP externes à renseigner |
-| CI | Workflow de build, TypeScript, format, tests HTTP/métier/PostgreSQL et export des bundles mobiles |
-| Release iOS et Android | À configurer et valider avec les comptes développeur |
+| Exigence                                           | État actuel                                                                                                                                     |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Expo, TypeScript, React Navigation, TanStack Query | Implémenté                                                                                                                                      |
+| Thèmes centralisés sombre et clair                 | Implémenté ; sombre au premier lancement                                                                                                        |
+| Splash et quatre étapes d’onboarding               | Accueil de présentation et onboarding implémentés                                                                                               |
+| Authentification Firebase                          | E-mail, inscription, réinitialisation, Google Web, persistance native et validation JWT serveur                                                 |
+| Connexion bancaire et consentement                 | Tink Transactions, jeton fournisseur chiffré, synchronisation, révocation distante et reconnexion                                               |
+| Synchronisation                                    | Synchrone pour le parcours mobile et file durable avec baux, reprises et états consultables                                                     |
+| Récurrences                                        | Détection configurable mensuelle, trimestrielle, annuelle ; calculs `decimal`                                                                   |
+| Dashboard et abonnements                           | Listes, détails, recherche, filtres, historique et prochaine date estimée                                                                       |
+| Corrections d’abonnement                           | Catégorie modifiable et retrait des analyses, persistés par utilisateur                                                                         |
+| Recommandations                                    | Calcul, sélection du meilleur gain par paiement, frais inclus, hypothèses explicites                                                            |
+| Offres et affiliation                              | Catalogue derrière interface ; clic traçable et conversions reçues par webhook HMAC dédupliqué                                                  |
+| Profil et suppression                              | Prénom, thème, export, suppression serveur et suppression Firebase côté client ou compte de service                                             |
+| Premium                                            | Achat mensuel/annuel et restauration via le SDK RevenueCat sur les builds natifs ; statut serveur affiché dans l’application                    |
+| PostgreSQL                                         | Comptes, transactions, analyses, offres, préférences, consentements, notifications, appareils push, Premium et audit persistés                  |
+| Redis                                              | Cache partagé du catalogue pendant 5 minutes, invalidation sur écriture et repli PostgreSQL                                                     |
+| Notifications                                      | Succès, opportunité et échec de synchronisation, historique in-app, lecture, registre iOS/Android et isolation utilisateur                      |
+| Catalogue / back-office API                        | Offres administrables ; clé dédiée en démo, claim Firebase `admin` en production                                                                |
+| Premium backend                                    | Vérification de l’entitlement via l’API RevenueCat, anti-rejeu, statut persistant et webhook autorisé pour renouvellement/annulation/expiration |
+| IA explicative                                     | Adaptateur Responses API optionnel, entrée limitée aux faits, `store: false`, validation et repli déterministe                                  |
+| Push                                               | Registre Expo, permissions mobiles, worker, préférences, tentatives, invalidation des jetons ; FCM direct reste disponible                      |
+| Rétention                                          | Purge quotidienne : idempotence expirée, jobs à 90 jours, notifications et audit à 2 ans                                                        |
+| Stores réels, export métriques                     | Les adaptateurs sont prêts ; produits Apple/Google et collecteur OTLP externes à renseigner                                                     |
+| CI                                                 | Workflow de build, TypeScript, format, tests HTTP/métier/PostgreSQL et export des bundles mobiles                                               |
+| Release iOS et Android                             | À configurer et valider avec les comptes développeur                                                                                            |
+| Documents                                          | Import PDF/JPEG/PNG, stockage chiffré PostgreSQL, OCR français/anglais, classement, recherche plein texte, correction, ouverture et suppression |
 
 ## Règles implémentées
 

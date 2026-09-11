@@ -6,7 +6,7 @@ RUN dotnet restore SubscriptionApp.sln --locked-mode \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 WORKDIR /app
-RUN apk add --no-cache icu-libs krb5-libs
+RUN apk add --no-cache icu-libs krb5-libs poppler-utils tesseract-ocr tesseract-ocr-data-fra tesseract-ocr-data-eng
 ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \

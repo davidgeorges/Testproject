@@ -27,6 +27,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     private readonly List<BankTransactionCategoryRule> categoryRules = [];
     private readonly List<CategoryBudget> categoryBudgets = [];
     private readonly List<AccountDeletionJob> accountDeletionJobs = [];
+    private readonly List<UserDocument> documents = [];
 
     public Task<UserProfile> Profile(string userId, CancellationToken ct)
     {
@@ -43,6 +44,37 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
         lock (gate)
             profiles[profile.Id] = profile;
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<UserDocument>> Documents(string userId, CancellationToken ct)
+    {
+        lock (gate)
+            return Task.FromResult<IReadOnlyList<UserDocument>>(
+                documents.Where(d => d.UserId == userId).OrderByDescending(d => d.CreatedAt).ToArray()
+            );
+    }
+
+    public Task<UserDocument?> Document(string userId, Guid id, CancellationToken ct)
+    {
+        lock (gate) return Task.FromResult(documents.FirstOrDefault(d => d.UserId == userId && d.Id == id));
+    }
+
+    public Task AddDocument(UserDocument document, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            if (documents.Any(d => d.UserId == document.UserId && d.Sha256 == document.Sha256))
+                throw new InvalidOperationException("DOCUMENT_EXISTS");
+            documents.Add(document);
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task SaveDocument(UserDocument document, CancellationToken ct) => Task.CompletedTask;
+
+    public Task<bool> RemoveDocument(string userId, Guid id, CancellationToken ct)
+    {
+        lock (gate) return Task.FromResult(documents.RemoveAll(d => d.UserId == userId && d.Id == id) > 0);
     }
 
     public Task<IReadOnlyList<BankConnection>> Connections(string userId, CancellationToken ct)
@@ -589,7 +621,11 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
                         .FirstOrDefault(),
                     premiumWebhookEvents.Where(e => e.UserId == userId).ToArray(),
                     storedPayments.Where(p => p.UserId == userId).ToArray(),
-                    storedRecommendations.Where(r => r.UserId == userId).ToArray()
+                    storedRecommendations.Where(r => r.UserId == userId).ToArray(),
+                    documents.Where(d => d.UserId == userId).Select(d => new ExportedDocument(
+                        d.Id, d.OriginalFileName, d.ContentType, d.Size, d.Status, d.Category,
+                        d.Title, d.Issuer, d.ExtractedText, d.Amount, d.DocumentDate, d.DueDate,
+                        d.ContractNumber, d.CreatedAt, d.UpdatedAt)).ToArray()
                 )
             );
         }
@@ -736,6 +772,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
             transactions.RemoveAll(t => t.UserId == userId);
             categoryRules.RemoveAll(r => r.UserId == userId);
             categoryBudgets.RemoveAll(b => b.UserId == userId);
+            documents.RemoveAll(d => d.UserId == userId);
             events.RemoveAll(e => e.UserId == userId);
             affiliateConversions.RemoveAll(c => c.UserId == userId);
             consents.RemoveAll(c => c.UserId == userId);

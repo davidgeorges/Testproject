@@ -30,6 +30,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
     public DbSet<StoredRecurringPayment> StoredPayments => Set<StoredRecurringPayment>();
     public DbSet<StoredRecommendation> StoredRecommendations => Set<StoredRecommendation>();
     public DbSet<AccountDeletionJob> AccountDeletionJobs => Set<AccountDeletionJob>();
+    public DbSet<UserDocument> Documents => Set<UserDocument>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -233,5 +234,24 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<AccountDeletionJob>().ToTable("account_deletion_jobs").HasKey(j => j.Id);
         b.Entity<AccountDeletionJob>().HasIndex(j => j.UserId).IsUnique();
         b.Entity<AccountDeletionJob>().HasIndex(j => new { j.Status, j.UpdatedAt });
+        b.Entity<UserDocument>().ToTable("documents").HasKey(d => d.Id);
+        b.Entity<UserDocument>().HasIndex(d => new { d.UserId, d.CreatedAt });
+        b.Entity<UserDocument>().HasIndex(d => new { d.UserId, d.Category });
+        b.Entity<UserDocument>().HasIndex(d => new { d.UserId, d.Sha256 }).IsUnique();
+        b.Entity<UserDocument>().Property(d => d.OriginalFileName).HasMaxLength(255);
+        b.Entity<UserDocument>().Property(d => d.ContentType).HasMaxLength(100);
+        b.Entity<UserDocument>().Property(d => d.Sha256).HasMaxLength(64);
+        b.Entity<UserDocument>().Property(d => d.Status).HasMaxLength(20);
+        b.Entity<UserDocument>().Property(d => d.Category).HasMaxLength(40);
+        b.Entity<UserDocument>().Property(d => d.Title).HasMaxLength(160);
+        b.Entity<UserDocument>().Property(d => d.Issuer).HasMaxLength(160);
+        b.Entity<UserDocument>().Property(d => d.ContractNumber).HasMaxLength(120);
+        b.Entity<UserDocument>().Property(d => d.ProcessingError).HasMaxLength(80);
+        b.Entity<UserDocument>().Property(d => d.Amount).HasPrecision(18, 2);
+        b.Entity<UserDocument>()
+            .HasOne<UserProfile>()
+            .WithMany()
+            .HasForeignKey(d => d.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
