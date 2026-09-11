@@ -766,17 +766,31 @@ static bool ValidMember(HouseholdMemberRequest request, out string error)
 }
 static object HouseholdMemberResponse(HouseholdMember member, string? invitationCode = null, bool invitationEmailSent = false) => new
 {
-    member.Id, member.DisplayName, member.Relationship, member.BirthDate, member.Email,
-    member.AccountStatus, member.AccessRole, HasAccount = member.LinkedUserId is not null,
+    member.Id,
+    member.DisplayName,
+    member.Relationship,
+    member.BirthDate,
+    member.Email,
+    member.AccountStatus,
+    member.AccessRole,
+    HasAccount = member.LinkedUserId is not null,
     InvitationPending = member.AccountStatus == "invited" && member.InvitationExpiresAt > DateTimeOffset.UtcNow,
-    member.InvitationExpiresAt, InvitationCode = invitationCode,
+    member.InvitationExpiresAt,
+    InvitationCode = invitationCode,
     InvitationEmailSent = invitationEmailSent,
-    member.CanManageBudgets, member.CanManageAssets, member.CanManageContracts,
+    member.CanManageBudgets,
+    member.CanManageAssets,
+    member.CanManageContracts,
 };
 static object HouseholdResponse(HouseholdSnapshot value) => new
 {
-    id = value.Household.Id, name = value.Household.Name, value.CanManageMembers, value.CanEdit,
-    value.CanManageBudgets, value.CanManageAssets, value.CanManageContracts,
+    id = value.Household.Id,
+    name = value.Household.Name,
+    value.CanManageMembers,
+    value.CanEdit,
+    value.CanManageBudgets,
+    value.CanManageAssets,
+    value.CanManageContracts,
     members = value.Members.Select(x => HouseholdMemberResponse(x)),
     budgets = value.Budgets.Select(x =>
     {
@@ -815,9 +829,13 @@ static async Task NotifyBudgetThreshold(IWorkspaceStore store, HouseholdSnapshot
     foreach (var userId in snapshot.Members.Select(x => x.LinkedUserId).Where(x => x is not null).Distinct()!)
         await store.AddNotification(new UserNotification
         {
-            UserId = userId!, Type = "household_budget", Title = level == "exceeded" ? $"Budget {budget.Name} dépassé" : $"Budget {budget.Name} bientôt atteint",
-            Body = $"{spent:0.00} € dépensés sur {budget.MonthlyLimit:0.00} € ce mois-ci.", ResourceId = budget.Id.ToString(),
-            SourceKey = $"household-budget:{budget.Id}:{now:yyyy-MM}:{level}", CreatedAt = now,
+            UserId = userId!,
+            Type = "household_budget",
+            Title = level == "exceeded" ? $"Budget {budget.Name} dépassé" : $"Budget {budget.Name} bientôt atteint",
+            Body = $"{spent:0.00} € dépensés sur {budget.MonthlyLimit:0.00} € ce mois-ci.",
+            ResourceId = budget.Id.ToString(),
+            SourceKey = $"household-budget:{budget.Id}:{now:yyyy-MM}:{level}",
+            CreatedAt = now,
         }, ct);
 }
 static async Task SyncContractDeadlines(IWorkspaceStore store, HouseholdSnapshot snapshot, HouseholdContract contract, TimeProvider time, CancellationToken ct)
@@ -1162,8 +1180,10 @@ api.MapPost(
         var member = new HouseholdMember
         {
             HouseholdId = snapshot.Household.Id,
-            DisplayName = request.DisplayName.Trim(), Relationship = request.Relationship,
-            BirthDate = request.BirthDate, Email = Clean(request.Email),
+            DisplayName = request.DisplayName.Trim(),
+            Relationship = request.Relationship,
+            BirthDate = request.BirthDate,
+            Email = Clean(request.Email),
             AccountStatus = invite ? "invited" : "managed",
             AccessRole = invite ? request.AccessRole : "viewer",
             CanManageBudgets = invite && request.CanManageBudgets,
@@ -1171,7 +1191,8 @@ api.MapPost(
             CanManageContracts = invite && request.CanManageContracts,
             InvitationTokenHash = token is null ? null : TokenHash(token),
             InvitationExpiresAt = token is null ? null : time.GetUtcNow().AddDays(7),
-            CreatedAt = time.GetUtcNow(), UpdatedAt = time.GetUtcNow(),
+            CreatedAt = time.GetUtcNow(),
+            UpdatedAt = time.GetUtcNow(),
         };
         await store.SaveHouseholdMember(User(c), member, ct);
         var emailSent = token is not null && member.Email is not null

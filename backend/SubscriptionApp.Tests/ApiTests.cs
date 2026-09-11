@@ -198,8 +198,11 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var budgetId = Guid.NewGuid();
         var budget = await c.PutAsJsonAsync($"/api/v1/household/budgets/{budgetId}", new
         {
-            name = "Budget enfants", category = "children", monthlyLimit = 300m,
-            notes = "Activités et vêtements", memberIds = new[] { childId },
+            name = "Budget enfants",
+            category = "children",
+            monthlyLimit = 300m,
+            notes = "Activités et vêtements",
+            memberIds = new[] { childId },
         });
         budget.EnsureSuccessStatusCode();
         var budgetJson = await budget.Content.ReadFromJsonAsync<JsonElement>();
@@ -210,8 +213,12 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var expenseId = Guid.NewGuid();
         var expense = await c.PutAsJsonAsync($"/api/v1/household/expenses/{expenseId}", new
         {
-            title = "Vêtements rentrée", category = "children", amount = 72.35m,
-            occurredOn = DateOnly.FromDateTime(DateTime.UtcNow), budgetId, notes = (string?)null,
+            title = "Vêtements rentrée",
+            category = "children",
+            amount = 72.35m,
+            occurredOn = DateOnly.FromDateTime(DateTime.UtcNow),
+            budgetId,
+            notes = (string?)null,
             memberIds = new[] { childId },
         });
         expense.EnsureSuccessStatusCode();
@@ -230,9 +237,15 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var contractId = Guid.NewGuid();
         (await c.PutAsJsonAsync($"/api/v1/household/contracts/{contractId}", new
         {
-            name = "Assurance habitation", category = "insurance", provider = "Assureur",
-            monthlyAmount = 24.50m, renewalDate = "2027-01-15", residenceId = homeId,
-            vehicleId = (Guid?)null, notes = (string?)null, memberIds = new[] { childId },
+            name = "Assurance habitation",
+            category = "insurance",
+            provider = "Assureur",
+            monthlyAmount = 24.50m,
+            renewalDate = "2027-01-15",
+            residenceId = homeId,
+            vehicleId = (Guid?)null,
+            notes = (string?)null,
+            memberIds = new[] { childId },
         })).EnsureSuccessStatusCode();
         var deadlines = (await c.GetFromJsonAsync<JsonElement[]>("/api/v1/deadlines"))!;
         Assert.Contains(deadlines, x => x.GetProperty("sourceType").GetString() == "household_contract" && x.GetProperty("sourceId").GetString() == contractId.ToString());
@@ -258,9 +271,15 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         await guest.GetAsync("/api/v1/household");
         var invitationResponse = await owner.PostAsJsonAsync("/api/v1/household/members", new
         {
-            displayName = "Compte invité", relationship = "partner", birthDate = (string?)null,
-            email = $"invite-{Guid.NewGuid():N}@example.fr", inviteToAccount = true, accessRole = "viewer",
-            canManageBudgets = true, canManageAssets = false, canManageContracts = false,
+            displayName = "Compte invité",
+            relationship = "partner",
+            birthDate = (string?)null,
+            email = $"invite-{Guid.NewGuid():N}@example.fr",
+            inviteToAccount = true,
+            accessRole = "viewer",
+            canManageBudgets = true,
+            canManageAssets = false,
+            canManageContracts = false,
         });
         invitationResponse.EnsureSuccessStatusCode();
         var invitation = await invitationResponse.Content.ReadFromJsonAsync<JsonElement>();

@@ -15,7 +15,7 @@
 | Tink appareil | retour `subscriptionapp://banking/callback` | configuration prête ; validation tactile Android/iOS requise |
 | Bundles | exports Expo Web, Android et iOS SDK 57 | validés |
 | APK partageable | profil EAS `preview`, distribution interne, API Render et Firebase réels | build EAS lancé |
-| RevenueCat | entitlement `premium`, offering `default`, produits Test Store `monthly` et `yearly` | validé |
+| RevenueCat | entitlement `premium`, offering `default`, uniquement les produits Test Store `monthly` et `yearly` | validé et nettoyé |
 | Stores réels | produits App Store Connect et Play Console | comptes développeur et produits stores requis |
 | Partenaires | Free, Sosh et B&You documentés comme candidats inactifs et non partenaires | publication bloquée jusqu’aux accords commerciaux |
 | Identité | noms techniques encore provisoires | choix commercial et recherche de marque définitive requis |
@@ -64,6 +64,7 @@ npx eas-cli build --platform android --profile preview
 ## Conditions avant publication publique
 
 - créer les comptes développeur Apple et Google et leurs abonnements sandbox ;
+- charger dans EAS une clé de compte de service FCM V1 dédiée avant la recette des notifications Android ;
 - injecter les clés SDK publiques RevenueCat propres à chaque store dans les profils correspondants ;
 - valider les achats et notifications sur appareils réels ;
 - signer les accords d’affiliation avant d’activer une offre ou un domaine partenaire ;
