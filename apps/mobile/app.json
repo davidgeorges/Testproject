@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/clarysio-icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/clarysio-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#17181B"
-    },
     "scheme": "subscriptionapp",
     "ios": {
       "supportsTablet": true,
@@ -52,6 +47,15 @@
           "photosPermission": "Autorisez l’accès à vos photos pour importer un document.",
           "cameraPermission": "Autorisez l’appareil photo pour scanner un document.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#17181B",
+          "image": "./assets/clarysio-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
         }
       ]
     ]
