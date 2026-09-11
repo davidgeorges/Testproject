@@ -613,7 +613,32 @@ export function DashboardScreen() {
                 title="Connectez votre première banque"
                 description="Retrouvez vos abonnements et vos économies possibles."
                 action={
-                  <Button title="Connecter une banque" onPress={() => nav.navigate('Bank')} />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Connecter une banque"
+                    onPress={() => nav.navigate('Bank')}
+                    style={({ pressed }) => ({
+                      minHeight: 48,
+                      paddingHorizontal: 20,
+                      paddingVertical: 12,
+                      borderRadius: 20,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: normalizedAccent,
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    <Label
+                      style={{
+                        color: accentForeground,
+                        fontSize: 14,
+                        fontWeight: '600',
+                        textAlign: 'center',
+                      }}
+                    >
+                      Connecter une banque
+                    </Label>
+                  </Pressable>
                 }
               />
             </View>
