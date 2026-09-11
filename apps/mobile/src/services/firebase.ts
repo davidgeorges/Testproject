@@ -9,7 +9,6 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   getAuth,
-  getRedirectResult,
   getReactNativePersistence,
   GoogleAuthProvider,
   initializeAuth,
@@ -18,7 +17,6 @@ import {
   setPersistence,
   signInWithCredential,
   signInWithEmailAndPassword,
-  signInWithRedirect,
   signOut,
   updateProfile,
   type Auth,
@@ -26,6 +24,11 @@ import {
   type User,
 } from 'firebase/auth';
 import { Platform } from 'react-native';
+
+const initialWebOAuthParams =
+  Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hash
+    ? new URLSearchParams(window.location.hash.slice(1))
+    : null;
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -98,6 +101,8 @@ export function useGoogleSignIn() {
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const usesExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
   const expoProxyRedirectUri = usesExpoGo ? AuthSession.getRedirectUrl() : undefined;
+  const webRedirectUri =
+    Platform.OS === 'web' ? AuthSession.makeRedirectUri({ path: 'Login' }) : undefined;
   const iosRedirectScheme = iosClientId
     ? `com.googleusercontent.apps.${iosClientId.split('.apps.googleusercontent.com')[0]}`
     : undefined;
@@ -106,7 +111,7 @@ export function useGoogleSignIn() {
       androidClientId: androidClientId ?? webClientId,
       iosClientId: usesExpoGo ? webClientId : (iosClientId ?? webClientId),
       webClientId,
-      redirectUri: expoProxyRedirectUri,
+      redirectUri: webRedirectUri ?? expoProxyRedirectUri,
     },
     iosRedirectScheme ? { native: `${iosRedirectScheme}:/oauthredirect` } : undefined,
   );
@@ -115,7 +120,12 @@ export function useGoogleSignIn() {
       const instance = requiredAuth();
       if (Platform.OS === 'web') {
         await setPersistence(instance, browserLocalPersistence);
-        await signInWithRedirect(instance, new GoogleAuthProvider());
+        if (!request?.url || typeof window === 'undefined')
+          throw new Error('La connexion Google n’est pas encore prête. Réessayez dans un instant.');
+        const state = new URL(request.url).searchParams.get('state');
+        if (!state) throw new Error('La connexion Google n’a pas pu être sécurisée.');
+        window.sessionStorage.setItem('google-oauth-state', state);
+        window.location.assign(request.url);
         return null;
       }
       const clientId = usesExpoGo
@@ -180,12 +190,29 @@ export function watchFirebaseToken(callback: (value: FirebaseSession | null) => 
     callback(null);
     return () => undefined;
   }
+  const idToken = initialWebOAuthParams?.get('id_token');
+  const returnedState = initialWebOAuthParams?.get('state');
+  const expectedState =
+    Platform.OS === 'web' && typeof window !== 'undefined'
+      ? window.sessionStorage.getItem('google-oauth-state')
+      : null;
+  let completingWebRedirect = Boolean(idToken && expectedState && returnedState === expectedState);
   const unsubscribe = onIdTokenChanged(
     auth,
-    async (user) => callback(user ? await session(user) : null),
+    async (user) => {
+      if (!user && completingWebRedirect) return;
+      callback(user ? await session(user) : null);
+    },
     () => callback(null),
   );
-  if (Platform.OS === 'web') void getRedirectResult(auth).catch(() => undefined);
+  if (completingWebRedirect && idToken && typeof window !== 'undefined') {
+    window.sessionStorage.removeItem('google-oauth-state');
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    void signInWithCredential(auth, GoogleAuthProvider.credential(idToken)).catch(() => {
+      completingWebRedirect = false;
+      callback(null);
+    });
+  }
   return unsubscribe;
 }
 
