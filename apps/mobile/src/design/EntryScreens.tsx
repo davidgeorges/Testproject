@@ -39,7 +39,13 @@ import {
   type FirebaseSession,
 } from '../services/firebase';
 import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
-import { DEFAULT_ACCENT_COLOR, normalizeAccentColor } from '../theme/accent';
+import {
+  accentTextColor,
+  accentWithAlpha,
+  DEFAULT_ACCENT_COLOR,
+  mixAccentColor,
+  normalizeAccentColor,
+} from '../theme/accent';
 import type { RootStackParams } from '../app/navigation';
 import { date, money } from '../utils/format';
 export function Welcome() {
@@ -311,9 +317,11 @@ function GlassAuthField({
   password?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
+  const c = useColors();
+  const accent = normalizeAccentColor(useSession((s) => s.accentColor)) ?? DEFAULT_ACCENT_COLOR;
   return (
     <View style={{ gap: 8 }}>
-      <Label style={{ color: '#DDE5EC', fontSize: 12, fontWeight: '600' }}>{label}</Label>
+      <Label style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>{label}</Label>
       <View
         style={{
           minHeight: 54,
@@ -322,17 +330,17 @@ function GlassAuthField({
           paddingHorizontal: 14,
           borderRadius: 17,
           borderWidth: 1,
-          borderColor: '#33414B',
-          backgroundColor: '#111920D9',
+          borderColor: c.border,
+          backgroundColor: c.surface,
         }}
       >
-        <Ionicons name={icon} size={19} color="#83909D" />
+        <Ionicons name={icon} size={19} color={accent} />
         <TextInput
           accessibilityLabel={label}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#66727E"
+          placeholderTextColor={c.muted}
           secureTextEntry={password && !visible}
           autoCapitalize="none"
           autoCorrect={false}
@@ -340,7 +348,7 @@ function GlassAuthField({
             flex: 1,
             minHeight: 52,
             paddingHorizontal: 12,
-            color: '#F7F9FB',
+            color: c.text,
             fontSize: 14,
           }}
         />
@@ -354,7 +362,7 @@ function GlassAuthField({
             <Ionicons
               name={visible ? 'eye-off-outline' : 'eye-outline'}
               size={20}
-              color="#9BA6B1"
+              color={c.muted}
             />
           </Pressable>
         )}
@@ -365,6 +373,11 @@ function GlassAuthField({
 
 export function AuthScreen({ register = false }: { register?: boolean }) {
   const nav = useNav();
+  const c = useColors();
+  const isDark = useSession((state) => state.theme) === 'dark';
+  const authAccent =
+    normalizeAccentColor(useSession((state) => state.accentColor)) ?? DEFAULT_ACCENT_COLOR;
+  const authForeground = accentTextColor(authAccent);
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -466,11 +479,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
     }
   }
   return (
-    <LinearGradient
-      colors={['#02060C', '#0B1420', '#182432']}
-      locations={[0, 0.52, 1]}
-      style={{ flex: 1 }}
-    >
+    <View style={{ flex: 1, backgroundColor: c.background }}>
       <Animated.View
         pointerEvents="none"
         style={{
@@ -480,7 +489,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
           width: 255,
           height: 255,
           borderRadius: 128,
-          backgroundColor: '#20F2A00D',
+          backgroundColor: accentWithAlpha(authAccent, 0.08),
           opacity: authPulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }),
           transform: [
             { scale: authPulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] }) },
@@ -508,7 +517,10 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
         >
           <View style={{ alignItems: 'center', gap: 14 }}>
             <LinearGradient
-              colors={['#5A6672', '#3C4A57', '#263541']}
+              colors={[
+                mixAccentColor(authAccent, '#FFFFFF', isDark ? 0.1 : 0.2),
+                mixAccentColor(authAccent, '#000000', isDark ? 0.16 : 0.06),
+              ]}
               style={{
                 width: 66,
                 height: 66,
@@ -516,8 +528,8 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderWidth: 1,
-                borderColor: '#6D7A8480',
-                shadowColor: '#20F2A0',
+                borderColor: c.border,
+                shadowColor: authAccent,
                 shadowOpacity: 0.18,
                 shadowRadius: 20,
                 shadowOffset: { width: 0, height: 8 },
@@ -526,7 +538,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
               <Ionicons
                 name={register ? 'person-add-outline' : 'layers'}
                 size={34}
-                color="#F4F7F9"
+                color={authForeground}
               />
             </LinearGradient>
             <View style={{ alignItems: 'center', gap: 5 }}>
@@ -535,9 +547,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
               >
                 {register ? 'Créer un compte' : 'Bienvenue !'}
               </Label>
-              <Label
-                style={{ color: '#939EAA', fontSize: 13, lineHeight: 19, textAlign: 'center' }}
-              >
+              <Label style={{ color: c.muted, fontSize: 13, lineHeight: 19, textAlign: 'center' }}>
                 {register
                   ? 'Quelques informations pour bien commencer.'
                   : 'Retrouvez une vision claire de vos dépenses.'}
@@ -546,13 +556,13 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
           </View>
 
           <LinearGradient
-            colors={['#4B5966E8', '#354451F0']}
+            colors={[c.surface, c.surface]}
             style={{
               gap: register ? 13 : 15,
               padding: 17,
               borderRadius: 25,
               borderWidth: 1,
-              borderColor: '#2C3740',
+              borderColor: c.border,
               shadowColor: '#000',
               shadowOpacity: 0.42,
               shadowRadius: 24,
@@ -590,9 +600,9 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                     <Ionicons
                       name="checkmark-circle"
                       size={17}
-                      color={valid ? '#20F2A0' : '#43515C'}
+                      color={valid ? authAccent : c.muted}
                     />
-                    <Label style={{ color: '#9BA6B1', fontSize: 11 }}>{label}</Label>
+                    <Label style={{ color: c.muted, fontSize: 11 }}>{label}</Label>
                   </View>
                 ))}
                 <Pressable
@@ -603,13 +613,13 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                 >
                   <Ionicons
                     name={accept ? 'checkbox' : 'square-outline'}
-                    color={accept ? '#20F2A0' : '#73808B'}
+                    color={accept ? authAccent : c.muted}
                     size={20}
                   />
-                  <Label style={{ flex: 1, fontSize: 11, color: '#AAB4BE' }}>
-                    J’accepte les <Label style={{ fontSize: 11, color: '#20F2A0' }}>CGU</Label> et
+                  <Label style={{ flex: 1, fontSize: 11, color: c.muted }}>
+                    J’accepte les <Label style={{ fontSize: 11, color: authAccent }}>CGU</Label> et
                     la{' '}
-                    <Label style={{ fontSize: 11, color: '#20F2A0' }}>
+                    <Label style={{ fontSize: 11, color: authAccent }}>
                       Politique de confidentialité
                     </Label>
                   </Label>
@@ -621,7 +631,7 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                 onPress={() => nav.navigate('ResetPassword')}
                 style={{ alignSelf: 'flex-end', minHeight: 32, justifyContent: 'center' }}
               >
-                <Label style={{ color: '#20F2A0', fontSize: 12, fontWeight: '600' }}>
+                <Label style={{ color: authAccent, fontSize: 12, fontWeight: '600' }}>
                   Mot de passe oublié ?
                 </Label>
               </Pressable>
@@ -648,26 +658,26 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
               style={({ pressed }) => ({ opacity: pressed || authBusy ? 0.72 : 1 })}
             >
               <LinearGradient
-                colors={['#35F5AE', '#13C985']}
+                colors={[authAccent, mixAccentColor(authAccent, '#000000', 0.18)]}
                 style={{
                   minHeight: 52,
                   borderRadius: 16,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  shadowColor: '#20F2A0',
+                  shadowColor: authAccent,
                   shadowOpacity: 0.24,
                   shadowRadius: 14,
                   shadowOffset: { width: 0, height: 7 },
                 }}
               >
                 {authBusy ? (
-                  <ActivityIndicator color="#04100B" />
+                  <ActivityIndicator color={authForeground} />
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Label style={{ color: '#03120C', fontSize: 14, fontWeight: '800' }}>
+                    <Label style={{ color: authForeground, fontSize: 14, fontWeight: '800' }}>
                       {register ? 'Créer mon compte' : 'Se connecter'}
                     </Label>
-                    <Ionicons name="arrow-forward" size={18} color="#03120C" />
+                    <Ionicons name="arrow-forward" size={18} color={authForeground} />
                   </View>
                 )}
               </LinearGradient>
@@ -677,9 +687,9 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
           {!register && (
             <>
               <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <View style={{ height: 1, flex: 1, backgroundColor: '#26313A' }} />
-                <Label style={{ color: '#707C87', fontSize: 11 }}>ou continuer avec</Label>
-                <View style={{ height: 1, flex: 1, backgroundColor: '#26313A' }} />
+                <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
+                <Label style={{ color: c.muted, fontSize: 11 }}>ou continuer avec</Label>
+                <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
               </View>
               <Pressable
                 accessibilityLabel="Connexion Google"
@@ -689,18 +699,18 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                 style={({ pressed }) => ({
                   opacity: pressed || authBusy ? 0.7 : 1,
                   height: 52,
-                  borderColor: '#E9EFF238',
+                  borderColor: c.border,
                   borderWidth: 1,
                   borderRadius: 16,
-                  backgroundColor: '#4B5966CC',
+                  backgroundColor: c.surface,
                   flexDirection: 'row',
                   gap: 10,
                   alignItems: 'center',
                   justifyContent: 'center',
                 })}
               >
-                <Ionicons name="logo-google" size={21} color="#F2F5F7" />
-                <Label style={{ color: '#EEF2F5', fontSize: 13, fontWeight: '700' }}>
+                <Ionicons name="logo-google" size={21} color={c.text} />
+                <Label style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>
                   Continuer avec Google
                 </Label>
               </Pressable>
@@ -709,9 +719,9 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
                 onPress={() => nav.navigate('Register')}
                 style={{ alignItems: 'center', minHeight: 42, justifyContent: 'center' }}
               >
-                <Label style={{ color: '#8995A0', fontSize: 12 }}>
+                <Label style={{ color: c.muted, fontSize: 12 }}>
                   Pas encore de compte ?{' '}
-                  <Label style={{ fontSize: 12, color: '#20F2A0', fontWeight: '700' }}>
+                  <Label style={{ fontSize: 12, color: authAccent, fontWeight: '700' }}>
                     Créer un compte
                   </Label>
                 </Label>
@@ -723,13 +733,13 @@ export function AuthScreen({ register = false }: { register?: boolean }) {
         <View
           style={{ flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Ionicons name="shield-checkmark-outline" size={14} color="#65717C" />
-          <Label style={{ fontSize: 9, lineHeight: 14, color: '#65717C', textAlign: 'center' }}>
+          <Ionicons name="shield-checkmark-outline" size={14} color={c.muted} />
+          <Label style={{ fontSize: 9, lineHeight: 14, color: c.muted, textAlign: 'center' }}>
             Connexion sécurisée par Firebase Authentication
           </Label>
         </View>
       </Page>
-    </LinearGradient>
+    </View>
   );
 }
 export function Login() {

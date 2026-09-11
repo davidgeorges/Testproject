@@ -6,7 +6,6 @@ import {
   Text,
   View,
   Image,
-  ImageBackground,
   TextInput,
   type ViewStyle,
   type TextStyle,
@@ -16,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSession } from '../store/session';
 import { themes } from '../theme/tokens';
+import { accentTextColor, normalizeAccentColor, DEFAULT_ACCENT_COLOR } from '../theme/accent';
 import { money, cadence } from '../utils/format';
 import { fr } from '../i18n/fr';
 import type { Category, Payment, Recommendation } from '../types/api';
@@ -77,41 +77,27 @@ export function Page({
   );
   if (transparent) return content;
   return (
-    <ImageBackground
-      source={require('../../assets/home-fabric.png')}
-      resizeMode="cover"
-      imageStyle={{ opacity: 0.96 }}
-      style={{ flex: 1, backgroundColor: backgroundColor ?? c.background }}
-    >
-      <LinearGradient
-        pointerEvents="none"
-        colors={['#02060CE8', '#0B14205C', '#182432ED']}
-        locations={[0, 0.46, 1]}
-        style={{ position: 'absolute', inset: 0 }}
-      />
-      {content}
-    </ImageBackground>
+    <View style={{ flex: 1, backgroundColor: backgroundColor ?? c.background }}>{content}</View>
   );
 }
 export function Card({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
   const c = useColors();
-  const dark = useSession((s) => s.theme) === 'dark';
   return (
-    <LinearGradient
-      colors={dark ? ['#4B5966E0', '#354451E0'] : [c.surface, c.surface]}
+    <View
       style={[
         {
           borderRadius: 23,
           padding: 14,
           gap: 8,
           borderWidth: 1,
-          borderColor: dark ? '#E9EFF238' : c.border,
+          borderColor: c.border,
+          backgroundColor: c.surface,
         },
         style,
       ]}
     >
       {children}
-    </LinearGradient>
+    </View>
   );
 }
 export function Button({
@@ -130,6 +116,8 @@ export function Button({
   loading?: boolean;
 }) {
   const c = useColors();
+  const accent = normalizeAccentColor(useSession((s) => s.accentColor)) ?? DEFAULT_ACCENT_COLOR;
+  const accentForeground = accentTextColor(accent);
   return (
     <Pressable
       onPress={onPress}
@@ -144,14 +132,7 @@ export function Button({
         shadowOpacity: 0.35,
       })}
     >
-      <LinearGradient
-        colors={
-          danger
-            ? ['#2B1720', '#1A111B']
-            : secondary
-              ? ['#4B5966E0', '#354451E0']
-              : ['#7D8A96', '#53616E']
-        }
+      <View
         style={{
           borderRadius: 20,
           minHeight: 48,
@@ -159,7 +140,8 @@ export function Button({
           justifyContent: 'center',
           padding: 12,
           borderWidth: 1,
-          borderColor: secondary ? '#E9EFF238' : danger ? '#EF444430' : '#DDE6EC4D',
+          borderColor: secondary ? c.border : danger ? '#EF44444A' : accent,
+          backgroundColor: danger ? '#EF444418' : secondary ? c.surface : accent,
         }}
       >
         {loading ? (
@@ -167,7 +149,7 @@ export function Button({
         ) : (
           <Label
             style={{
-              color: danger ? '#FF4545' : secondary ? c.text : '#fff',
+              color: danger ? '#E86D67' : secondary ? c.text : accentForeground,
               fontWeight: '600',
               fontSize: 14,
               textAlign: 'center',
@@ -176,7 +158,7 @@ export function Button({
             {title}
           </Label>
         )}
-      </LinearGradient>
+      </View>
     </Pressable>
   );
 }
@@ -245,7 +227,7 @@ export function Badge({
       style={{
         alignSelf: 'flex-start',
         backgroundColor:
-          tone === 'success' ? '#005439' : tone === 'warning' ? '#4A3315' : c.elevated,
+          tone === 'success' ? '#10B9811F' : tone === 'warning' ? '#F59E0B1F' : c.elevated,
         borderRadius: 20,
         paddingHorizontal: 9,
         paddingVertical: 3,
@@ -253,7 +235,7 @@ export function Badge({
     >
       <Label
         style={{
-          color: tone === 'success' ? '#3DFFB0' : tone === 'warning' ? '#FBBF24' : c.muted,
+          color: tone === 'success' ? c.success : tone === 'warning' ? c.warning : c.muted,
           fontSize: 10,
           lineHeight: 14,
           fontWeight: '600',
@@ -287,9 +269,9 @@ export function Field({
           flexDirection: 'row',
           alignItems: 'center',
           borderWidth: 1,
-          borderColor: '#E9EFF238',
+          borderColor: c.border,
           borderRadius: 20,
-          backgroundColor: '#4B5966C7',
+          backgroundColor: c.surface,
         }}
       >
         <TextInput
@@ -330,7 +312,9 @@ export function Search({
         alignItems: 'center',
         gap: 8,
         paddingHorizontal: 12,
-        backgroundColor: '#5B6068D9',
+        backgroundColor: c.surface,
+        borderWidth: 1,
+        borderColor: c.border,
         borderRadius: 20,
       }}
     >
@@ -356,6 +340,8 @@ export function Chips({
   onChange: (v: string) => void;
 }) {
   const c = useColors();
+  const accent = normalizeAccentColor(useSession((s) => s.accentColor)) ?? DEFAULT_ACCENT_COLOR;
+  const accentForeground = accentTextColor(accent);
   return (
     <View style={{ flexDirection: 'row', gap: 7 }}>
       {items.map((item) => (
@@ -366,21 +352,27 @@ export function Chips({
           onPress={() => onChange(item)}
           style={{ flex: 1, minHeight: 36, justifyContent: 'center' }}
         >
-          <LinearGradient
-            colors={value === item ? ['#7E8995', '#65717D'] : ['#4B5966D4', '#354451D4']}
+          <View
             style={{
               borderRadius: 20,
               paddingVertical: 7,
               paddingHorizontal: 7,
               alignItems: 'center',
+              borderWidth: 1,
+              borderColor: value === item ? accent : c.border,
+              backgroundColor: value === item ? accent : c.surface,
             }}
           >
             <Label
-              style={{ fontSize: 11, lineHeight: 15, color: value === item ? 'white' : c.muted }}
+              style={{
+                fontSize: 11,
+                lineHeight: 15,
+                color: value === item ? accentForeground : c.muted,
+              }}
             >
               {item}
             </Label>
-          </LinearGradient>
+          </View>
         </Pressable>
       ))}
     </View>

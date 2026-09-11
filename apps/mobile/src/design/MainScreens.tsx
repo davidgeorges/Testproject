@@ -68,7 +68,8 @@ export function BottomBar({ active }: { active: keyof TabsParams }) {
     active === 'Home' ||
     active === 'Subscriptions' ||
     active === 'Finances' ||
-    active === 'Savings';
+    active === 'Savings' ||
+    active === 'Premium';
   const glassTheme =
     active === 'Home' ||
     active === 'Subscriptions' ||
@@ -1352,6 +1353,9 @@ export function SubscriptionDetail() {
     ? ({ Netflix: 13.99, Spotify: 10.99, Adobe: 52.99 }[p.merchant] ?? p.amount)
     : 0;
   const c = useColors();
+  const isDark = useSession((s) => s.theme) === 'dark';
+  const detailAccent =
+    normalizeAccentColor(useSession((s) => s.accentColor)) ?? DEFAULT_ACCENT_COLOR;
   const [message, setMessage] = useState('');
   const [dialog, setDialog] = useState<'category' | 'ignore' | null>(null);
   const queryClient = useQueryClient();
@@ -1374,23 +1378,20 @@ export function SubscriptionDetail() {
   });
   return (
     <ScreenWithTabs active="Subscriptions" standalone>
-      <Page
-        backgroundColor="#020609"
-        style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 10 }}
-      >
+      <Page style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 10 }}>
         {!p ? (
           <State loading={q.isPending} error={q.error} title="Abonnement introuvable" />
         ) : (
           <>
             <LinearGradient
-              colors={['#4B5966D4', '#354451D4', '#202B35D9']}
+              colors={[c.surface, c.surface]}
               style={{
                 alignItems: 'center',
                 gap: 5,
                 paddingVertical: 14,
                 borderRadius: 25,
                 borderWidth: 1,
-                borderColor: '#E9EFF238',
+                borderColor: c.border,
               }}
             >
               <GlassBrandIcon name={p.merchant} size={58} />
@@ -1404,7 +1405,7 @@ export function SubscriptionDetail() {
                     : setDialog('category')
                 }
               >
-                <Label muted style={{ fontSize: 12, color: '#929DAE' }}>
+                <Label muted style={{ fontSize: 12 }}>
                   {fr.categories[p.category]} · Modifier
                 </Label>
               </Pressable>
@@ -1418,7 +1419,7 @@ export function SubscriptionDetail() {
                 }}
               >
                 {money(preview ? previewPrice : p.amount)}
-                <Label style={{ fontSize: 15, color: '#A0AABA' }}> /{cadence[p.cadence]}</Label>
+                <Label style={{ fontSize: 15, color: c.muted }}> /{cadence[p.cadence]}</Label>
               </Label>
               <View
                 style={{
@@ -1432,11 +1433,11 @@ export function SubscriptionDetail() {
               </View>
             </LinearGradient>
             <LinearGradient
-              colors={['#4B5966D4', '#354451D4']}
+              colors={[c.surface, c.surface]}
               style={{
                 borderRadius: 22,
                 borderWidth: 1,
-                borderColor: '#27323C',
+                borderColor: c.border,
                 paddingHorizontal: 14,
                 overflow: 'hidden',
               }}
@@ -1463,7 +1464,7 @@ export function SubscriptionDetail() {
                     gap: 10,
                     paddingVertical: 9,
                     borderBottomWidth: 0.5,
-                    borderColor: '#26313B',
+                    borderColor: c.border,
                   }}
                 >
                   <View
@@ -1471,14 +1472,14 @@ export function SubscriptionDetail() {
                       width: 29,
                       height: 29,
                       borderRadius: 15,
-                      backgroundColor: '#34424FCE',
+                      backgroundColor: c.elevated,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name={icon as 'calendar-outline'} color="#DDE5ED" size={15} />
+                    <Ionicons name={icon as 'calendar-outline'} color={detailAccent} size={15} />
                   </View>
-                  <Label muted style={{ flex: 1, fontSize: 12, color: '#919CAB' }}>
+                  <Label muted style={{ flex: 1, fontSize: 12 }}>
                     {label}
                   </Label>
                   <Label style={{ fontSize: 12, fontWeight: '600' }}>{value}</Label>
@@ -1486,11 +1487,11 @@ export function SubscriptionDetail() {
               ))}
             </LinearGradient>
             <LinearGradient
-              colors={['#4B5966D4', '#354451D4']}
+              colors={[c.surface, c.surface]}
               style={{
                 borderRadius: 22,
                 borderWidth: 1,
-                borderColor: '#27323C',
+                borderColor: c.border,
                 paddingHorizontal: 14,
                 paddingTop: 12,
                 paddingBottom: 8,
@@ -1523,7 +1524,11 @@ export function SubscriptionDetail() {
                       </Label>
                     )}
                     <LinearGradient
-                      colors={i === 5 ? ['#E7EEF5', '#778596'] : ['#515E6D', '#202A34']}
+                      colors={
+                        i === 5
+                          ? [detailAccent, mixAccentColor(detailAccent, '#000000', 0.25)]
+                          : [c.elevated, c.border]
+                      }
                       style={{
                         height: [34, 52, 36, 39, 37, 42][i],
                         width: '76%',
@@ -1546,7 +1551,7 @@ export function SubscriptionDetail() {
               style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
             >
               <LinearGradient
-                colors={['#4B5966D4', '#354451D4']}
+                colors={[c.surface, c.surface]}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1555,7 +1560,7 @@ export function SubscriptionDetail() {
                   paddingHorizontal: 13,
                   borderRadius: 20,
                   borderWidth: 1,
-                  borderColor: '#27323C',
+                  borderColor: c.border,
                 }}
               >
                 <View
@@ -1565,18 +1570,18 @@ export function SubscriptionDetail() {
                     borderRadius: 19,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: '#34424FCE',
+                    backgroundColor: accentWithAlpha(detailAccent, 0.14),
                   }}
                 >
-                  <Ionicons name="sparkles-outline" size={20} color="#FFFFFF" />
+                  <Ionicons name="sparkles-outline" size={20} color={detailAccent} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Label style={{ fontSize: 13, fontWeight: '700' }}>Voir les alternatives</Label>
-                  <Label muted style={{ fontSize: 10, color: '#8E99A9' }}>
+                  <Label muted style={{ fontSize: 10 }}>
                     Des offres similaires moins chères
                   </Label>
                 </View>
-                <Ionicons name="chevron-forward" color="#8792A2" size={21} />
+                <Ionicons name="chevron-forward" color={c.muted} size={21} />
               </LinearGradient>
             </Pressable>
             <Pressable
@@ -1597,7 +1602,7 @@ export function SubscriptionDetail() {
                   borderRadius: 18,
                   borderWidth: 1,
                   borderColor: '#84323A',
-                  backgroundColor: '#2A0D12',
+                  backgroundColor: isDark ? '#2A0D12' : '#FFF7F7',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexDirection: 'row',
@@ -2110,6 +2115,10 @@ export function SavingsScreen() {
 }
 export function RecommendationDetail() {
   const nav = useNav();
+  const c = useColors();
+  const isDark = useSession((state) => state.theme) === 'dark';
+  const detailAccent =
+    normalizeAccentColor(useSession((state) => state.accentColor)) ?? DEFAULT_ACCENT_COLOR;
   const route = useRoute<RouteProp<RootStackParams, 'Recommendation'>>();
   const q = useRecommendations();
   const r = q.data?.find((r) => r.id === route.params.id);
@@ -2136,16 +2145,13 @@ export function RecommendationDetail() {
     },
   });
   return (
-    <Page
-      backgroundColor="#020609"
-      style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 14 }}
-    >
+    <Page style={{ gap: 10, paddingHorizontal: 16, paddingTop: 58, paddingBottom: 14 }}>
       {!r ? (
         <State loading={q.isPending} error={q.error} title="Recommandation introuvable" />
       ) : (
         <>
           <LinearGradient
-            colors={['#4B5966D4', '#354451D4']}
+            colors={[c.surface, c.surface]}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -2154,7 +2160,7 @@ export function RecommendationDetail() {
               padding: 13,
               borderRadius: 22,
               borderWidth: 1,
-              borderColor: '#28333D',
+              borderColor: c.border,
             }}
           >
             <View
@@ -2164,18 +2170,18 @@ export function RecommendationDetail() {
                 borderRadius: 15,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#18212A',
+                backgroundColor: c.elevated,
               }}
             >
               <Ionicons
                 name={r.category === 'mobile' ? 'phone-portrait-outline' : 'sparkles-outline'}
                 size={24}
-                color="#F3F6F9"
+                color={detailAccent}
               />
             </View>
             <View style={{ flex: 1 }}>
               <Label style={{ fontWeight: '800', fontSize: 16 }}>{r.title}</Label>
-              <Label muted style={{ fontSize: 11, color: '#8E99A9' }}>
+              <Label muted style={{ fontSize: 11, color: c.muted }}>
                 Recommandation personnalisée
               </Label>
             </View>
@@ -2184,10 +2190,10 @@ export function RecommendationDetail() {
                 paddingHorizontal: 10,
                 paddingVertical: 7,
                 borderRadius: 16,
-                backgroundColor: '#34424FCE',
+                backgroundColor: accentWithAlpha(detailAccent, 0.14),
               }}
             >
-              <Label style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>
+              <Label style={{ color: detailAccent, fontSize: 11, fontWeight: '700' }}>
                 + {money(r.annualSaving)} /an
               </Label>
             </View>
@@ -2196,11 +2202,11 @@ export function RecommendationDetail() {
             Votre situation actuelle
           </Label>
           <LinearGradient
-            colors={['#4B5966D4', '#354451D4']}
+            colors={[c.surface, c.surface]}
             style={{
               borderRadius: 21,
               borderWidth: 1,
-              borderColor: '#27323C',
+              borderColor: c.border,
               paddingHorizontal: 14,
               paddingVertical: 7,
             }}
@@ -2222,10 +2228,10 @@ export function RecommendationDetail() {
                   alignItems: 'center',
                   minHeight: 31,
                   borderBottomWidth: k === 'Consommation moyenne' ? 0 : 0.5,
-                  borderBottomColor: '#25303A',
+                  borderBottomColor: c.border,
                 }}
               >
-                <Label muted style={{ fontSize: 12, color: '#8E99A9' }}>
+                <Label muted style={{ fontSize: 12, color: c.muted }}>
                   {k}
                 </Label>
                 <Label style={{ fontSize: 12, fontWeight: '600' }}>{v}</Label>
@@ -2236,7 +2242,7 @@ export function RecommendationDetail() {
             Notre recommandation
           </Label>
           <LinearGradient
-            colors={['#4B5966D4', '#354451D4', '#202B35D9']}
+            colors={[c.surface, c.surface]}
             style={{
               gap: 9,
               padding: 14,
@@ -2259,7 +2265,7 @@ export function RecommendationDetail() {
             />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <LinearGradient
-                colors={['#18C7C7', '#067A8B']}
+                colors={[detailAccent, mixAccentColor(detailAccent, '#000000', 0.22)]}
                 style={{
                   width: 52,
                   height: 52,
@@ -2291,7 +2297,7 @@ export function RecommendationDetail() {
                     width: 18,
                     height: 18,
                     borderRadius: 9,
-                    backgroundColor: '#34424FCE',
+                    backgroundColor: accentWithAlpha(detailAccent, 0.14),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -2309,22 +2315,22 @@ export function RecommendationDetail() {
                 paddingHorizontal: 11,
                 paddingVertical: 6,
                 borderRadius: 15,
-                backgroundColor: '#34424FCE',
+                backgroundColor: accentWithAlpha(detailAccent, 0.14),
               }}
             >
-              <Label style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>
+              <Label style={{ color: detailAccent, fontSize: 11, fontWeight: '700' }}>
                 Économie : {money(r.annualSaving)} /an
               </Label>
             </View>
           </LinearGradient>
           <LinearGradient
-            colors={['#4B5966D4', '#354451D4']}
+            colors={[c.surface, c.surface]}
             style={{
               gap: 5,
               padding: 13,
               borderRadius: 21,
               borderWidth: 1,
-              borderColor: '#27323C',
+              borderColor: c.border,
             }}
           >
             <Label style={{ fontWeight: '800', fontSize: 15 }}>Pourquoi ?</Label>

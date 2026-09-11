@@ -1,33 +1,13 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Pressable,
-  Switch,
-  Share,
-  Modal,
-  ImageBackground,
-  Animated,
-  Platform,
-  StatusBar,
-} from 'react-native';
+import { View, Pressable, Switch, Modal, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRoute, type RouteProp } from '@react-navigation/native';
-import {
-  Page,
-  Card,
-  Label,
-  Button,
-  Badge,
-  ReferenceCrop,
-  Field,
-  useColors,
-  type IconName,
-} from './ui';
+import { Page, Card, Label, Button, Badge, Field, useColors, type IconName } from './ui';
 import { dashboardScrollY, useNav } from './MainScreens';
 import { useProfile } from './reference';
-import { PREVIEW_ENABLED, useSession, useLiveToken } from '../store/session';
+import { useSession, useLiveToken } from '../store/session';
 import { api, idempotencyKey } from '../services/api';
 import { logOutRevenueCat, purchasePremium, restorePremium } from '../services/revenuecat';
 import { deleteCurrentFirebaseUser, signOutFirebase } from '../services/firebase';
@@ -57,6 +37,7 @@ function Row({
   right?: string;
 }) {
   const c = useColors();
+  const accent = normalizeAccentColor(useSession((s) => s.accentColor)) ?? DEFAULT_ACCENT_COLOR;
   return (
     <Pressable
       accessibilityRole="button"
@@ -67,24 +48,24 @@ function Row({
         gap: 12,
         minHeight: 61,
         borderBottomWidth: 1,
-        borderColor: '#DDE5EA24',
+        borderColor: c.border,
         paddingVertical: 8,
         paddingHorizontal: 10,
         backgroundColor: 'transparent',
       }}
     >
-      <LinearGradient
-        colors={color === '#0877FF' ? ['#465665', '#34424F'] : [color, color]}
+      <View
         style={{
           width: 35,
           height: 35,
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: 9,
+          backgroundColor: accentWithAlpha(color === '#0877FF' ? accent : color, 0.14),
         }}
       >
-        <Ionicons name={icon} color="white" size={23} />
-      </LinearGradient>
+        <Ionicons name={icon} color={color === '#0877FF' ? accent : color} size={21} />
+      </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Label style={{ fontSize: 13, fontWeight: '600' }}>{title}</Label>
         {subtitle && (
@@ -948,6 +929,11 @@ export function SettingsScreen() {
 }
 export function PremiumScreen() {
   const token = useLiveToken();
+  const c = useColors();
+  const isDark = useSession((state) => state.theme) === 'dark';
+  const premiumAccent =
+    normalizeAccentColor(useSession((state) => state.accentColor)) ?? DEFAULT_ACCENT_COLOR;
+  const premiumForeground = accentTextColor(premiumAccent);
   const profile = useProfile();
   const cache = useQueryClient();
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
@@ -972,21 +958,24 @@ export function PremiumScreen() {
   });
   const premium = status.data?.isPremium === true;
   return (
-    <LinearGradient colors={['#02060C', '#0B1420', '#182432']} style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: c.background }}>
       <Page
         fill
         transparent
         style={{ gap: 11, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 }}
       >
         <LinearGradient
-          colors={['#4B5966D4', '#354451D4', '#202B35D9']}
+          colors={[
+            mixAccentColor(premiumAccent, '#FFFFFF', isDark ? 0.1 : 0.2),
+            mixAccentColor(premiumAccent, '#000000', isDark ? 0.16 : 0.06),
+          ]}
           style={{
             alignItems: 'center',
             gap: 7,
             paddingVertical: 17,
             borderRadius: 27,
             borderWidth: 1,
-            borderColor: '#E9EFF238',
+            borderColor: c.border,
             overflow: 'hidden',
           }}
         >
@@ -1006,7 +995,7 @@ export function PremiumScreen() {
               width: 62,
               height: 62,
               borderRadius: 31,
-              backgroundColor: '#34424FCE',
+              backgroundColor: accentWithAlpha(premiumForeground, 0.15),
               alignItems: 'center',
               justifyContent: 'center',
               shadowColor: '#FFFFFF',
@@ -1014,27 +1003,44 @@ export function PremiumScreen() {
               shadowRadius: 15,
             }}
           >
-            <Ionicons name="diamond" size={30} color="#FFFFFF" />
+            <Ionicons name="diamond" size={30} color={premiumForeground} />
           </View>
-          <Label style={{ fontSize: 25, lineHeight: 31, fontWeight: '800', letterSpacing: -0.5 }}>
+          <Label
+            style={{
+              color: premiumForeground,
+              fontSize: 25,
+              lineHeight: 31,
+              fontWeight: '800',
+              letterSpacing: -0.5,
+            }}
+          >
             Passez au Premium
           </Label>
           <Label
             muted
-            style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', color: '#9CA6B4' }}
+            style={{
+              fontSize: 13,
+              lineHeight: 18,
+              textAlign: 'center',
+              color: mixAccentColor(
+                premiumAccent,
+                premiumForeground === '#FFFFFF' ? '#FFFFFF' : '#000000',
+                0.72,
+              ),
+            }}
           >
             Des économies encore plus grandes{'\n'}avec votre application Premium.
           </Label>
         </LinearGradient>
         <LinearGradient
-          colors={['#4B5966D4', '#354451D4']}
+          colors={[c.surface, c.surface]}
           style={{
             gap: 0,
             paddingHorizontal: 14,
             paddingVertical: 5,
             borderRadius: 22,
             borderWidth: 1,
-            borderColor: '#28333D',
+            borderColor: c.border,
           }}
         >
           {[
@@ -1051,7 +1057,7 @@ export function PremiumScreen() {
                 gap: 11,
                 minHeight: 39,
                 borderBottomWidth: text === 'Restauration des achats sur vos appareils' ? 0 : 0.5,
-                borderBottomColor: '#25303A',
+                borderBottomColor: c.border,
               }}
             >
               <View
@@ -1059,14 +1065,14 @@ export function PremiumScreen() {
                   width: 22,
                   height: 22,
                   borderRadius: 11,
-                  backgroundColor: '#34424FCE',
+                  backgroundColor: accentWithAlpha(premiumAccent, 0.14),
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Ionicons name="checkmark" color="#FFFFFF" size={14} />
+                <Ionicons name="checkmark" color={premiumAccent} size={14} />
               </View>
-              <Label muted style={{ fontSize: 12, color: '#A2ACB9' }}>
+              <Label muted style={{ fontSize: 12, color: c.muted }}>
                 {text}
               </Label>
             </View>
@@ -1085,12 +1091,12 @@ export function PremiumScreen() {
               style={{ flex: 1 }}
             >
               <LinearGradient
-                colors={plan === id ? ['#566572D9', '#364551D9'] : ['#4B5966B8', '#354451B8']}
+                colors={plan === id ? [c.surface, c.surface] : [c.surface, c.surface]}
                 style={{
                   padding: 14,
                   borderRadius: 21,
                   borderWidth: 1,
-                  borderColor: plan === id ? '#F2F6F875' : '#E9EFF238',
+                  borderColor: plan === id ? premiumAccent : c.border,
                   gap: 4,
                   minHeight: 104,
                 }}
@@ -1101,43 +1107,43 @@ export function PremiumScreen() {
                       position: 'absolute',
                       right: 8,
                       top: -10,
-                      backgroundColor: '#5B6874E8',
+                      backgroundColor: premiumAccent,
                       paddingHorizontal: 10,
                       paddingVertical: 3,
                       borderRadius: 15,
                     }}
                   >
-                    <Label style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>
+                    <Label style={{ color: premiumForeground, fontSize: 10, fontWeight: '700' }}>
                       -17%
                     </Label>
                   </View>
                 )}
-                <Label style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC' }}>{title}</Label>
+                <Label style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Label>
                 <Label
                   style={{
                     fontSize: 21,
                     lineHeight: 27,
                     fontWeight: '800',
-                    color: plan === id ? '#20F2A0' : '#F8FAFC',
+                    color: plan === id ? '#20F2A0' : c.text,
                   }}
                 >
                   {price}
                 </Label>
-                <Label style={{ fontSize: 10, color: '#8E99A9' }}>{note}</Label>
+                <Label style={{ fontSize: 10, color: c.muted }}>{note}</Label>
               </LinearGradient>
             </Pressable>
           ))}
         </View>
         {premium ? (
           <LinearGradient
-            colors={['#4B5966D4', '#354451D4']}
+            colors={[c.surface, c.surface]}
             style={{
               alignItems: 'center',
               padding: 16,
               gap: 5,
               borderRadius: 21,
               borderWidth: 1,
-              borderColor: '#E9EFF238',
+              borderColor: c.border,
             }}
           >
             <Badge text="Premium actif" />
@@ -1161,7 +1167,7 @@ export function PremiumScreen() {
             style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}
           >
             <LinearGradient
-              colors={['#20D994', '#0D9F72']}
+              colors={[premiumAccent, mixAccentColor(premiumAccent, '#000000', 0.18)]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{
@@ -1171,7 +1177,7 @@ export function PremiumScreen() {
                 justifyContent: 'center',
               }}
             >
-              <Label style={{ color: '#03110B', fontSize: 13, fontWeight: '800' }}>
+              <Label style={{ color: premiumForeground, fontSize: 13, fontWeight: '800' }}>
                 {activate.isPending ? 'Chargement…' : 'Commencer maintenant'}
               </Label>
             </LinearGradient>
@@ -1187,7 +1193,7 @@ export function PremiumScreen() {
             }}
             style={{ alignItems: 'center', padding: 6 }}
           >
-            <Label style={{ color: '#A4AFBC', fontSize: 12, fontWeight: '600' }}>
+            <Label style={{ color: c.muted, fontSize: 12, fontWeight: '600' }}>
               Restaurer mes achats
             </Label>
           </Pressable>
@@ -1204,51 +1210,13 @@ export function PremiumScreen() {
             </Label>
           </Card>
         )}
-        <Label muted style={{ fontSize: 10, textAlign: 'center', color: '#7D8897' }}>
+        <Label muted style={{ fontSize: 10, textAlign: 'center', color: c.muted }}>
           Annulation possible à tout moment.
         </Label>
       </Page>
-    </LinearGradient>
+    </View>
   );
 }
-const initialNotices = [
-  {
-    id: 'saving',
-    type: 'saving_found',
-    resourceId: 'internet',
-    readAt: null,
-    group: 'Aujourd’hui',
-    icon: 'bulb-outline',
-    color: '#00D57A',
-    title: 'Nouvelle économie détectée',
-    body: 'Vous pouvez économiser 96 €/an sur votre abonnement Internet.',
-    time: '09:41',
-  },
-  {
-    id: 'sync',
-    type: 'sync_completed',
-    resourceId: null,
-    readAt: null,
-    group: 'Aujourd’hui',
-    icon: 'sync-outline',
-    color: '#00CCA4',
-    title: 'Votre analyse est terminée',
-    body: '12 abonnements détectés.',
-    time: '09:20',
-  },
-  {
-    id: 'price',
-    type: 'saving_found',
-    resourceId: 'auto',
-    readAt: null,
-    group: 'Hier',
-    icon: 'star-outline',
-    color: '#FFAE13',
-    title: 'Votre assurance pourrait être moins chère',
-    body: 'Nous avons trouvé une offre plus avantageuse.',
-    time: '18:22',
-  },
-];
 export function NotificationsScreen() {
   const nav = useNav();
   const [read, setRead] = useState<string[]>([]);
@@ -1263,9 +1231,26 @@ export function NotificationsScreen() {
     mutationFn: api.readNotification,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', token] }),
   });
+  const notificationGroup = (createdAt: string) => {
+    const created = new Date(createdAt);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const sameDay = (left: Date, right: Date) =>
+      left.getFullYear() === right.getFullYear() &&
+      left.getMonth() === right.getMonth() &&
+      left.getDate() === right.getDate();
+    if (sameDay(created, today)) return 'Aujourd’hui';
+    if (sameDay(created, yesterday)) return 'Hier';
+    return created.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: created.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+    });
+  };
   const liveNotices = (notifications.data ?? []).map((n) => ({
     ...n,
-    group: 'Aujourd’hui',
+    group: notificationGroup(n.createdAt),
     icon: n.type === 'saving_found' ? 'bulb-outline' : 'sync-outline',
     color: n.type === 'saving_found' ? '#00D57A' : '#00CCA4',
     time: new Date(n.createdAt).toLocaleTimeString('fr-FR', {
@@ -1273,8 +1258,8 @@ export function NotificationsScreen() {
       minute: '2-digit',
     }),
   }));
-  const notices = token ? liveNotices : PREVIEW_ENABLED ? initialNotices : [];
-  const groups = token ? ['Aujourd’hui'] : PREVIEW_ENABLED ? ['Aujourd’hui', 'Hier'] : [];
+  const notices = token ? liveNotices : [];
+  const groups = [...new Set(notices.map((notice) => notice.group))];
   const openNotice = (notice: (typeof notices)[number]) => {
     if (token && !notice.readAt) markRead.mutate(notice.id);
     if (!token) setRead([...read, notice.id]);
@@ -1349,80 +1334,79 @@ export function NotificationsScreen() {
 export function SystemScreen() {
   const nav = useNav();
   const route = useRoute<RouteProp<RootStackParams, 'System'>>();
+  const c = useColors();
+  const accent =
+    normalizeAccentColor(useSession((state) => state.accentColor)) ?? DEFAULT_ACCENT_COLOR;
   const kind = route.params.kind;
-  const [message, setMessage] = useState('');
   const content =
     kind === 'error'
       ? {
-          rect: [471, 878, 80, 46],
+          icon: 'alert-circle-outline' as IconName,
           title: 'Une erreur est survenue',
-          body: 'Impossible de récupérer vos\ntransactions. Veuillez réessayer.',
+          body: 'Impossible de récupérer vos transactions. Veuillez réessayer.',
           button: 'Réessayer',
+          color: '#E86D67',
         }
       : kind === 'empty'
         ? {
-            rect: [701, 880, 53, 37],
+            icon: 'leaf-outline' as IconName,
             title: 'Bonne nouvelle !',
-            body: 'Nous n’avons trouvé aucune économie\naujourd’hui. Nous continuons à analyser\nvos dépenses pour vous proposer\nde nouvelles opportunités.',
-            button: 'Parfait !',
+            body: 'Aucune nouvelle économie détectée aujourd’hui. L’analyse continue automatiquement.',
+            button: 'Retour à l’accueil',
+            color: accent,
           }
         : {
-            rect: [916, 879, 68, 40],
-            title: 'Bravo !',
-            body: 'Vous venez d’économiser',
-            button: 'Partager ma réussite',
+            icon: 'checkmark-circle-outline' as IconName,
+            title: 'Opération terminée',
+            body: 'Votre modification a bien été enregistrée.',
+            button: 'Retour à l’accueil',
+            color: c.success,
           };
   return (
     <Page
       fill
-      style={{ justifyContent: 'center', alignItems: 'center', gap: 18, paddingHorizontal: 28 }}
+      style={{ justifyContent: 'center', alignItems: 'center', gap: 16, paddingHorizontal: 28 }}
     >
-      <ReferenceCrop rect={content.rect as [number, number, number, number]} width={145} />
-      <Label style={{ fontSize: 25, lineHeight: 32, fontWeight: '700', textAlign: 'center' }}>
+      <View
+        style={{
+          width: 88,
+          height: 88,
+          borderRadius: 44,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: `${content.color}18`,
+        }}
+      >
+        <Ionicons name={content.icon} size={45} color={content.color} />
+      </View>
+      <Label style={{ fontSize: 25, lineHeight: 32, fontWeight: '900', textAlign: 'center' }}>
         {content.title}
       </Label>
-      <Label muted style={{ fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
+      <Label muted style={{ maxWidth: 310, fontSize: 13, lineHeight: 20, textAlign: 'center' }}>
         {content.body}
       </Label>
-      {kind === 'success' && (
-        <>
-          <Label style={{ fontSize: 35, lineHeight: 43, fontWeight: '700', color: '#16F894' }}>
-            180 €/an
-          </Label>
-          <Label muted>Continuez comme ça !</Label>
-          <Label muted style={{ fontSize: 10 }}>
-            Exemple de réussite · donnée de maquette
-          </Label>
-        </>
-      )}
-      <View style={{ width: '100%', marginTop: 6 }}>
-        <Button
-          title={content.button}
-          onPress={() => {
-            if (kind === 'success') {
-              void Share.share({ message: 'Exemple de la maquette : 180 €/an d’économie.' }).catch(
-                () => setMessage('Le partage n’est pas disponible sur cet appareil.'),
-              );
-            } else nav.navigate('Main', { screen: 'Home' });
-          }}
-        />
+      <View style={{ width: '100%', marginTop: 8 }}>
+        <Button title={content.button} onPress={() => nav.navigate('Main', { screen: 'Home' })} />
       </View>
-      {kind === 'error' && (
+      {kind === 'error' ? (
         <Pressable
           onPress={() => nav.navigate('Info', { kind: 'support' })}
           accessibilityRole="button"
           style={{ padding: 10 }}
         >
-          <Label style={{ color: '#168CFF', fontSize: 14 }}>Contacter le support</Label>
+          <Label style={{ color: accent, fontSize: 13, fontWeight: '700' }}>
+            Contacter le support
+          </Label>
         </Pressable>
-      )}
-      {message && <Label muted>{message}</Label>}
+      ) : null}
     </Page>
   );
 }
 export function InfoScreen() {
   const route = useRoute<RouteProp<RootStackParams, 'Info'>>();
   const nav = useNav();
+  const accent =
+    normalizeAccentColor(useSession((state) => state.accentColor)) ?? DEFAULT_ACCENT_COLOR;
   const kind = route.params.kind;
   return (
     <Page style={{ paddingTop: 64 }}>
@@ -1435,7 +1419,7 @@ export function InfoScreen() {
               : 'help-circle-outline'
         }
         size={48}
-        color="#168CFF"
+        color={accent}
       />
       <Label style={{ fontSize: 23, lineHeight: 30, fontWeight: '700' }}>
         {kind === 'security'
@@ -1462,17 +1446,20 @@ export function InfoScreen() {
 }
 export function MenuScreen() {
   const nav = useNav();
+  const accent =
+    normalizeAccentColor(useSession((state) => state.accentColor)) ?? DEFAULT_ACCENT_COLOR;
   return (
     <Page style={{ gap: 20, paddingTop: 64 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ backgroundColor: '#0674FF', borderRadius: 7, padding: 5 }}>
-          <Ionicons name="layers" color="white" size={20} />
+        <View style={{ backgroundColor: accent, borderRadius: 9, padding: 6 }}>
+          <Ionicons name="layers" color={accentTextColor(accent)} size={20} />
         </View>
         <Label style={{ fontWeight: '700' }}>Votre application</Label>
       </View>
       {[
         ['home-outline', 'Accueil', 'Home'],
         ['reader-outline', 'Abonnements', 'Subscriptions'],
+        ['wallet-outline', 'Finances', 'Finances'],
         ['water-outline', 'Économies', 'Savings'],
         ['star-outline', 'Premium', 'Premium'],
         ['person-outline', 'Profil', 'Profile'],
@@ -1483,7 +1470,7 @@ export function MenuScreen() {
           onPress={() => nav.navigate('Main', { screen: screen as 'Home' })}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 15, minHeight: 44 }}
         >
-          <Ionicons name={icon as IconName} color="#D5E0F1" size={23} />
+          <Ionicons name={icon as IconName} color={accent} size={23} />
           <Label>{label}</Label>
         </Pressable>
       ))}

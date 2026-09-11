@@ -218,14 +218,8 @@ function Navigator({ onChange }: { onChange: () => void }) {
     >
       <Stack.Navigator
         initialRouteName={token || PREVIEW_ENABLED ? 'Main' : 'Welcome'}
-        screenOptions={({ route, navigation: nav }) => ({
-          contentStyle: {
-            backgroundColor: ['Subscription', 'Recommendation', 'Login', 'Register'].includes(
-              route.name,
-            )
-              ? '#020609'
-              : c.background,
-          },
+        screenOptions={({ navigation: nav }) => ({
+          contentStyle: { backgroundColor: c.background },
           animation: 'fade',
           headerTransparent: true,
           header: ({ options }) => {
@@ -241,13 +235,13 @@ function Navigator({ onChange }: { onChange: () => void }) {
                     borderRadius: 17,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: pressed ? '#87929CBF' : '#5B6874CC',
+                    backgroundColor: c.surface,
                     borderWidth: 1,
-                    borderColor: '#EFF4F54A',
+                    borderColor: c.border,
                     opacity: pressed ? 0.78 : 1,
                   })}
                 >
-                  <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+                  <Ionicons name="chevron-back" size={20} color={c.text} />
                 </Pressable>
                 {options.title ? (
                   <View
@@ -263,9 +257,9 @@ function Navigator({ onChange }: { onChange: () => void }) {
                         paddingHorizontal: 14,
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: '#5B6874B8',
+                        backgroundColor: c.surface,
                         borderWidth: 1,
-                        borderColor: '#EFF4F536',
+                        borderColor: c.border,
                       }}
                     >
                       <Label style={{ textAlign: 'center', fontSize: 13, fontWeight: '600' }}>
