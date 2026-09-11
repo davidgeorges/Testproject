@@ -18,7 +18,7 @@
 | RevenueCat | entitlement `premium`, offering `default`, uniquement les produits Test Store `monthly` et `yearly` | validé et nettoyé |
 | Stores réels | produits App Store Connect et Play Console | comptes développeur et produits stores requis |
 | Partenaires | Free, Sosh et B&You documentés comme candidats inactifs et non partenaires | publication bloquée jusqu’aux accords commerciaux |
-| Identité | noms techniques encore provisoires | choix commercial et recherche de marque définitive requis |
+| Identité | nom visible **Clarysio**, icône et splash dédiés ; identifiants techniques historiques conservés pour Firebase/Tink/EAS | recherche d’antériorité juridique requise avant publication |
 
 ## Matrice de recette sur appareils réels
 

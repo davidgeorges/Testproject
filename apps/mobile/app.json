@@ -1,10 +1,16 @@
 {
   "expo": {
-    "name": "Projet abonnements",
+    "name": "Clarysio",
     "slug": "subscription-project",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/clarysio-icon.png",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/clarysio-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#17181B"
+    },
     "scheme": "subscriptionapp",
     "ios": {
       "supportsTablet": true,
@@ -19,7 +25,11 @@
     },
     "android": {
       "package": "com.davidgeorges.subscriptionapp",
-      "versionCode": 1
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/clarysio-icon.png",
+        "backgroundColor": "#17181B"
+      }
     },
     "web": {
       "bundler": "metro",

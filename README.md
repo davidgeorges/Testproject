@@ -1,6 +1,6 @@
-# Projet abonnements
+# Clarysio
 
-Application de gestion d’abonnements issue du cahier des charges fourni. Le nom commercial reste à choisir. Les noms techniques `SubscriptionApp` et `subscription-project` sont provisoires.
+Assistant personnel de budget, de documents et de foyer issu du cahier des charges fourni. Le nom commercial visible est **Clarysio**. Les identifiants techniques historiques `SubscriptionApp`, `subscription-project` et `subscriptionapp` restent stables afin de préserver les connexions Firebase, Expo et Tink déjà configurées.
 
 L’application Expo communique avec une API ASP.NET Core .NET 10. Son interface reproduit la composition mobile de la maquette sombre fournie. En production, les données viennent exclusivement de Firebase, Tink, PostgreSQL et RevenueCat. Les données de présentation ne sont accessibles que si `EXPO_PUBLIC_ENABLE_PREVIEW=true` est explicitement défini en développement. Les détails de l’interface sont dans [docs/ui-reference.md](docs/ui-reference.md).
 
