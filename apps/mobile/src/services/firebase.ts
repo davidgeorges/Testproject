@@ -112,6 +112,7 @@ export function useGoogleSignIn() {
       iosClientId: usesExpoGo ? webClientId : (iosClientId ?? webClientId),
       webClientId,
       redirectUri: webRedirectUri ?? expoProxyRedirectUri,
+      selectAccount: true,
     },
     iosRedirectScheme ? { native: `${iosRedirectScheme}:/oauthredirect` } : undefined,
   );
