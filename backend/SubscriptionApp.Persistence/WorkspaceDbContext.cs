@@ -31,6 +31,7 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
     public DbSet<StoredRecommendation> StoredRecommendations => Set<StoredRecommendation>();
     public DbSet<AccountDeletionJob> AccountDeletionJobs => Set<AccountDeletionJob>();
     public DbSet<UserDocument> Documents => Set<UserDocument>();
+    public DbSet<UserDeadline> Deadlines => Set<UserDeadline>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -249,6 +250,17 @@ public sealed class WorkspaceDbContext(DbContextOptions<WorkspaceDbContext> opti
         b.Entity<UserDocument>().Property(d => d.ProcessingError).HasMaxLength(80);
         b.Entity<UserDocument>().Property(d => d.Amount).HasPrecision(18, 2);
         b.Entity<UserDocument>()
+            .HasOne<UserProfile>()
+            .WithMany()
+            .HasForeignKey(d => d.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<UserDeadline>().ToTable("deadlines").HasKey(d => d.Id);
+        b.Entity<UserDeadline>().HasIndex(d => new { d.UserId, d.DueAt });
+        b.Entity<UserDeadline>().HasIndex(d => new { d.ReminderSentAt, d.CompletedAt, d.DueAt });
+        b.Entity<UserDeadline>().Property(d => d.Title).HasMaxLength(160);
+        b.Entity<UserDeadline>().Property(d => d.Category).HasMaxLength(40);
+        b.Entity<UserDeadline>().Property(d => d.Notes).HasMaxLength(1000);
+        b.Entity<UserDeadline>()
             .HasOne<UserProfile>()
             .WithMany()
             .HasForeignKey(d => d.UserId)

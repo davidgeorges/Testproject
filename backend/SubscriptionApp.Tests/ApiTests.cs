@@ -130,6 +130,42 @@ public sealed class ApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task DeadlinesArePersistedEditableCompletableAndDeletable()
+    {
+        using var c = await Session();
+        var dueAt = DateTimeOffset.UtcNow.AddDays(5);
+        var createdResponse = await c.PostAsJsonAsync("/api/v1/deadlines", new
+        {
+            title = "Renouveler l’assurance",
+            category = "insurance",
+            notes = "Comparer les offres",
+            dueAt,
+            reminderMinutesBefore = 4320,
+            completed = false,
+        });
+        Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
+        var created = (await createdResponse.Content.ReadFromJsonAsync<JsonElement>());
+        var id = created.GetProperty("id").GetString();
+
+        var list = (await c.GetFromJsonAsync<JsonElement[]>("/api/v1/deadlines"))!;
+        Assert.Contains(list, item => item.GetProperty("id").GetString() == id);
+
+        var updated = await c.PatchAsJsonAsync($"/api/v1/deadlines/{id}", new
+        {
+            title = "Assurance auto",
+            category = "insurance",
+            notes = (string?)null,
+            dueAt,
+            reminderMinutesBefore = 1440,
+            completed = true,
+        });
+        updated.EnsureSuccessStatusCode();
+        Assert.NotEqual(JsonValueKind.Null, (await updated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("completedAt").ValueKind);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/deadlines/{id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task ProfileAccentColorIsValidatedNormalizedAndPersisted()
     {
         using var c = await Session();

@@ -36,6 +36,7 @@ import {
 } from '../design/MainScreens';
 import { FinancesScreen } from '../features/finances/Finances';
 import { DocumentsScreen, DocumentDetailScreen } from '../features/documents/Documents';
+import { DeadlinesScreen } from '../features/deadlines/Deadlines';
 import {
   Welcome,
   Login,
@@ -322,6 +323,7 @@ function Navigator({ onChange }: { onChange: () => void }) {
         <Stack.Screen name="Menu" component={MenuScreen} options={{ title: 'Menu' }} />
         <Stack.Screen name="Documents" component={DocumentsScreen} options={{ title: '' }} />
         <Stack.Screen name="Document" component={DocumentDetailScreen} options={{ title: '' }} />
+        <Stack.Screen name="Deadlines" component={DeadlinesScreen} options={{ title: '' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -250,6 +250,21 @@ public sealed class UserDocument
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
+public sealed class UserDeadline
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string UserId { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Category { get; set; } = "other";
+    public string? Notes { get; set; }
+    public DateTimeOffset DueAt { get; set; }
+    public int ReminderMinutesBefore { get; set; } = 1440;
+    public DateTimeOffset? ReminderSentAt { get; set; }
+    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 public sealed class StoredRecurringPayment
 {
     public string Id { get; set; } = "";

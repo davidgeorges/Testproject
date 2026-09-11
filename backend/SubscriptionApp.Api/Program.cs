@@ -265,10 +265,12 @@ builder.Services.AddScoped<ConsentExpiryProcessor>();
 builder.Services.AddScoped<BankSyncProcessor>();
 builder.Services.AddScoped<PushDeliveryProcessor>();
 builder.Services.AddScoped<PushReceiptProcessor>();
+builder.Services.AddScoped<DeadlineReminderProcessor>();
 builder.Services.AddHostedService<ConsentExpiryWorker>();
 builder.Services.AddHostedService<BankSyncWorker>();
 builder.Services.AddHostedService<PushDeliveryWorker>();
 builder.Services.AddHostedService<PushReceiptWorker>();
+builder.Services.AddHostedService<DeadlineReminderWorker>();
 builder.Services.AddHostedService<DataRetentionWorker>();
 builder.Services.AddHostedService<AccountDeletionWorker>();
 var connectionString = builder.Configuration.GetConnectionString("Postgres");
@@ -925,6 +927,91 @@ api.MapDelete(
     {
         if (!await store.RemoveDocument(User(c), id, ct)) return Missing(c);
         await Audit(store, c, "document.deleted", "document", id.ToString(), ct);
+        return Results.NoContent();
+    }
+);
+api.MapGet(
+    "/deadlines",
+    async (HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+    {
+        var manual = (await store.Deadlines(User(c), ct)).Select(d => new DeadlineResponse(
+            d.Id.ToString(), d.Title, d.Category, d.Notes, d.DueAt,
+            d.ReminderMinutesBefore, d.ReminderSentAt, d.CompletedAt,
+            "manual", null, true));
+        var documents = (await store.Documents(User(c), ct))
+            .Where(d => d.DueDate is not null)
+            .Select(d => new DeadlineResponse(
+                $"document:{d.Id}", d.Title, d.Category, d.Issuer,
+                new DateTimeOffset(d.DueDate!.Value.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero),
+                null, null, null, "document", d.Id.ToString(), false));
+        return Results.Ok(manual.Concat(documents).OrderBy(d => d.DueAt));
+    }
+);
+api.MapPost(
+    "/deadlines",
+    async (DeadlineRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        string[] categories = ["administrative", "invoice", "insurance", "housing", "vehicle", "health", "tax", "subscription", "other"];
+        if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Length > 160
+            || !categories.Contains(request.Category) || request.Notes?.Length > 1000
+            || request.ReminderMinutesBefore is < 0 or > 525600)
+            return Results.BadRequest(new { code = "INVALID_DEADLINE", message = "Vérifiez les informations de l’échéance." });
+        var now = time.GetUtcNow();
+        var deadline = new UserDeadline
+        {
+            UserId = User(c),
+            Title = request.Title.Trim(),
+            Category = request.Category,
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            DueAt = request.DueAt,
+            ReminderMinutesBefore = request.ReminderMinutesBefore,
+            CompletedAt = request.Completed ? now : null,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await store.AddDeadline(deadline, ct);
+        await Audit(store, c, "deadline.created", "deadline", deadline.Id.ToString(), ct);
+        return Results.Created($"/api/v1/deadlines/{deadline.Id}", new DeadlineResponse(
+            deadline.Id.ToString(), deadline.Title, deadline.Category, deadline.Notes,
+            deadline.DueAt, deadline.ReminderMinutesBefore, null, deadline.CompletedAt,
+            "manual", null, true));
+    }
+);
+api.MapPatch(
+    "/deadlines/{id:guid}",
+    async (Guid id, DeadlineRequest request, HttpContext c, IWorkspaceStore store, TimeProvider time, CancellationToken ct) =>
+    {
+        var deadline = await store.Deadline(User(c), id, ct);
+        if (deadline is null) return Missing(c);
+        string[] categories = ["administrative", "invoice", "insurance", "housing", "vehicle", "health", "tax", "subscription", "other"];
+        if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Length > 160
+            || !categories.Contains(request.Category) || request.Notes?.Length > 1000
+            || request.ReminderMinutesBefore is < 0 or > 525600)
+            return Results.BadRequest(new { code = "INVALID_DEADLINE", message = "Vérifiez les informations de l’échéance." });
+        var scheduleChanged = deadline.DueAt != request.DueAt
+            || deadline.ReminderMinutesBefore != request.ReminderMinutesBefore;
+        deadline.Title = request.Title.Trim();
+        deadline.Category = request.Category;
+        deadline.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+        deadline.DueAt = request.DueAt;
+        deadline.ReminderMinutesBefore = request.ReminderMinutesBefore;
+        deadline.CompletedAt = request.Completed ? deadline.CompletedAt ?? time.GetUtcNow() : null;
+        if (scheduleChanged || !request.Completed) deadline.ReminderSentAt = null;
+        deadline.UpdatedAt = time.GetUtcNow();
+        await store.SaveDeadline(deadline, ct);
+        await Audit(store, c, "deadline.updated", "deadline", id.ToString(), ct);
+        return Results.Ok(new DeadlineResponse(
+            deadline.Id.ToString(), deadline.Title, deadline.Category, deadline.Notes,
+            deadline.DueAt, deadline.ReminderMinutesBefore, deadline.ReminderSentAt,
+            deadline.CompletedAt, "manual", null, true));
+    }
+);
+api.MapDelete(
+    "/deadlines/{id:guid}",
+    async (Guid id, HttpContext c, IWorkspaceStore store, CancellationToken ct) =>
+    {
+        if (!await store.RemoveDeadline(User(c), id, ct)) return Missing(c);
+        await Audit(store, c, "deadline.deleted", "deadline", id.ToString(), ct);
         return Results.NoContent();
     }
 );
@@ -1901,6 +1988,27 @@ public sealed record DocumentUpdateRequest(
     DateOnly? DocumentDate,
     DateOnly? DueDate,
     string? ContractNumber
+);
+public sealed record DeadlineRequest(
+    string Title,
+    string Category,
+    string? Notes,
+    DateTimeOffset DueAt,
+    int ReminderMinutesBefore,
+    bool Completed
+);
+public sealed record DeadlineResponse(
+    string Id,
+    string Title,
+    string Category,
+    string? Notes,
+    DateTimeOffset DueAt,
+    int? ReminderMinutesBefore,
+    DateTimeOffset? ReminderSentAt,
+    DateTimeOffset? CompletedAt,
+    string SourceType,
+    string? SourceId,
+    bool Editable
 );
 
 public sealed record OfferRequest(

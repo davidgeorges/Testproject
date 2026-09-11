@@ -37,6 +37,14 @@ public interface IWorkspaceStore
     Task AddDocument(UserDocument document, CancellationToken ct);
     Task SaveDocument(UserDocument document, CancellationToken ct);
     Task<bool> RemoveDocument(string userId, Guid id, CancellationToken ct);
+    Task<IReadOnlyList<UserDeadline>> Deadlines(string userId, CancellationToken ct);
+    Task<UserDeadline?> Deadline(string userId, Guid id, CancellationToken ct);
+    Task AddDeadline(UserDeadline deadline, CancellationToken ct);
+    Task SaveDeadline(UserDeadline deadline, CancellationToken ct);
+    Task<bool> RemoveDeadline(string userId, Guid id, CancellationToken ct);
+    Task<IReadOnlyList<UserDeadline>> DueDeadlineReminders(DateTimeOffset now, int limit, CancellationToken ct);
+    Task MarkDeadlineReminderSent(Guid id, DateTimeOffset sentAt, CancellationToken ct);
+    Task<IReadOnlyList<UserDocument>> DueDocumentDeadlines(DateOnly from, DateOnly until, CancellationToken ct);
     Task Synchronize(
         BankConnection connection,
         IReadOnlyList<BankTransaction> transactions,
@@ -259,7 +267,8 @@ public sealed record UserDataExport(
     IReadOnlyList<PremiumWebhookEvent> PremiumWebhookEvents,
     IReadOnlyList<StoredRecurringPayment> StoredPayments,
     IReadOnlyList<StoredRecommendation> StoredRecommendations,
-    IReadOnlyList<ExportedDocument> Documents
+    IReadOnlyList<ExportedDocument> Documents,
+    IReadOnlyList<UserDeadline> Deadlines
 );
 
 public sealed record ExportedDocument(

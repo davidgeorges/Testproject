@@ -205,3 +205,17 @@ export interface UserDocument {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Deadline {
+  id: string;
+  title: string;
+  category: string;
+  notes: string | null;
+  dueAt: string;
+  reminderMinutesBefore: number | null;
+  reminderSentAt: string | null;
+  completedAt: string | null;
+  sourceType: 'manual' | 'document';
+  sourceId: string | null;
+  editable: boolean;
+}

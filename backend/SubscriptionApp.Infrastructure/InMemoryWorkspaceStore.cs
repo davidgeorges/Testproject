@@ -28,6 +28,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     private readonly List<CategoryBudget> categoryBudgets = [];
     private readonly List<AccountDeletionJob> accountDeletionJobs = [];
     private readonly List<UserDocument> documents = [];
+    private readonly List<UserDeadline> deadlines = [];
 
     public Task<UserProfile> Profile(string userId, CancellationToken ct)
     {
@@ -75,6 +76,59 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     public Task<bool> RemoveDocument(string userId, Guid id, CancellationToken ct)
     {
         lock (gate) return Task.FromResult(documents.RemoveAll(d => d.UserId == userId && d.Id == id) > 0);
+    }
+
+    public Task<IReadOnlyList<UserDeadline>> Deadlines(string userId, CancellationToken ct)
+    {
+        lock (gate) return Task.FromResult<IReadOnlyList<UserDeadline>>(
+            deadlines.Where(d => d.UserId == userId).OrderBy(d => d.DueAt).ToArray());
+    }
+
+    public Task<UserDeadline?> Deadline(string userId, Guid id, CancellationToken ct)
+    {
+        lock (gate) return Task.FromResult(deadlines.FirstOrDefault(d => d.UserId == userId && d.Id == id));
+    }
+
+    public Task AddDeadline(UserDeadline deadline, CancellationToken ct)
+    {
+        lock (gate) deadlines.Add(deadline);
+        return Task.CompletedTask;
+    }
+
+    public Task SaveDeadline(UserDeadline deadline, CancellationToken ct) => Task.CompletedTask;
+
+    public Task<bool> RemoveDeadline(string userId, Guid id, CancellationToken ct)
+    {
+        lock (gate) return Task.FromResult(deadlines.RemoveAll(d => d.UserId == userId && d.Id == id) > 0);
+    }
+
+    public Task<IReadOnlyList<UserDeadline>> DueDeadlineReminders(DateTimeOffset now, int limit, CancellationToken ct)
+    {
+        lock (gate) return Task.FromResult<IReadOnlyList<UserDeadline>>(deadlines
+            .Where(d => d.CompletedAt is null && d.ReminderSentAt is null
+                && d.DueAt.AddMinutes(-d.ReminderMinutesBefore) <= now)
+            .OrderBy(d => d.DueAt).Take(limit).ToArray());
+    }
+
+    public Task MarkDeadlineReminderSent(Guid id, DateTimeOffset sentAt, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            var deadline = deadlines.FirstOrDefault(d => d.Id == id);
+            if (deadline is not null && deadline.ReminderSentAt is null) deadline.ReminderSentAt = sentAt;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<UserDocument>> DueDocumentDeadlines(
+        DateOnly from,
+        DateOnly until,
+        CancellationToken ct
+    )
+    {
+        lock (gate) return Task.FromResult<IReadOnlyList<UserDocument>>(documents
+            .Where(d => d.DueDate >= from && d.DueDate <= until)
+            .OrderBy(d => d.DueDate).ToArray());
     }
 
     public Task<IReadOnlyList<BankConnection>> Connections(string userId, CancellationToken ct)
@@ -625,7 +679,8 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
                     documents.Where(d => d.UserId == userId).Select(d => new ExportedDocument(
                         d.Id, d.OriginalFileName, d.ContentType, d.Size, d.Status, d.Category,
                         d.Title, d.Issuer, d.ExtractedText, d.Amount, d.DocumentDate, d.DueDate,
-                        d.ContractNumber, d.CreatedAt, d.UpdatedAt)).ToArray()
+                        d.ContractNumber, d.CreatedAt, d.UpdatedAt)).ToArray(),
+                    deadlines.Where(d => d.UserId == userId).ToArray()
                 )
             );
         }
@@ -773,6 +828,7 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
             categoryRules.RemoveAll(r => r.UserId == userId);
             categoryBudgets.RemoveAll(b => b.UserId == userId);
             documents.RemoveAll(d => d.UserId == userId);
+            deadlines.RemoveAll(d => d.UserId == userId);
             events.RemoveAll(e => e.UserId == userId);
             affiliateConversions.RemoveAll(c => c.UserId == userId);
             consents.RemoveAll(c => c.UserId == userId);

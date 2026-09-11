@@ -26,4 +26,5 @@ export type RootStackParams = {
   Info: { kind: 'security' | 'privacy' | 'support' };
   Documents: undefined;
   Document: { id: string };
+  Deadlines: undefined;
 };

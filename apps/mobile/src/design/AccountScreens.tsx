@@ -161,8 +161,14 @@ export function ProfileScreen() {
     {
       icon: 'folder-open-outline',
       title: 'Mes documents',
-      subtitle: 'Imports, analyses et échéances',
+      subtitle: 'Imports, analyses et classement',
       onPress: () => nav.navigate('Documents'),
+    },
+    {
+      icon: 'calendar-outline',
+      title: 'Mes échéances',
+      subtitle: 'Calendrier, rappels et dates importantes',
+      onPress: () => nav.navigate('Deadlines'),
     },
     {
       icon: 'notifications-outline',
@@ -1257,8 +1263,18 @@ export function NotificationsScreen() {
   const liveNotices = (notifications.data ?? []).map((n) => ({
     ...n,
     group: notificationGroup(n.createdAt),
-    icon: n.type === 'saving_found' ? 'bulb-outline' : 'sync-outline',
-    color: n.type === 'saving_found' ? '#00D57A' : '#00CCA4',
+    icon:
+      n.type === 'saving_found'
+        ? 'bulb-outline'
+        : n.type === 'deadline_reminder' || n.type === 'document_deadline'
+          ? 'calendar-outline'
+          : 'sync-outline',
+    color:
+      n.type === 'saving_found'
+        ? '#00D57A'
+        : n.type === 'deadline_reminder' || n.type === 'document_deadline'
+          ? '#8A76FF'
+          : '#00CCA4',
     time: new Date(n.createdAt).toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit',
@@ -1271,6 +1287,9 @@ export function NotificationsScreen() {
     if (!token) setRead([...read, notice.id]);
     if (notice.type === 'saving_found' && notice.resourceId)
       nav.navigate('Recommendation', { id: notice.resourceId });
+    else if (notice.type === 'document_deadline' && notice.resourceId)
+      nav.navigate('Document', { id: notice.resourceId });
+    else if (notice.type === 'deadline_reminder') nav.navigate('Deadlines');
     else nav.navigate('Main');
   };
   return (

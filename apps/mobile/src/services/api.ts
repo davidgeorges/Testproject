@@ -15,6 +15,7 @@ import type {
   PremiumStatus,
   Recommendation,
   UserDocument,
+  Deadline,
   DocumentCategory,
 } from '../types/api';
 export const API_URL =
@@ -262,6 +263,32 @@ export const api = {
       );
     return response.blob();
   },
+  deadlines: () => request<Deadline[]>('/deadlines'),
+  createDeadline: (value: {
+    title: string;
+    category: string;
+    notes: string | null;
+    dueAt: string;
+    reminderMinutesBefore: number;
+    completed: boolean;
+  }) => request<Deadline>('/deadlines', { method: 'POST', body: JSON.stringify(value) }),
+  updateDeadline: (
+    id: string,
+    value: {
+      title: string;
+      category: string;
+      notes: string | null;
+      dueAt: string;
+      reminderMinutesBefore: number;
+      completed: boolean;
+    },
+  ) =>
+    request<Deadline>(`/deadlines/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(value),
+    }),
+  deleteDeadline: (id: string) =>
+    request(`/deadlines/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   verifyRevenueCat: (productId: string, transactionId: string, key: string) =>
     request<PremiumStatus>('/premium/verify-purchase', {
       method: 'POST',

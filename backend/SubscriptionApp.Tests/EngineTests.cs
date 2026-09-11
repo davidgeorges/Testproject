@@ -53,6 +53,28 @@ public sealed class EngineTests
     }
 
     [Fact]
+    public async Task DueDeadlineCreatesOnlyOneReminderNotification()
+    {
+        var store = new InMemoryWorkspaceStore();
+        var deadline = new UserDeadline
+        {
+            UserId = Guid.NewGuid().ToString(),
+            Title = "Échéance test",
+            DueAt = DateTimeOffset.UtcNow.AddMinutes(30),
+            ReminderMinutesBefore = 60,
+        };
+        await store.AddDeadline(deadline, default);
+        var processor = new DeadlineReminderProcessor(store, TimeProvider.System);
+
+        await processor.RunOnce(default);
+        await processor.RunOnce(default);
+
+        var notification = Assert.Single(await store.Notifications(deadline.UserId, default));
+        Assert.Equal("deadline_reminder", notification.Type);
+        Assert.Equal(deadline.Id.ToString(), notification.ResourceId);
+    }
+
+    [Fact]
     public void CalendarMonthEndsAreRecognized()
     {
         var dates = new[]

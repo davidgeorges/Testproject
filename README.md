@@ -76,6 +76,10 @@ Le coffre documentaire accepte les PDF, JPEG et PNG jusqu’à 10 Mo. Les fichie
 
 Les clés Data Protection persistées sont indispensables pour relire les documents après un redéploiement. Leur perte rend les fichiers stockés illisibles.
 
+## Échéances et rappels
+
+Le calendrier réunit les échéances créées par l’utilisateur et les dates détectées dans ses documents. Les échéances manuelles, leur catégorie, leur note, leur date, leur heure, leur délai de rappel et leur état sont persistés dans PostgreSQL. Un traitement serveur vérifie les rappels toutes les cinq minutes et crée une notification unique, ensuite distribuée par le pipeline Expo/FCM existant. Les dates provenant d’un document ouvrent directement ce document et déclenchent un rappel sept jours avant l’échéance.
+
 ## Vérifier le code
 
 ```powershell

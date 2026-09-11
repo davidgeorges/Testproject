@@ -283,6 +283,55 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
     public async Task<bool> RemoveDocument(string userId, Guid id, CancellationToken ct) =>
         await db.Documents.Where(d => d.UserId == userId && d.Id == id).ExecuteDeleteAsync(ct) > 0;
 
+    public async Task<IReadOnlyList<UserDeadline>> Deadlines(string userId, CancellationToken ct) =>
+        await db.Deadlines.AsNoTracking()
+            .Where(d => d.UserId == userId)
+            .OrderBy(d => d.DueAt)
+            .ToListAsync(ct);
+
+    public async Task<UserDeadline?> Deadline(string userId, Guid id, CancellationToken ct) =>
+        await db.Deadlines.SingleOrDefaultAsync(d => d.UserId == userId && d.Id == id, ct);
+
+    public async Task AddDeadline(UserDeadline deadline, CancellationToken ct)
+    {
+        await Profile(deadline.UserId, ct);
+        db.Deadlines.Add(deadline);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task SaveDeadline(UserDeadline deadline, CancellationToken ct)
+    {
+        db.Deadlines.Update(deadline);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> RemoveDeadline(string userId, Guid id, CancellationToken ct) =>
+        await db.Deadlines.Where(d => d.UserId == userId && d.Id == id).ExecuteDeleteAsync(ct) > 0;
+
+    public async Task<IReadOnlyList<UserDeadline>> DueDeadlineReminders(
+        DateTimeOffset now,
+        int limit,
+        CancellationToken ct
+    ) => await db.Deadlines.AsNoTracking()
+        .Where(d => d.CompletedAt == null && d.ReminderSentAt == null
+            && d.DueAt.AddMinutes(-d.ReminderMinutesBefore) <= now)
+        .OrderBy(d => d.DueAt)
+        .Take(limit)
+        .ToListAsync(ct);
+
+    public async Task MarkDeadlineReminderSent(Guid id, DateTimeOffset sentAt, CancellationToken ct) =>
+        _ = await db.Deadlines.Where(d => d.Id == id && d.ReminderSentAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.ReminderSentAt, sentAt), ct);
+
+    public async Task<IReadOnlyList<UserDocument>> DueDocumentDeadlines(
+        DateOnly from,
+        DateOnly until,
+        CancellationToken ct
+    ) => await db.Documents.AsNoTracking()
+        .Where(d => d.DueDate != null && d.DueDate >= from && d.DueDate <= until)
+        .OrderBy(d => d.DueDate)
+        .ToListAsync(ct);
+
     public async Task<bool> SaveAffiliateConversion(AffiliateConversion conversion, CancellationToken ct)
     {
         if (await db.AffiliateConversions.AnyAsync(c => c.Provider == conversion.Provider && c.ExternalConversionId == conversion.ExternalConversionId, ct)) return false;
@@ -545,6 +594,7 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             d.Id, d.OriginalFileName, d.ContentType, d.Size, d.Status, d.Category, d.Title,
             d.Issuer, d.ExtractedText, d.Amount, d.DocumentDate, d.DueDate, d.ContractNumber,
             d.CreatedAt, d.UpdatedAt)).ToArray();
+        var deadlines = await Deadlines(userId, ct);
         return new(
             DateTimeOffset.UtcNow,
             profile,
@@ -565,7 +615,8 @@ public sealed class PostgresWorkspaceStore(WorkspaceDbContext db) : IWorkspaceSt
             premiumEvents,
             storedPayments,
             storedRecommendations,
-            documents
+            documents,
+            deadlines
         );
     }
 
