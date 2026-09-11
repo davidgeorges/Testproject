@@ -288,7 +288,11 @@ function Navigator({ onChange }: { onChange: () => void }) {
       >
         <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
         <Stack.Screen name="Welcome" component={Welcome} options={{ headerShown: false }} />
-        <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen
+          name="Login"
+          component={Login}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
         <Stack.Screen name="Register" component={Register} />
         <Stack.Screen
           name="ResetPassword"
