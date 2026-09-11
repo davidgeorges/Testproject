@@ -111,12 +111,14 @@ export function useGoogleSignIn() {
   const iosRedirectScheme = iosClientId
     ? `com.googleusercontent.apps.${iosClientId.split('.apps.googleusercontent.com')[0]}`
     : undefined;
-  const [request, , promptAsync] = Google.useIdTokenAuthRequest(
+  const [request, , promptAsync] = Google.useAuthRequest(
     {
       androidClientId: androidClientId ?? webClientId,
       iosClientId: usesExpoGo ? webClientId : (iosClientId ?? webClientId),
       webClientId,
       redirectUri: webRedirectUri ?? expoProxyRedirectUri,
+      responseType:
+        usesExpoGo || Platform.OS === 'web' ? AuthSession.ResponseType.IdToken : undefined,
       selectAccount: true,
     },
     iosRedirectScheme ? { native: `${iosRedirectScheme}:/oauthredirect` } : undefined,
