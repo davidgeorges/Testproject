@@ -4,7 +4,7 @@ COPY . .
 RUN dotnet restore SubscriptionApp.sln --locked-mode \
     && dotnet publish backend/SubscriptionApp.Api/SubscriptionApp.Api.csproj -c Release --no-restore -o /app /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-alpine
 WORKDIR /app
 RUN apk add --no-cache icu-libs krb5-libs poppler-utils tesseract-ocr tesseract-ocr-data-fra tesseract-ocr-data-eng
 ENV ASPNETCORE_URLS=http://+:8080 \
